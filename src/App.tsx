@@ -7,6 +7,9 @@ import Products from './components/Products';
 import Sellers from './components/Sellers';
 import CTABanner from './components/CTABanner';
 import Footer from './components/Footer';
+import CatalogPage from './pages/Catalog';
+import ProductDetailPage from './pages/ProductDetail';
+import VendorShopPage from './pages/VendorShop';
 import {
   LoginPage,
   RegisterClientPage,
@@ -61,6 +64,9 @@ export default function App() {
       <Router>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/catalogue" element={<CatalogPage />} />
+          <Route path="/produit/:slug" element={<ProductDetailPage />} />
+          <Route path="/boutique/:slug" element={<VendorShopPage />} />
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/auth/register/client" element={<RegisterClientPage />} />
           <Route path="/auth/register/vendor" element={<RegisterVendorPage />} />

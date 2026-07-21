@@ -1,11 +1,22 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, MapPin, User, Menu, X, ChevronDown, Truck, Shield, Headphones, CreditCard, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const cities = ['Dakar', 'Ouagadougou', 'Bamako'];
 
+const navItems = [
+  { label: 'Toutes les catégories', to: '/catalogue' },
+  { label: 'Électronique', to: '/catalogue?category=%C3%89lectronique' },
+  { label: 'Mode', to: '/catalogue?category=Mode' },
+  { label: 'Maison', to: '/catalogue?category=Maison' },
+  { label: 'Beauté', to: '/catalogue?category=Beaut%C3%A9' },
+  { label: 'Alimentation', to: '/catalogue?category=Alimentation' },
+  { label: 'Envoi de Colis', to: '/catalogue' },
+];
+
 export default function Header() {
+  const navigate = useNavigate();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [city, setCity] = useState('Dakar');
   const [cityOpen, setCityOpen] = useState(false);
@@ -19,6 +30,16 @@ export default function Header() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const goSearch = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const q = searchQuery.trim();
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (city) params.set('city', city);
+    navigate(`/catalogue?${params.toString()}`);
+    setMobileMenuOpen(false);
+  };
 
   return (
     <header className={`sticky top-0 z-50 bg-white transition-shadow duration-300 ${scrolled ? 'shadow-lg' : 'shadow-sm'}`}>
@@ -54,7 +75,7 @@ export default function Header() {
           </Link>
 
           {/* Search bar */}
-          <div className="hidden md:flex flex-1 max-w-xl relative">
+          <form onSubmit={goSearch} className="hidden md:flex flex-1 max-w-xl relative">
             <input
               type="text"
               value={searchQuery}
@@ -62,10 +83,13 @@ export default function Header() {
               placeholder="Rechercher un produit, une marque, un vendeur..."
               className="w-full pl-4 pr-12 py-2.5 border-2 border-gray-200 rounded-full focus:border-[#FF6B00] focus:outline-none transition-colors text-sm"
             />
-            <button className="absolute right-1 top-1/2 -translate-y-1/2 bg-[#FF6B00] text-white p-2 rounded-full hover:bg-[#E05E00] transition-colors">
+            <button
+              type="submit"
+              className="absolute right-1 top-1/2 -translate-y-1/2 bg-[#FF6B00] text-white p-2 rounded-full hover:bg-[#E05E00] transition-colors"
+            >
               <Search size={18} />
             </button>
-          </div>
+          </form>
 
           {/* City selector */}
           <div className="relative hidden lg:block">
@@ -82,7 +106,11 @@ export default function Header() {
                 {cities.map((c) => (
                   <button
                     key={c}
-                    onClick={() => { setCity(c); setCityOpen(false); }}
+                    onClick={() => {
+                      setCity(c);
+                      setCityOpen(false);
+                      navigate(`/catalogue?city=${encodeURIComponent(c)}`);
+                    }}
                     className={`w-full text-left px-4 py-2 text-sm hover:bg-orange-50 hover:text-[#FF6B00] transition-colors ${city === c ? 'text-[#FF6B00] font-semibold bg-orange-50' : ''}`}
                   >
                     {c}
@@ -93,10 +121,9 @@ export default function Header() {
           </div>
 
           {/* Cart */}
-          <button className="relative p-2 hover:bg-gray-100 rounded-full transition-colors">
+          <Link to="/catalogue" className="relative p-2 hover:bg-gray-100 rounded-full transition-colors" title="Catalogue">
             <ShoppingCart size={22} className="text-[#1F2937]" />
-            <span className="absolute -top-0.5 -right-0.5 bg-[#FF6B00] text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">3</span>
-          </button>
+          </Link>
 
           {/* Auth */}
           {!isLoading && (
@@ -168,16 +195,21 @@ export default function Header() {
         </div>
 
         {/* Mobile search */}
-        <div className="md:hidden mt-3 relative">
+        <form onSubmit={goSearch} className="md:hidden mt-3 relative">
           <input
             type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Rechercher..."
             className="w-full pl-4 pr-12 py-2.5 border-2 border-gray-200 rounded-full focus:border-[#FF6B00] focus:outline-none text-sm"
           />
-          <button className="absolute right-1 top-1/2 -translate-y-1/2 bg-[#FF6B00] text-white p-2 rounded-full">
+          <button
+            type="submit"
+            className="absolute right-1 top-1/2 -translate-y-1/2 bg-[#FF6B00] text-white p-2 rounded-full"
+          >
             <Search size={18} />
           </button>
-        </div>
+        </form>
       </div>
 
       {/* Mobile menu */}
@@ -185,14 +217,41 @@ export default function Header() {
         <div className="lg:hidden bg-white border-t border-gray-100 py-4 px-4 animate-fade-in">
           <div className="flex items-center gap-2 mb-3">
             <MapPin size={16} className="text-[#FF6B00]" />
-            <select value={city} onChange={(e) => setCity(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm">
-              {cities.map(c => <option key={c}>{c}</option>)}
+            <select
+              value={city}
+              onChange={(e) => {
+                setCity(e.target.value);
+                navigate(`/catalogue?city=${encodeURIComponent(e.target.value)}`);
+              }}
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+            >
+              {cities.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
             </select>
           </div>
           <nav className="flex flex-col gap-1">
-            {['Accueil', 'Catégories', 'Vendeurs', 'Envoi Colis', 'Promotions'].map(item => (
-              <a key={item} href="#" className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm transition-colors">{item}</a>
-            ))}
+            <Link
+              to="/"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
+            >
+              Accueil
+            </Link>
+            <Link
+              to="/catalogue"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
+            >
+              Catalogue
+            </Link>
+            <Link
+              to="/auth/register/vendor"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
+            >
+              Devenir vendeur
+            </Link>
           </nav>
           <div className="flex gap-2 mt-4">
             {isAuthenticated && user ? (
@@ -207,8 +266,18 @@ export default function Header() {
               </button>
             ) : (
               <>
-                <Link to="/auth/login" className="flex-1 px-4 py-2.5 text-sm font-semibold border-2 border-[#00A651] text-[#00A651] rounded-lg text-center">Connexion</Link>
-                <Link to="/auth/register/client" className="flex-1 px-4 py-2.5 text-sm font-semibold bg-[#00A651] text-white rounded-lg text-center">Inscription</Link>
+                <Link
+                  to="/auth/login"
+                  className="flex-1 px-4 py-2.5 text-sm font-semibold border-2 border-[#00A651] text-[#00A651] rounded-lg text-center"
+                >
+                  Connexion
+                </Link>
+                <Link
+                  to="/auth/register/client"
+                  className="flex-1 px-4 py-2.5 text-sm font-semibold bg-[#00A651] text-white rounded-lg text-center"
+                >
+                  Inscription
+                </Link>
               </>
             )}
           </div>
@@ -219,14 +288,16 @@ export default function Header() {
       <nav className="hidden lg:block border-t border-gray-100 bg-white">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center gap-1">
-            {['Toutes les catégories', 'Électronique', 'Mode', 'Maison', 'Beauté', 'Alimentation', 'Envoi de Colis'].map((item, i) => (
-              <a
-                key={item}
-                href="#"
-                className={`px-4 py-3 text-sm font-semibold transition-colors hover:text-[#FF6B00] ${i === 0 ? 'text-[#FF6B00] bg-orange-50' : 'text-[#1F2937]'}`}
+            {navItems.map((item, i) => (
+              <Link
+                key={item.label}
+                to={item.to}
+                className={`px-4 py-3 text-sm font-semibold transition-colors hover:text-[#FF6B00] ${
+                  i === 0 ? 'text-[#FF6B00] bg-orange-50' : 'text-[#1F2937]'
+                }`}
               >
-                {item}
-              </a>
+                {item.label}
+              </Link>
             ))}
           </div>
         </div>
