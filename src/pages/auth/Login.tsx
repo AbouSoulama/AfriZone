@@ -35,7 +35,9 @@ export default function Login() {
     const result = await login(data.identifier, data.password);
 
     if (result.success) {
-      navigate('/');
+      if (result.role === 'admin') navigate('/admin/vendeurs');
+      else if (result.role === 'vendeur') navigate('/vendeur');
+      else navigate('/');
     } else {
       setError(result.error || 'Une erreur est survenue');
     }

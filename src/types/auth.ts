@@ -75,4 +75,5 @@ export interface AuthResult {
   error?: string;
   needsEmailConfirmation?: boolean;
   vendorCode?: string;
+  role?: UserRole;
 }

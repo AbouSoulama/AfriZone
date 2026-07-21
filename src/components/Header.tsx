@@ -155,6 +155,24 @@ export default function Header() {
                           <p className="text-xs text-[#00A651] truncate">{user.vendor.shopName}</p>
                         )}
                       </div>
+                      {user.role === 'vendeur' && (
+                        <Link
+                          to="/vendeur"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="block px-4 py-2 text-sm hover:bg-orange-50 text-[#FF6B00] font-semibold"
+                        >
+                          Espace vendeur
+                        </Link>
+                      )}
+                      {user.role === 'admin' && (
+                        <Link
+                          to="/admin/vendeurs"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="block px-4 py-2 text-sm hover:bg-orange-50 text-[#FF6B00] font-semibold"
+                        >
+                          Administration
+                        </Link>
+                      )}
                       <button
                         onClick={async () => {
                           setUserMenuOpen(false);

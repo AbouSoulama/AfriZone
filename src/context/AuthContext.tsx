@@ -232,6 +232,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             };
           }
         }
+
+        return { success: true, role: (profile?.role as UserRole) || 'client' };
       }
 
       return { success: true };
