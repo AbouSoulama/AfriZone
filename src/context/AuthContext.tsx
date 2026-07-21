@@ -16,6 +16,7 @@ import {
   mapAuthError,
   normalizePhone,
   slugify,
+  validateIdDocument,
 } from '../lib/auth-helpers';
 import type {
   AuthResult,
@@ -202,18 +203,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (profile?.role === 'vendeur') {
           const { data: vendor } = await supabase
             .from('vendors')
-            .select('status')
+            .select('status, vendor_code, shop_name')
             .eq('user_id', data.user.id)
             .maybeSingle();
 
-          if (vendor?.status === 'pending') {
+          // Pas de fiche boutique = inscription incomplète
+          if (!vendor) {
             await supabase.auth.signOut();
             return {
               success: false,
-              error: "Votre compte vendeur est en attente de validation par l'administrateur.",
+              error:
+                "Votre inscription vendeur est incomplète (boutique non créée). Recommencez l'inscription vendeur ou contactez le support.",
             };
           }
-          if (vendor?.status === 'rejected' || vendor?.status === 'suspended') {
+
+          if (vendor.status === 'pending') {
+            await supabase.auth.signOut();
+            return {
+              success: false,
+              error: `Compte vendeur « ${vendor.shop_name} » (${vendor.vendor_code}) en attente de validation admin.`,
+            };
+          }
+          if (vendor.status === 'rejected' || vendor.status === 'suspended') {
             await supabase.auth.signOut();
             return {
               success: false,
@@ -305,8 +316,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!data.acceptTerms) {
         return { success: false, error: 'Vous devez accepter les conditions générales.' };
       }
-      if (!data.idDocument) {
-        return { success: false, error: "Veuillez uploader votre pièce d'identité." };
+
+      const idError = validateIdDocument(data.idDocument);
+      if (idError || !data.idDocument) {
+        return { success: false, error: idError || "Pièce d'identité manquante." };
       }
 
       const phone = normalizePhone(data.phone);
@@ -322,6 +335,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: 'Ce numéro de téléphone est déjà utilisé.' };
       }
 
+      // Créer le compte Auth — rôle vendeur uniquement après création boutique
       const { data: authData, error } = await supabase.auth.signUp({
         email,
         password: data.password,
@@ -338,22 +352,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) return { success: false, error: mapAuthError(error.message) };
       if (!authData.user) {
-        return { success: false, error: "Impossible de créer le compte." };
+        return { success: false, error: 'Impossible de créer le compte.' };
       }
 
       const userId = authData.user.id;
 
-      // Si confirmation email requise, pas de session → on ne peut pas uploader
-      if (!authData.session) {
-        return {
-          success: true,
-          needsEmailConfirmation: true,
-          error:
-            'Compte créé. Confirmez votre email, puis reconnectez-vous pour finaliser le dossier vendeur si nécessaire.',
-        };
+      // Garantir une session (upload Storage + insert vendors exigent d'être connecté)
+      let session = authData.session;
+      if (!session) {
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password: data.password,
+        });
+        if (signInError || !signInData.session) {
+          return {
+            success: false,
+            error:
+              'Compte créé mais session impossible. Dans Supabase → Authentication → Providers → Email, désactivez « Confirm email », puis réessayez avec un nouvel email.',
+          };
+        }
+        session = signInData.session;
       }
 
-      await supabase
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({
           phone,
@@ -364,16 +385,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         .eq('id', userId);
 
-      const idDocumentPath = await uploadPrivateFile(
-        'vendor-documents',
-        userId,
-        data.idDocument,
-        'identity'
-      );
+      if (profileError) {
+        console.error(profileError);
+        await supabase.auth.signOut();
+        return { success: false, error: `Erreur profil : ${profileError.message}` };
+      }
+
+      let idDocumentPath: string;
+      try {
+        idDocumentPath = await uploadPrivateFile(
+          'vendor-documents',
+          userId,
+          data.idDocument,
+          'identity'
+        );
+      } catch (uploadErr) {
+        console.error(uploadErr);
+        await supabase.auth.signOut();
+        return {
+          success: false,
+          error:
+            "Impossible d'uploader la pièce d'identité. Vérifiez que le bucket « vendor-documents » existe dans Supabase Storage.",
+        };
+      }
 
       let shopLogoUrl: string | null = null;
       if (data.shopLogo) {
-        shopLogoUrl = await uploadPublicFile('avatars', userId, data.shopLogo, 'shop-logo');
+        try {
+          shopLogoUrl = await uploadPublicFile('avatars', userId, data.shopLogo, 'shop-logo');
+        } catch (logoErr) {
+          console.error(logoErr);
+          // Logo optionnel : on continue sans bloquer
+        }
       }
 
       const vendorCode = generateVendorCode(data.country, data.city);
@@ -399,20 +442,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (vendorError) {
         console.error(vendorError);
+        await supabase.auth.signOut();
         return {
           success: false,
           error: vendorError.message.includes('duplicate')
             ? 'Cette boutique ou ce code existe déjà. Réessayez.'
-            : `Erreur lors de la création de la boutique : ${vendorError.message}`,
+            : `Erreur création boutique : ${vendorError.message}`,
         };
       }
 
-      // Déconnexion : vendeur pending ne doit pas rester connecté
+      // Vendeur pending : pas de session active
       await supabase.auth.signOut();
 
       return { success: true, vendorCode };
     } catch (e) {
       console.error(e);
+      await supabase.auth.signOut();
       return { success: false, error: "Une erreur est survenue lors de l'inscription vendeur." };
     }
   };

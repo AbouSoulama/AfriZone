@@ -118,8 +118,15 @@ export default function Header() {
                   {userMenuOpen && (
                     <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
                       <div className="px-4 py-2 border-b border-gray-100">
-                        <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+                        <p className="text-xs text-gray-500 capitalize">
+                          {user.role === 'vendeur'
+                            ? `Vendeur${user.vendor?.vendorCode ? ` · ${user.vendor.vendorCode}` : ''}`
+                            : user.role}
+                        </p>
                         <p className="text-sm font-semibold truncate">{user.fullName}</p>
+                        {user.role === 'vendeur' && user.vendor?.shopName && (
+                          <p className="text-xs text-[#00A651] truncate">{user.vendor.shopName}</p>
+                        )}
                       </div>
                       <button
                         onClick={async () => {

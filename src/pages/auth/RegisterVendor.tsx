@@ -17,8 +17,11 @@ import {
   Globe,
   Building,
   CreditCard,
+  AlertCircle,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { validateIdDocument } from '../../lib/auth-helpers';
 
 const step1Schema = z
   .object({
@@ -28,11 +31,15 @@ const step1Schema = z
     password: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères'),
     confirmPassword: z.string(),
     idDocumentType: z.enum(['cni', 'passport']),
-    acceptTerms: z.boolean().refine((val) => val === true, 'Vous devez accepter les CGV'),
+    acceptTerms: z.boolean(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Les mots de passe ne correspondent pas',
     path: ['confirmPassword'],
+  })
+  .refine((data) => data.acceptTerms === true, {
+    message: 'Vous devez accepter les CGV vendeurs',
+    path: ['acceptTerms'],
   });
 
 const step2Schema = z.object({
@@ -79,9 +86,9 @@ export default function RegisterVendor() {
   const [isLoading, setIsLoading] = useState(false);
   const [step1Data, setStep1Data] = useState<Step1FormData | null>(null);
   const [vendorCode, setVendorCode] = useState<string | null>(null);
-  const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [country, setCountry] = useState<'SN' | 'BF' | 'ML'>('SN');
   const [idDocFile, setIdDocFile] = useState<File | null>(null);
+  const [idDocPreview, setIdDocPreview] = useState<string | null>(null);
   const [shopLogoFile, setShopLogoFile] = useState<File | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -92,9 +99,14 @@ export default function RegisterVendor() {
     handleSubmit: handleSubmit1,
     formState: { errors: errors1 },
     watch: watch1,
+    setValue: setValue1,
   } = useForm<Step1FormData>({
     resolver: zodResolver(step1Schema),
-    defaultValues: { idDocumentType: 'cni', acceptTerms: false },
+    defaultValues: {
+      idDocumentType: 'cni',
+      acceptTerms: false,
+    },
+    mode: 'onSubmit',
   });
 
   const {
@@ -108,18 +120,68 @@ export default function RegisterVendor() {
     defaultValues: { country: 'SN', city: 'Dakar' },
   });
 
+  const handleIdFileChange = (file: File | null) => {
+    if (idDocPreview) URL.revokeObjectURL(idDocPreview);
+
+    if (!file) {
+      setIdDocFile(null);
+      setIdDocPreview(null);
+      return;
+    }
+
+    const validationError = validateIdDocument(file);
+    if (validationError) {
+      setError(validationError);
+      setIdDocFile(null);
+      setIdDocPreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setError(null);
+    setIdDocFile(file);
+    if (file.type.startsWith('image/')) {
+      setIdDocPreview(URL.createObjectURL(file));
+    } else {
+      setIdDocPreview(null);
+    }
+  };
+
   const handleStep1Submit = (data: Step1FormData) => {
-    if (!idDocFile) {
-      setError("Veuillez uploader votre pièce d'identité");
+    const docError = validateIdDocument(idDocFile);
+    if (docError) {
+      setError(docError);
       return;
     }
     setStep1Data(data);
-    setStep(2);
     setError(null);
+    setStep(2);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleStep1Invalid = () => {
+    const docError = validateIdDocument(idDocFile);
+    if (docError) {
+      setError(docError);
+      return;
+    }
+    setError('Veuillez corriger les champs indiqués en rouge avant de continuer.');
   };
 
   const handleStep2Submit = async (data: Step2FormData) => {
-    if (!step1Data) return;
+    if (!step1Data) {
+      setError('Recommencez depuis l’étape 1.');
+      setStep(1);
+      return;
+    }
+
+    const docError = validateIdDocument(idDocFile);
+    if (docError || !idDocFile) {
+      setError(docError || "Pièce d'identité manquante.");
+      setStep(1);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -144,7 +206,6 @@ export default function RegisterVendor() {
 
     if (result.success) {
       setVendorCode(result.vendorCode || null);
-      setInfoMessage(result.needsEmailConfirmation ? result.error || null : null);
       setStep(3);
     } else {
       setError(result.error || 'Une erreur est survenue');
@@ -158,19 +219,26 @@ export default function RegisterVendor() {
         <div className="w-full max-w-md text-center">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
             <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle size={40} className="text-[#FF6B00]" />
+              <Store size={40} className="text-[#FF6B00]" />
             </div>
-            <h1 className="text-2xl font-extrabold text-[#1F2937] mb-2">Demande envoyée!</h1>
+            <h1 className="text-2xl font-extrabold text-[#1F2937] mb-2">Dossier vendeur envoyé</h1>
             <p className="text-gray-500 mb-4">
-              Votre dossier vendeur a été soumis. Notre équipe l&apos;examinera sous 24-48h.
+              Votre boutique et votre pièce d&apos;identité ont été enregistrées. Un admin doit
+              valider votre compte avant que vous puissiez vous connecter.
             </p>
             {vendorCode && (
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-4">
-                <p className="text-xs text-gray-500 mb-1">Code vendeur :</p>
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4">
+                <p className="text-xs text-gray-500 mb-1">Code vendeur</p>
                 <p className="text-2xl font-mono font-bold text-[#FF6B00]">{vendorCode}</p>
+                <p className="text-xs text-gray-500 mt-2">Statut : en attente de validation</p>
               </div>
             )}
-            {infoMessage && <p className="text-sm text-amber-700 mb-4">{infoMessage}</p>}
+            <div className="bg-gray-50 rounded-xl p-3 mb-6 text-left text-xs text-gray-600 space-y-1">
+              <p>✓ Compte Auth créé (rôle vendeur)</p>
+              <p>✓ Boutique enregistrée</p>
+              <p>✓ Pièce d&apos;identité uploadée</p>
+              <p>✓ Connexion bloquée jusqu&apos;à validation admin</p>
+            </div>
             <button
               onClick={() => navigate('/auth/login')}
               className="w-full py-3.5 bg-[#00A651] hover:bg-[#008A43] text-white rounded-xl font-bold transition-all shadow-lg"
@@ -191,28 +259,40 @@ export default function RegisterVendor() {
             <img src="/logo-afrizone.png" alt="AfriZone" className="h-16 w-auto mx-auto" />
           </Link>
           <h1 className="text-2xl font-extrabold text-[#1F2937] mt-3">Devenir Vendeur AfriZone</h1>
-          <p className="text-gray-500 text-sm mt-1">Rejoignez des milliers de vendeurs africains</p>
+          <p className="text-gray-500 text-sm mt-1">
+            Inscription en 2 étapes — différente du compte client
+          </p>
         </div>
 
-        <div className="flex items-center gap-2 mb-6">
+        <div className="flex items-center gap-2 mb-2">
           <div className={`flex-1 h-2 rounded-full ${step >= 1 ? 'bg-[#FF6B00]' : 'bg-gray-200'}`} />
-          <div className={`flex-1 h-2 rounded-full ${step >= 2 ? 'bg-[#FF6B00]' : 'bg-gray-200'}`} />
+          <div className={`flex-1 h-2 rounded-full ${step >= 2 ? 'bg-[#00A651]' : 'bg-gray-200'}`} />
         </div>
-        <div className="flex justify-between text-xs font-semibold text-gray-500 mb-6">
-          <span>Informations personnelles</span>
-          <span>Informations boutique</span>
+        <div className="flex justify-between text-xs font-semibold mb-6">
+          <span className={step === 1 ? 'text-[#FF6B00]' : 'text-gray-500'}>
+            1. Identité + CNI/Passeport
+          </span>
+          <span className={step === 2 ? 'text-[#00A651]' : 'text-gray-500'}>
+            2. Création boutique
+          </span>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
           {step === 1 && (
-            <form onSubmit={handleSubmit1(handleStep1Submit)} className="space-y-4">
+            <form
+              onSubmit={handleSubmit1(handleStep1Submit, handleStep1Invalid)}
+              className="space-y-4"
+              noValidate
+            >
               <div className="flex items-center gap-2 mb-4">
                 <Smartphone size={20} className="text-[#FF6B00]" />
-                <h2 className="text-lg font-bold text-[#1F2937]">Étape 1: Informations personnelles</h2>
+                <h2 className="text-lg font-bold text-[#1F2937]">
+                  Étape 1 — Informations & pièce d&apos;identité
+                </h2>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Nom complet</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Nom complet *</label>
                 <input
                   {...reg1('fullName')}
                   type="text"
@@ -227,7 +307,7 @@ export default function RegisterVendor() {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Téléphone</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Téléphone *</label>
                 <div className="relative">
                   <Smartphone
                     size={18}
@@ -248,7 +328,7 @@ export default function RegisterVendor() {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Email</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Email *</label>
                 <div className="relative">
                   <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
@@ -266,7 +346,7 @@ export default function RegisterVendor() {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Mot de passe</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Mot de passe *</label>
                 <div className="relative">
                   <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
@@ -292,21 +372,18 @@ export default function RegisterVendor() {
 
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Confirmation mot de passe
+                  Confirmation mot de passe *
                 </label>
-                <div className="relative">
-                  <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    {...reg1('confirmPassword')}
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none ${
-                      errors1.confirmPassword
-                        ? 'border-red-300'
-                        : 'border-gray-200 focus:border-[#FF6B00]'
-                    }`}
-                  />
-                </div>
+                <input
+                  {...reg1('confirmPassword')}
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none ${
+                    errors1.confirmPassword
+                      ? 'border-red-300'
+                      : 'border-gray-200 focus:border-[#FF6B00]'
+                  }`}
+                />
                 {errors1.confirmPassword && (
                   <p className="text-red-500 text-xs mt-1">{String(errors1.confirmPassword.message)}</p>
                 )}
@@ -314,7 +391,7 @@ export default function RegisterVendor() {
 
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Type de pièce d&apos;identité
+                  Type de pièce d&apos;identité *
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <label
@@ -324,7 +401,13 @@ export default function RegisterVendor() {
                         : 'border-gray-200'
                     }`}
                   >
-                    <input {...reg1('idDocumentType')} type="radio" value="cni" className="accent-[#FF6B00]" />
+                    <input
+                      type="radio"
+                      value="cni"
+                      checked={watch1('idDocumentType') === 'cni'}
+                      onChange={() => setValue1('idDocumentType', 'cni', { shouldValidate: true })}
+                      className="accent-[#FF6B00]"
+                    />
                     <div>
                       <p className="font-bold text-sm">CNI</p>
                       <p className="text-xs text-gray-500">Carte Nationale</p>
@@ -338,9 +421,12 @@ export default function RegisterVendor() {
                     }`}
                   >
                     <input
-                      {...reg1('idDocumentType')}
                       type="radio"
                       value="passport"
+                      checked={watch1('idDocumentType') === 'passport'}
+                      onChange={() =>
+                        setValue1('idDocumentType', 'passport', { shouldValidate: true })
+                      }
                       className="accent-[#FF6B00]"
                     />
                     <div>
@@ -353,35 +439,86 @@ export default function RegisterVendor() {
 
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  <FileText size={14} className="inline mr-1" /> Photo de la pièce d&apos;identité
+                  <FileText size={14} className="inline mr-1" />
+                  Photo / scan de la pièce * (obligatoire)
                 </label>
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-[#FF6B00]"
-                >
-                  <Upload size={32} className="mx-auto text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-600">Cliquez pour uploader</p>
-                  <p className="text-xs text-gray-400 mt-1">JPG, PNG, PDF - Max 5MB</p>
-                  {idDocFile && (
-                    <p className="text-xs text-green-600 mt-2 font-semibold">✓ {idDocFile.name}</p>
-                  )}
-                </div>
+                {!idDocFile ? (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full border-2 border-dashed border-red-200 bg-red-50/40 rounded-xl p-6 text-center hover:border-[#FF6B00] transition-colors"
+                  >
+                    <Upload size={32} className="mx-auto text-[#FF6B00] mb-2" />
+                    <p className="text-sm font-semibold text-gray-700">
+                      Cliquez pour uploader votre{' '}
+                      {watch1('idDocumentType') === 'passport' ? 'passeport' : 'CNI'}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP ou PDF — max 5 Mo</p>
+                  </button>
+                ) : (
+                  <div className="border-2 border-green-200 bg-green-50 rounded-xl p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <CheckCircle size={20} className="text-green-600 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-green-800 truncate">
+                            {idDocFile.name}
+                          </p>
+                          <p className="text-xs text-green-700">
+                            {(idDocFile.size / 1024).toFixed(0)} Ko ·{' '}
+                            {watch1('idDocumentType') === 'passport' ? 'Passeport' : 'CNI'}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleIdFileChange(null)}
+                        className="p-1 text-gray-500 hover:text-red-600"
+                        aria-label="Retirer le fichier"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                    {idDocPreview && (
+                      <img
+                        src={idDocPreview}
+                        alt="Aperçu pièce d'identité"
+                        className="mt-3 max-h-40 rounded-lg mx-auto object-contain"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="mt-3 text-xs font-semibold text-[#FF6B00] hover:underline"
+                    >
+                      Remplacer le fichier
+                    </button>
+                  </div>
+                )}
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*,.pdf"
+                  accept="image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf"
                   className="hidden"
-                  onChange={(e) => setIdDocFile(e.target.files?.[0] || null)}
+                  onChange={(e) => handleIdFileChange(e.target.files?.[0] || null)}
                 />
               </div>
 
               <label className="flex items-start gap-2 cursor-pointer">
-                <input {...reg1('acceptTerms')} type="checkbox" className="mt-1 rounded accent-[#FF6B00]" />
+                <input
+                  type="checkbox"
+                  checked={watch1('acceptTerms')}
+                  onChange={(e) =>
+                    setValue1('acceptTerms', e.target.checked, { shouldValidate: true })
+                  }
+                  className="mt-1 rounded accent-[#FF6B00]"
+                />
                 <span className="text-sm text-gray-600">
                   J&apos;accepte les{' '}
                   <a href="#" className="text-[#FF6B00] underline">
                     Conditions Générales Vendeurs
-                  </a>
+                  </a>{' '}
+                  *
                 </span>
               </label>
               {errors1.acceptTerms && (
@@ -389,7 +526,8 @@ export default function RegisterVendor() {
               )}
 
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+                  <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />
                   <p className="text-red-700 text-sm">{error}</p>
                 </div>
               )}
@@ -398,20 +536,26 @@ export default function RegisterVendor() {
                 type="submit"
                 className="w-full py-3.5 bg-[#FF6B00] hover:bg-[#E05E00] text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg"
               >
-                Suivant <ArrowRight size={18} />
+                Continuer vers la boutique <ArrowRight size={18} />
               </button>
             </form>
           )}
 
           {step === 2 && (
             <form onSubmit={handleSubmit2(handleStep2Submit)} className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-2">
                 <Store size={20} className="text-[#00A651]" />
-                <h2 className="text-lg font-bold text-[#1F2937]">Étape 2: Informations boutique</h2>
+                <h2 className="text-lg font-bold text-[#1F2937]">Étape 2 — Création de la boutique</h2>
               </div>
+              <p className="text-xs text-gray-500 mb-4">
+                Identité : {step1Data?.fullName} · Pièce :{' '}
+                {step1Data?.idDocumentType === 'passport' ? 'Passeport' : 'CNI'} ({idDocFile?.name})
+              </p>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Nom de la boutique</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Nom de la boutique *
+                </label>
                 <div className="relative">
                   <Store size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
@@ -429,12 +573,12 @@ export default function RegisterVendor() {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Pays</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Pays *</label>
                 <div className="grid grid-cols-3 gap-3">
                   {(
                     [
                       { code: 'SN', label: 'Sénégal' },
-                      { code: 'BF', label: 'Burkina Faso' },
+                      { code: 'BF', label: 'Burkina' },
                       { code: 'ML', label: 'Mali' },
                     ] as const
                   ).map((p) => (
@@ -447,15 +591,15 @@ export default function RegisterVendor() {
                       }`}
                     >
                       <input
-                        {...reg2('country')}
                         type="radio"
                         value={p.code}
-                        className="accent-[#00A651]"
-                        onChange={(e) => {
-                          reg2('country').onChange(e);
+                        checked={watch2('country') === p.code}
+                        onChange={() => {
                           setCountry(p.code);
+                          setValue2('country', p.code, { shouldValidate: true });
                           setValue2('city', citiesByCountry[p.code][0]);
                         }}
+                        className="accent-[#00A651]"
                       />
                       <div className="flex items-center gap-1">
                         <Globe size={14} className="text-green-600" />
@@ -467,7 +611,7 @@ export default function RegisterVendor() {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Ville</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Ville *</label>
                 <select
                   {...reg2('city')}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#00A651] focus:outline-none bg-white"
@@ -481,7 +625,9 @@ export default function RegisterVendor() {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Adresse physique</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Adresse physique *
+                </label>
                 <div className="relative">
                   <Building
                     size={18}
@@ -502,7 +648,9 @@ export default function RegisterVendor() {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Catégorie principale</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Catégorie principale *
+                </label>
                 <select
                   {...reg2('shopCategory')}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#00A651] focus:outline-none bg-white"
@@ -521,7 +669,7 @@ export default function RegisterVendor() {
 
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Description de la boutique
+                  Description de la boutique *
                 </label>
                 <textarea
                   {...reg2('shopDescription')}
@@ -542,16 +690,17 @@ export default function RegisterVendor() {
                 <label className="block text-sm font-bold text-gray-700 mb-2">
                   Logo boutique <span className="text-gray-400 font-normal">(optionnel)</span>
                 </label>
-                <div
+                <button
+                  type="button"
                   onClick={() => logoInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-[#00A651]"
+                  className="w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-[#00A651]"
                 >
                   <Upload size={32} className="mx-auto text-gray-400 mb-2" />
                   <p className="text-sm text-gray-600">Cliquez pour uploader un logo</p>
                   {shopLogoFile && (
                     <p className="text-xs text-green-600 mt-2 font-semibold">✓ {shopLogoFile.name}</p>
                   )}
-                </div>
+                </button>
                 <input
                   ref={logoInputRef}
                   type="file"
@@ -575,7 +724,8 @@ export default function RegisterVendor() {
               </div>
 
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+                  <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />
                   <p className="text-red-700 text-sm">{error}</p>
                 </div>
               )}
@@ -583,7 +733,10 @@ export default function RegisterVendor() {
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setStep(1)}
+                  onClick={() => {
+                    setError(null);
+                    setStep(1);
+                  }}
                   className="flex-1 py-3.5 border-2 border-gray-200 text-gray-700 rounded-xl font-bold hover:border-gray-300"
                 >
                   Retour
@@ -594,10 +747,10 @@ export default function RegisterVendor() {
                   className="flex-1 py-3.5 bg-[#00A651] hover:bg-[#008A43] disabled:bg-gray-300 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg"
                 >
                   {isLoading ? (
-                    'Envoi...'
+                    'Création...'
                   ) : (
                     <>
-                      Soumettre <CheckCircle size={18} />
+                      Soumettre le dossier <CheckCircle size={18} />
                     </>
                   )}
                 </button>

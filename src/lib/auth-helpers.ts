@@ -43,6 +43,20 @@ export function generateVendorCode(country: string, city: string): string {
   return `${country}-${cityCode}-${seq}`;
 }
 
+const ID_DOC_MAX_BYTES = 5 * 1024 * 1024;
+const ID_DOC_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+
+/** Valide la pièce d'identité (CNI / passeport) */
+export function validateIdDocument(file: File | null): string | null {
+  if (!file) return "Veuillez uploader votre pièce d'identité (CNI ou passeport).";
+  if (file.size > ID_DOC_MAX_BYTES) return 'Le fichier ne doit pas dépasser 5 Mo.';
+  const typeOk =
+    ID_DOC_TYPES.includes(file.type) ||
+    /\.(jpe?g|png|webp|pdf)$/i.test(file.name);
+  if (!typeOk) return 'Format accepté : JPG, PNG, WEBP ou PDF.';
+  return null;
+}
+
 export function mapAuthError(message: string): string {
   const lower = message.toLowerCase();
   if (lower.includes('invalid login credentials')) {
@@ -54,11 +68,16 @@ export function mapAuthError(message: string): string {
   if (lower.includes('email not confirmed')) {
     return 'Confirmez votre email avant de vous connecter (vérifiez votre boîte de réception).';
   }
+  if (
+    lower.includes('rate limit') ||
+    lower.includes('too many') ||
+    lower.includes('over_request_rate_limit') ||
+    lower.includes('over_email_send_rate_limit')
+  ) {
+    return 'Limite Supabase atteinte (trop d’essais Auth). Attendez 2–5 minutes, utilisez un nouvel email, ou augmentez les plafonds dans Supabase → Authentication → Rate Limits. En dev : désactivez aussi « Confirm email ».';
+  }
   if (lower.includes('password')) {
     return 'Mot de passe invalide (minimum 6 caractères).';
-  }
-  if (lower.includes('rate limit') || lower.includes('too many')) {
-    return 'Trop de tentatives. Réessayez dans quelques minutes.';
   }
   return message || 'Une erreur est survenue.';
 }
