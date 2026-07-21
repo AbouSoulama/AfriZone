@@ -3,11 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Lock, Eye, EyeOff, ArrowRight, Smartphone, AlertCircle, CheckCircle } from 'lucide-react';
+import { Lock, Eye, EyeOff, ArrowRight, Smartphone, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const loginSchema = z.object({
-  phone: z.string().min(10, 'Numéro de téléphone invalide').regex(/^\+?[0-9]{8,15}$/, 'Format de téléphone invalide'),
+  identifier: z.string().min(3, 'Email ou téléphone requis'),
   password: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères'),
 });
 
@@ -15,14 +15,16 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, requestOTP } = useAuth();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState<string | null>(null);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
 
@@ -30,66 +32,56 @@ export default function Login() {
     setIsLoading(true);
     setError(null);
 
-    const result = await login(data.phone, data.password);
-    
+    const result = await login(data.identifier, data.password);
+
     if (result.success) {
       navigate('/');
     } else {
       setError(result.error || 'Une erreur est survenue');
-      // Request OTP for password reset option
-      if (result.error?.includes('incorrect')) {
-        const otpResult = await requestOTP(data.phone, 'login');
-        if (otpResult.success) {
-          setOtpSent(true);
-          setOtpCode(otpResult.code || null);
-        }
-      }
     }
-    
+
     setIsLoading(false);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
-          <img src="/logo-afrizone.png" alt="AfriZone" className="h-20 w-auto mx-auto" />
+          <Link to="/">
+            <img src="/logo-afrizone.png" alt="AfriZone" className="h-20 w-auto mx-auto" />
+          </Link>
           <h1 className="text-2xl font-extrabold text-[#1F2937] mt-4">Connexion</h1>
           <p className="text-gray-500 text-sm mt-1">Accédez à votre compte AfriZone</p>
         </div>
 
-        {/* Form Card */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            {/* Phone */}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">
-                Numéro de téléphone
+                Email ou téléphone
               </label>
               <div className="relative">
                 <Smartphone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
-                  {...register('phone')}
-                  type="tel"
-                  placeholder="+221 77 000 00 00"
+                  {...register('identifier')}
+                  type="text"
+                  placeholder="+221 77 000 00 00 ou email"
                   className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none transition-colors ${
-                    errors.phone ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-[#FF6B00]'
+                    errors.identifier
+                      ? 'border-red-300 focus:border-red-500'
+                      : 'border-gray-200 focus:border-[#FF6B00]'
                   }`}
                 />
               </div>
-              {errors.phone && (
+              {errors.identifier && (
                 <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <AlertCircle size={12} /> {errors.phone.message}
+                  <AlertCircle size={12} /> {errors.identifier.message}
                 </p>
               )}
             </div>
 
-            {/* Password */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                Mot de passe
-              </label>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Mot de passe</label>
               <div className="relative">
                 <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
@@ -97,7 +89,9 @@ export default function Login() {
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   className={`w-full pl-10 pr-12 py-3 border-2 rounded-xl focus:outline-none transition-colors ${
-                    errors.password ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-[#FF6B00]'
+                    errors.password
+                      ? 'border-red-300 focus:border-red-500'
+                      : 'border-gray-200 focus:border-[#FF6B00]'
                   }`}
                 />
                 <button
@@ -115,18 +109,16 @@ export default function Login() {
               )}
             </div>
 
-            {/* Remember & Forgot */}
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" className="rounded accent-[#FF6B00]" />
                 <span className="text-gray-600">Se souvenir</span>
               </label>
-              <button type="button" className="text-[#FF6B00] font-semibold hover:underline">
+              <Link to="/auth/forgot-password" className="text-[#FF6B00] font-semibold hover:underline">
                 Mot de passe oublié?
-              </button>
+              </Link>
             </div>
 
-            {/* Error */}
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
                 <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />
@@ -134,18 +126,6 @@ export default function Login() {
               </div>
             )}
 
-            {/* OTP Demo */}
-            {otpSent && otpCode && (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-start gap-2">
-                <CheckCircle size={18} className="text-green-500 shrink-0 mt-0.5" />
-                <div className="text-green-700 text-sm">
-                  <p className="font-semibold">Mode développement</p>
-                  <p>Votre code OTP: <span className="font-mono font-bold text-lg">{otpCode}</span></p>
-                </div>
-              </div>
-            )}
-
-            {/* Submit */}
             <button
               type="submit"
               disabled={isLoading}
@@ -154,27 +134,27 @@ export default function Login() {
               {isLoading ? (
                 <span className="animate-pulse">Connexion en cours...</span>
               ) : (
-                <>Se connecter <ArrowRight size={18} /></>
+                <>
+                  Se connecter <ArrowRight size={18} />
+                </>
               )}
             </button>
           </form>
 
-          {/* Divider */}
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200"></div>
+              <div className="w-full border-t border-gray-200" />
             </div>
             <div className="relative flex justify-center text-sm">
               <span className="px-4 bg-white text-gray-500">ou</span>
             </div>
           </div>
 
-          {/* Register Links */}
           <div className="space-y-3">
             <p className="text-center text-sm text-gray-600">
               Pas encore de compte?{' '}
               <Link to="/auth/register/client" className="text-[#00A651] font-bold hover:underline">
-                S'inscrire en tant que Client
+                S&apos;inscrire en tant que Client
               </Link>
             </p>
             <p className="text-center text-sm text-gray-600">
@@ -186,10 +166,9 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Back to home */}
         <div className="text-center mt-6">
           <Link to="/" className="text-sm text-gray-500 hover:text-[#1F2937] transition-colors">
-            ← Retour à l'accueil
+            ← Retour à l&apos;accueil
           </Link>
         </div>
       </div>

@@ -1,74 +1,78 @@
-export type UserRole = 'visiteur' | 'client' | 'vendeur' | 'admin' | 'livreur';
-export type VendorStatus = 'pending' | 'approved' | 'rejected';
+export type UserRole = 'client' | 'vendeur' | 'admin' | 'livreur';
+export type VendorStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
 
-export interface User {
+export interface Profile {
   id: string;
-  email?: string;
-  phone: string;
+  email?: string | null;
+  phone: string | null;
   fullName: string;
   role: UserRole;
-  city?: string;
-  createdAt: Date;
+  city?: string | null;
+  avatarUrl?: string | null;
   verified: boolean;
-  password?: string;
+  createdAt: string;
 }
 
-export interface Client extends User {
-  role: 'client';
-}
-
-export interface Vendor extends User {
-  role: 'vendeur';
+export interface VendorProfile {
+  id: string;
+  userId: string;
   status: VendorStatus;
   shopName: string;
-  shopDescription?: string;
-  shopCategory?: string;
-  shopLogo?: string;
+  shopSlug: string;
+  shopDescription?: string | null;
+  shopCategory?: string | null;
+  shopLogoUrl?: string | null;
   vendorCode: string;
-  country?: string;
-  address?: string;
-  idDocument?: string;
-  commerceRegister?: string;
-  approvedAt?: Date;
-  approvedBy?: string;
+  country: string;
+  city: string;
+  address?: string | null;
+  commerceRegister?: string | null;
+  idDocumentUrl?: string | null;
+  idDocumentType?: string | null;
 }
 
-// Extend for internal use with password
-export interface VendorWithPassword extends Vendor {
-  password: string;
-}
-
-export interface UserWithPassword extends User {
-  password: string;
-}
-
-export interface Admin extends User {
-  role: 'admin';
-}
-
-export interface DeliveryPerson extends User {
-  role: 'livreur';
-  vehicleType?: string;
-  licenseNumber?: string;
-}
-
-export interface Session {
-  user: User | Vendor | Admin | DeliveryPerson;
-  token: string;
-  expiresAt: Date;
-}
-
-export interface OTPRequest {
-  phone: string;
-  code: string;
-  expiresAt: Date;
-  verified: boolean;
-  type: 'register' | 'login' | 'password-reset';
+export interface AuthUser extends Profile {
+  vendor?: VendorProfile | null;
 }
 
 export interface AuthState {
-  user: User | Vendor | Admin | DeliveryPerson | null;
-  session: Session | null;
+  user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+}
+
+export interface RegisterData {
+  fullName: string;
+  phone: string;
+  email?: string;
+  password: string;
+  confirmPassword: string;
+  city: string;
+  acceptTerms: boolean;
+}
+
+export interface VendorRegisterData {
+  fullName: string;
+  phone: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  idDocument: File | null;
+  idDocumentType: 'cni' | 'passport';
+  shopName: string;
+  country: 'SN' | 'BF' | 'ML';
+  city: string;
+  address: string;
+  shopCategory: string;
+  shopDescription: string;
+  shopLogo: File | null;
+  commerceRegister?: string;
+  acceptTerms: boolean;
+}
+
+export interface AuthResult {
+  success: boolean;
+  error?: string;
+  needsEmailConfirmation?: boolean;
+  vendorCode?: string;
 }

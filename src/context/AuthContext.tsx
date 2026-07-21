@@ -1,331 +1,463 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Vendor, Session, AuthState, OTPRequest } from '../types/auth';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from 'react';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
+import {
+  authEmailFromPhone,
+  generateVendorCode,
+  isEmail,
+  isSyntheticAuthEmail,
+  mapAuthError,
+  normalizePhone,
+  slugify,
+} from '../lib/auth-helpers';
+import type {
+  AuthResult,
+  AuthState,
+  AuthUser,
+  RegisterData,
+  VendorProfile,
+  VendorRegisterData,
+  UserRole,
+} from '../types/auth';
 
 interface AuthContextType extends AuthState {
-  login: (phone: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
-  registerVendor: (data: VendorRegisterData) => Promise<{ success: boolean; error?: string }>;
-  requestOTP: (phone: string, type: 'register' | 'login' | 'password-reset') => Promise<{ success: boolean; code?: string; error?: string }>;
-  verifyOTP: (phone: string, code: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
-  updateUser: (data: Partial<User>) => void;
-}
-
-export interface RegisterData {
-  fullName: string;
-  phone: string;
-  email?: string;
-  password: string;
-  confirmPassword: string;
-  city: string;
-  acceptTerms: boolean;
-  otpCode?: string;
-}
-
-export interface VendorRegisterData {
-  // Step 1
-  fullName: string;
-  phone: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  idDocument: File | null;
-  idDocumentType: 'cni' | 'passport';
-  // Step 2
-  shopName: string;
-  country: 'SN' | 'BF';
-  city: string;
-  address: string;
-  shopCategory: string;
-  shopDescription: string;
-  shopLogo: File | null;
-  commerceRegister?: string;
-  acceptTerms: boolean;
+  login: (identifier: string, password: string) => Promise<AuthResult>;
+  register: (data: RegisterData) => Promise<AuthResult>;
+  registerVendor: (data: VendorRegisterData) => Promise<AuthResult>;
+  logout: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<AuthResult>;
+  updatePassword: (password: string) => Promise<AuthResult>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Simulated database storage
-const STORAGE_KEYS = {
-  USERS: 'afrizone_users',
-  VENDORS: 'afrizone_vendors',
-  SESSION: 'afrizone_session',
-  OTP: 'afrizone_otp',
-};
-
-function generateId(): string {
-  return 'usr_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+function mapProfile(row: Record<string, unknown>, vendor?: VendorProfile | null): AuthUser {
+  return {
+    id: row.id as string,
+    fullName: row.full_name as string,
+    phone: (row.phone as string) ?? null,
+    email: (row.email as string) ?? null,
+    role: row.role as UserRole,
+    city: (row.city as string) ?? null,
+    avatarUrl: (row.avatar_url as string) ?? null,
+    verified: Boolean(row.verified),
+    createdAt: row.created_at as string,
+    vendor: vendor ?? null,
+  };
 }
 
-function generateVendorCode(country: 'SN' | 'BF', city: string): string {
-  const cityCode = city.toUpperCase().substring(0, 3);
-  const random = Math.floor(1000 + Math.random() * 9000);
-  return `${country}-${cityCode}-${random}`;
+function mapVendor(row: Record<string, unknown>): VendorProfile {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    status: row.status as VendorProfile['status'],
+    shopName: row.shop_name as string,
+    shopSlug: row.shop_slug as string,
+    shopDescription: (row.shop_description as string) ?? null,
+    shopCategory: (row.shop_category as string) ?? null,
+    shopLogoUrl: (row.shop_logo_url as string) ?? null,
+    vendorCode: row.vendor_code as string,
+    country: row.country as string,
+    city: row.city as string,
+    address: (row.address as string) ?? null,
+    commerceRegister: (row.commerce_register as string) ?? null,
+    idDocumentUrl: (row.id_document_url as string) ?? null,
+    idDocumentType: (row.id_document_type as string) ?? null,
+  };
 }
 
-function hashPassword(password: string): string {
-  // Simple hash for demo (use bcrypt in production)
-  return btoa(password + '_afrizone_salt_2026');
+async function resolveLoginEmail(identifier: string): Promise<string | null> {
+  const value = identifier.trim();
+  if (isEmail(value)) return value.toLowerCase();
+
+  const phone = normalizePhone(value);
+  const { data } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('phone', phone)
+    .maybeSingle();
+
+  if (data?.email) return data.email as string;
+  return authEmailFromPhone(phone);
+}
+
+async function uploadPrivateFile(
+  bucket: string,
+  userId: string,
+  file: File,
+  folder: string
+): Promise<string> {
+  const ext = file.name.split('.').pop() || 'bin';
+  const path = `${userId}/${folder}/${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from(bucket).upload(path, file, {
+    upsert: true,
+    contentType: file.type,
+  });
+  if (error) throw error;
+  return path;
+}
+
+async function uploadPublicFile(
+  bucket: string,
+  userId: string,
+  file: File,
+  folder: string
+): Promise<string> {
+  const path = await uploadPrivateFile(bucket, userId, file, folder);
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return data.publicUrl;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
-    session: null,
     isAuthenticated: false,
     isLoading: true,
   });
 
-  // Load session on mount
-  useEffect(() => {
-    const loadSession = () => {
-      try {
-        const sessionStr = localStorage.getItem(STORAGE_KEYS.SESSION);
-        if (sessionStr) {
-          const session: Session = JSON.parse(sessionStr);
-          if (new Date(session.expiresAt) > new Date()) {
-            setState({
-              user: session.user,
-              session,
-              isAuthenticated: true,
-              isLoading: false,
-            });
-            return;
-          }
-        }
-      } catch (e) {
-        console.error('Failed to load session', e);
-      }
-      setState(prev => ({ ...prev, isLoading: false }));
-    };
-    loadSession();
+  const loadUser = useCallback(async (session: Session | null) => {
+    if (!session?.user) {
+      setState({ user: null, isAuthenticated: false, isLoading: false });
+      return;
+    }
+
+    const userId = session.user.id;
+
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error || !profile) {
+      console.error('Failed to load profile', error);
+      setState({ user: null, isAuthenticated: false, isLoading: false });
+      return;
+    }
+
+    let vendor: VendorProfile | null = null;
+    if (profile.role === 'vendeur') {
+      const { data: vendorRow } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (vendorRow) vendor = mapVendor(vendorRow);
+    }
+
+    setState({
+      user: mapProfile(profile, vendor),
+      isAuthenticated: true,
+      isLoading: false,
+    });
   }, []);
 
-  // Simulated OTP storage
-  const otpStore = new Map<string, OTPRequest>();
+  useEffect(() => {
+    let mounted = true;
 
-  const requestOTP = async (phone: string, type: 'register' | 'login' | 'password-reset'): Promise<{ success: boolean; code?: string; error?: string }> => {
-    // Generate 6-digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    const otp: OTPRequest = {
-      phone,
-      code,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
-      verified: false,
-      type,
+    supabase.auth.getSession().then(({ data }) => {
+      if (mounted) loadUser(data.session);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      loadUser(session);
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
     };
-    
-    otpStore.set(phone, otp);
-    
-    // Store in localStorage for persistence
-    const otps = JSON.parse(localStorage.getItem(STORAGE_KEYS.OTP) || '[]');
-    otps.push(otp);
-    localStorage.setItem(STORAGE_KEYS.OTP, JSON.stringify(otps));
+  }, [loadUser]);
 
-    // Simulate SMS sending
-    console.log(`📱 SMS OTP sent to ${phone}: ${code}`);
-    
-    // In development, return the code for testing
-    return { success: true, code };
-  };
+  const refreshProfile = useCallback(async () => {
+    const { data } = await supabase.auth.getSession();
+    await loadUser(data.session);
+  }, [loadUser]);
 
-  const verifyOTP = async (phone: string, code: string): Promise<{ success: boolean; error?: string }> => {
-    const otp = otpStore.get(phone);
-    if (!otp) {
-      return { success: false, error: 'Code OTP non trouvé. Veuillez en demander un nouveau.' };
-    }
-    if (otp.expiresAt < new Date()) {
-      otpStore.delete(phone);
-      return { success: false, error: 'Code OTP expiré. Veuillez en demander un nouveau.' };
-    }
-    if (otp.code !== code) {
-      return { success: false, error: 'Code OTP incorrect.' };
-    }
-    otp.verified = true;
-    otpStore.set(phone, otp);
-    return { success: true };
-  };
-
-  const login = async (phone: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  const login = async (identifier: string, password: string): Promise<AuthResult> => {
     try {
-      const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
-      const vendors = JSON.parse(localStorage.getItem(STORAGE_KEYS.VENDORS) || '[]');
-      const allUsers = [...users, ...vendors];
-      
-      const user = allUsers.find((u: any) => u.phone === phone && u.password === hashPassword(password));
-      
-      if (!user) {
-        return { success: false, error: 'Numéro de téléphone ou mot de passe incorrect.' };
+      const email = await resolveLoginEmail(identifier);
+      if (!email) {
+        return { success: false, error: 'Identifiant invalide.' };
       }
 
-      if (user.role === 'vendeur' && user.status === 'pending') {
-        return { success: false, error: 'Votre compte vendeur est en attente de validation par l\'administrateur.' };
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { success: false, error: mapAuthError(error.message) };
+
+      if (data.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .maybeSingle();
+
+        if (profile?.role === 'vendeur') {
+          const { data: vendor } = await supabase
+            .from('vendors')
+            .select('status')
+            .eq('user_id', data.user.id)
+            .maybeSingle();
+
+          if (vendor?.status === 'pending') {
+            await supabase.auth.signOut();
+            return {
+              success: false,
+              error: "Votre compte vendeur est en attente de validation par l'administrateur.",
+            };
+          }
+          if (vendor?.status === 'rejected' || vendor?.status === 'suspended') {
+            await supabase.auth.signOut();
+            return {
+              success: false,
+              error: 'Votre compte vendeur n’est pas actif. Contactez le support.',
+            };
+          }
+        }
       }
-
-      if (user.role === 'vendeur' && user.status === 'rejected') {
-        return { success: false, error: 'Votre compte vendeur a été refusé. Veuillez contacter le support.' };
-      }
-
-      const session: Session = {
-        user,
-        token: 'tok_' + Math.random().toString(36).substr(2),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-      };
-
-      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(session));
-      
-      setState({
-        user,
-        session,
-        isAuthenticated: true,
-        isLoading: false,
-      });
 
       return { success: true };
     } catch (e) {
-      console.error('Login error', e);
+      console.error(e);
       return { success: false, error: 'Une erreur est survenue lors de la connexion.' };
     }
   };
 
-  const register = async (data: RegisterData): Promise<{ success: boolean; error?: string }> => {
+  const register = async (data: RegisterData): Promise<AuthResult> => {
     try {
-      const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
-      
-      if (users.some((u: any) => u.phone === data.phone)) {
-        return { success: false, error: 'Ce numéro de téléphone est déjà utilisé.' };
-      }
-
-      if (data.email && users.some((u: any) => u.email === data.email)) {
-        return { success: false, error: 'Cet email est déjà utilisé.' };
-      }
-
       if (data.password !== data.confirmPassword) {
         return { success: false, error: 'Les mots de passe ne correspondent pas.' };
       }
-
       if (!data.acceptTerms) {
-        return { success: false, error: 'Vous devez accepter les conditions générales de vente.' };
+        return { success: false, error: 'Vous devez accepter les conditions générales.' };
       }
 
-      const newUser: User = {
-        id: generateId(),
-        fullName: data.fullName,
-        phone: data.phone,
-        email: data.email,
-        role: 'client',
-        city: data.city,
-        createdAt: new Date(),
-        verified: true,
-      };
-      (newUser as any).password = hashPassword(data.password);
+      const phone = normalizePhone(data.phone);
+      const email = data.email?.trim()
+        ? data.email.trim().toLowerCase()
+        : authEmailFromPhone(phone);
 
-      users.push(newUser);
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      const { data: existingPhone } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('phone', phone)
+        .maybeSingle();
 
-      // Auto login after registration
-      const session: Session = {
-        user: newUser,
-        token: 'tok_' + Math.random().toString(36).substr(2),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      };
-      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(session));
+      if (existingPhone) {
+        return { success: false, error: 'Ce numéro de téléphone est déjà utilisé.' };
+      }
 
-      setState({
-        user: newUser,
-        session,
-        isAuthenticated: true,
-        isLoading: false,
+      const { data: authData, error } = await supabase.auth.signUp({
+        email,
+        password: data.password,
+        options: {
+          data: {
+            full_name: data.fullName,
+            phone,
+            city: data.city,
+            role: 'client',
+            email: data.email?.trim() || null,
+          },
+        },
       });
+
+      if (error) return { success: false, error: mapAuthError(error.message) };
+
+      if (authData.user) {
+        await supabase
+          .from('profiles')
+          .update({
+            phone,
+            full_name: data.fullName,
+            city: data.city,
+            email: isSyntheticAuthEmail(email) ? null : email,
+            role: 'client',
+          })
+          .eq('id', authData.user.id);
+      }
+
+      if (!authData.session) {
+        return {
+          success: true,
+          needsEmailConfirmation: true,
+        };
+      }
 
       return { success: true };
     } catch (e) {
-      console.error('Register error', e);
-      return { success: false, error: 'Une erreur est survenue lors de l\'inscription.' };
+      console.error(e);
+      return { success: false, error: "Une erreur est survenue lors de l'inscription." };
     }
   };
 
-  const registerVendor = async (data: VendorRegisterData): Promise<{ success: boolean; error?: string }> => {
+  const registerVendor = async (data: VendorRegisterData): Promise<AuthResult> => {
     try {
-      const vendors = JSON.parse(localStorage.getItem(STORAGE_KEYS.VENDORS) || '[]');
-      
-      if (vendors.some((v: any) => v.phone === data.phone)) {
-        return { success: false, error: 'Ce numéro de téléphone est déjà utilisé.' };
-      }
-
-      if (vendors.some((v: any) => v.email === data.email)) {
-        return { success: false, error: 'Cet email est déjà utilisé.' };
-      }
-
       if (data.password !== data.confirmPassword) {
         return { success: false, error: 'Les mots de passe ne correspondent pas.' };
       }
-
       if (!data.acceptTerms) {
-        return { success: false, error: 'Vous devez accepter les conditions générales de vente.' };
+        return { success: false, error: 'Vous devez accepter les conditions générales.' };
+      }
+      if (!data.idDocument) {
+        return { success: false, error: "Veuillez uploader votre pièce d'identité." };
+      }
+
+      const phone = normalizePhone(data.phone);
+      const email = data.email.trim().toLowerCase();
+
+      const { data: existingPhone } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('phone', phone)
+        .maybeSingle();
+
+      if (existingPhone) {
+        return { success: false, error: 'Ce numéro de téléphone est déjà utilisé.' };
+      }
+
+      const { data: authData, error } = await supabase.auth.signUp({
+        email,
+        password: data.password,
+        options: {
+          data: {
+            full_name: data.fullName,
+            phone,
+            city: data.city,
+            role: 'vendeur',
+            email,
+          },
+        },
+      });
+
+      if (error) return { success: false, error: mapAuthError(error.message) };
+      if (!authData.user) {
+        return { success: false, error: "Impossible de créer le compte." };
+      }
+
+      const userId = authData.user.id;
+
+      // Si confirmation email requise, pas de session → on ne peut pas uploader
+      if (!authData.session) {
+        return {
+          success: true,
+          needsEmailConfirmation: true,
+          error:
+            'Compte créé. Confirmez votre email, puis reconnectez-vous pour finaliser le dossier vendeur si nécessaire.',
+        };
+      }
+
+      await supabase
+        .from('profiles')
+        .update({
+          phone,
+          full_name: data.fullName,
+          city: data.city,
+          email,
+          role: 'vendeur',
+        })
+        .eq('id', userId);
+
+      const idDocumentPath = await uploadPrivateFile(
+        'vendor-documents',
+        userId,
+        data.idDocument,
+        'identity'
+      );
+
+      let shopLogoUrl: string | null = null;
+      if (data.shopLogo) {
+        shopLogoUrl = await uploadPublicFile('avatars', userId, data.shopLogo, 'shop-logo');
       }
 
       const vendorCode = generateVendorCode(data.country, data.city);
+      const baseSlug = slugify(data.shopName) || 'boutique';
+      const shopSlug = `${baseSlug}-${vendorCode.toLowerCase()}`;
 
-      const newVendor: Vendor = {
-        id: generateId(),
-        fullName: data.fullName,
-        phone: data.phone,
-        email: data.email,
-        role: 'vendeur',
+      const { error: vendorError } = await supabase.from('vendors').insert({
+        user_id: userId,
         status: 'pending',
-        shopName: data.shopName,
-        shopDescription: data.shopDescription,
-        shopCategory: data.shopCategory,
-        vendorCode,
+        vendor_code: vendorCode,
+        shop_name: data.shopName,
+        shop_slug: shopSlug,
+        shop_description: data.shopDescription,
+        shop_category: data.shopCategory,
+        shop_logo_url: shopLogoUrl,
         country: data.country,
         city: data.city,
         address: data.address,
-        commerceRegister: data.commerceRegister,
-        createdAt: new Date(),
-        verified: false,
-      };
-      (newVendor as any).password = hashPassword(data.password);
+        commerce_register: data.commerceRegister || null,
+        id_document_url: idDocumentPath,
+        id_document_type: data.idDocumentType,
+      });
 
-      vendors.push(newVendor);
-      localStorage.setItem(STORAGE_KEYS.VENDORS, JSON.stringify(vendors));
+      if (vendorError) {
+        console.error(vendorError);
+        return {
+          success: false,
+          error: vendorError.message.includes('duplicate')
+            ? 'Cette boutique ou ce code existe déjà. Réessayez.'
+            : `Erreur lors de la création de la boutique : ${vendorError.message}`,
+        };
+      }
 
-      return { success: true, error: undefined };
+      // Déconnexion : vendeur pending ne doit pas rester connecté
+      await supabase.auth.signOut();
+
+      return { success: true, vendorCode };
     } catch (e) {
-      console.error('Vendor register error', e);
-      return { success: false, error: 'Une erreur est survenue lors de l\'inscription.' };
+      console.error(e);
+      return { success: false, error: "Une erreur est survenue lors de l'inscription vendeur." };
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem(STORAGE_KEYS.SESSION);
-    setState({
-      user: null,
-      session: null,
-      isAuthenticated: false,
-      isLoading: false,
-    });
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setState({ user: null, isAuthenticated: false, isLoading: false });
   };
 
-  const updateUser = (data: Partial<User>) => {
-    if (state.user) {
-      const updatedUser = { ...state.user, ...data };
-      const session: Session = {
-        ...state.session!,
-        user: updatedUser,
-      };
-      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(session));
-      setState(prev => ({
-        ...prev,
-        user: updatedUser,
-        session,
-      }));
+  const requestPasswordReset = async (email: string): Promise<AuthResult> => {
+    try {
+      const redirectTo = `${window.location.origin}/auth/reset-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo,
+      });
+      if (error) return { success: false, error: mapAuthError(error.message) };
+      return { success: true };
+    } catch {
+      return { success: false, error: "Impossible d'envoyer l'email de réinitialisation." };
+    }
+  };
+
+  const updatePassword = async (password: string): Promise<AuthResult> => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) return { success: false, error: mapAuthError(error.message) };
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Impossible de mettre à jour le mot de passe.' };
     }
   };
 
   return (
-    <AuthContext.Provider value={{ ...state, login, register, registerVendor, requestOTP, verifyOTP, logout, updateUser }}>
+    <AuthContext.Provider
+      value={{
+        ...state,
+        login,
+        register,
+        registerVendor,
+        logout,
+        requestPasswordReset,
+        updatePassword,
+        refreshProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

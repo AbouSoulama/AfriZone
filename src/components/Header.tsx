@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, ShoppingCart, MapPin, User, Menu, X, ChevronDown, Truck, Shield, Headphones, CreditCard } from 'lucide-react';
+import { Search, ShoppingCart, MapPin, User, Menu, X, ChevronDown, Truck, Shield, Headphones, CreditCard, LogOut } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
-const cities = ['Dakar', 'Ouagadougou', 'Bamako', 'Abidjan', 'Lomé', 'Cotonou'];
+const cities = ['Dakar', 'Ouagadougou', 'Bamako'];
 
 export default function Header() {
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [city, setCity] = useState('Dakar');
   const [cityOpen, setCityOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [scrolled, setScrolled] = useState(false);
 
@@ -42,13 +45,13 @@ export default function Header() {
           </button>
 
           {/* Logo */}
-          <div className="flex items-center gap-2 shrink-0">
+          <Link to="/" className="flex items-center gap-2 shrink-0">
             <img
               src="/logo-afrizone.png"
               alt="AfriZone - Achetez. Vendez. Expédiez."
               className="h-12 w-auto object-contain"
             />
-          </div>
+          </Link>
 
           {/* Search bar */}
           <div className="hidden md:flex flex-1 max-w-xl relative">
@@ -95,20 +98,66 @@ export default function Header() {
             <span className="absolute -top-0.5 -right-0.5 bg-[#FF6B00] text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">3</span>
           </button>
 
-          {/* Auth buttons */}
-          <div className="hidden sm:flex items-center gap-2">
-            <Link to="/auth/login" className="px-4 py-2 text-sm font-semibold text-[#1F2937] hover:text-[#FF6B00] transition-colors">
-              Connexion
-            </Link>
-            <Link to="/auth/register/client" className="px-4 py-2 text-sm font-semibold bg-[#00A651] text-white rounded-lg hover:bg-[#008A43] transition-colors shadow-sm">
-              Inscription
-            </Link>
-          </div>
+          {/* Auth */}
+          {!isLoading && (
+            <>
+              {isAuthenticated && user ? (
+                <div className="relative hidden sm:block">
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-[#FF6B00] text-white flex items-center justify-center text-sm font-bold">
+                      {user.fullName.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-sm font-semibold text-[#1F2937] max-w-[120px] truncate">
+                      {user.fullName.split(' ')[0]}
+                    </span>
+                    <ChevronDown size={14} />
+                  </button>
+                  {userMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
+                      <div className="px-4 py-2 border-b border-gray-100">
+                        <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+                        <p className="text-sm font-semibold truncate">{user.fullName}</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          setUserMenuOpen(false);
+                          await logout();
+                        }}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                      >
+                        <LogOut size={14} /> Déconnexion
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="hidden sm:flex items-center gap-2">
+                  <Link to="/auth/login" className="px-4 py-2 text-sm font-semibold text-[#1F2937] hover:text-[#FF6B00] transition-colors">
+                    Connexion
+                  </Link>
+                  <Link to="/auth/register/client" className="px-4 py-2 text-sm font-semibold bg-[#00A651] text-white rounded-lg hover:bg-[#008A43] transition-colors shadow-sm">
+                    Inscription
+                  </Link>
+                </div>
+              )}
 
-          {/* Mobile auth */}
-          <Link to="/auth/login" className="sm:hidden p-2 hover:bg-gray-100 rounded-full">
-            <User size={22} />
-          </Link>
+              <Link
+                to={isAuthenticated ? '/' : '/auth/login'}
+                className="sm:hidden p-2 hover:bg-gray-100 rounded-full"
+                onClick={async (e) => {
+                  if (isAuthenticated) {
+                    e.preventDefault();
+                    await logout();
+                  }
+                }}
+              >
+                {isAuthenticated ? <LogOut size={22} /> : <User size={22} />}
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile search */}
@@ -139,8 +188,22 @@ export default function Header() {
             ))}
           </nav>
           <div className="flex gap-2 mt-4">
-            <Link to="/auth/login" className="flex-1 px-4 py-2.5 text-sm font-semibold border-2 border-[#00A651] text-[#00A651] rounded-lg text-center">Connexion</Link>
-            <Link to="/auth/register/client" className="flex-1 px-4 py-2.5 text-sm font-semibold bg-[#00A651] text-white rounded-lg text-center">Inscription</Link>
+            {isAuthenticated && user ? (
+              <button
+                onClick={async () => {
+                  setMobileMenuOpen(false);
+                  await logout();
+                }}
+                className="flex-1 px-4 py-2.5 text-sm font-semibold border-2 border-red-200 text-red-600 rounded-lg text-center"
+              >
+                Déconnexion ({user.fullName.split(' ')[0]})
+              </button>
+            ) : (
+              <>
+                <Link to="/auth/login" className="flex-1 px-4 py-2.5 text-sm font-semibold border-2 border-[#00A651] text-[#00A651] rounded-lg text-center">Connexion</Link>
+                <Link to="/auth/register/client" className="flex-1 px-4 py-2.5 text-sm font-semibold bg-[#00A651] text-white rounded-lg text-center">Inscription</Link>
+              </>
+            )}
           </div>
         </div>
       )}
