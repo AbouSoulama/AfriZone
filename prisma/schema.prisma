@@ -1,0 +1,389 @@
+// Prisma Schema for AfriZone
+// PostgreSQL Database Configuration
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Roles
+enum UserRole {
+  VISITEUR
+  CLIENT
+  VENDEUR
+  ADMIN
+  LIVREUR
+}
+
+// Vendor Status
+enum VendorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Order Status
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+// User Model
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  phone         String    @unique
+  password      String
+  fullName      String
+  role          UserRole  @default(CLIENT)
+  city          String?
+  avatar        String?
+  verified      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLogin     DateTime?
+  
+  // Relations
+  sessions      Session[]
+  orders        Order[]
+  reviews       Review[]
+  cart          Cart?
+  addresses     Address[]
+  notifications Notification[]
+  
+  // Role-specific relations
+  vendor        Vendor?
+  deliveryPerson DeliveryPerson?
+  
+  @@index([phone])
+  @@index([email])
+  @@index([role])
+}
+
+// Vendor Model
+model Vendor {
+  id                String       @id @default(cuid())
+  userId            String       @unique
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  status            VendorStatus @default(PENDING)
+  vendorCode        String       @unique
+  shopName          String
+  shopSlug          String       @unique
+  shopDescription   String?
+  shopCategory      String?
+  shopLogo          String?
+  shopCover         String?
+  
+  country           String
+  city              String
+  address           String?
+  commerceRegister  String?
+  idDocument        String?
+  idDocumentType    String?      // CNI or PASSPORT
+  
+  rating            Float        @default(0)
+  totalSales        Int          @default(0)
+  totalOrders       Int          @default(0)
+  
+  approvedAt        DateTime?
+  approvedBy        String?
+  rejectionReason   String?
+  
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  // Relations
+  products          Product[]
+  orders            Order[]
+  reviews           Review[]
+  
+  @@index([vendorCode])
+  @@index([status])
+  @@index([shopSlug])
+}
+
+// Delivery Person Model
+model DeliveryPerson {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  vehicleType    String?  // MOTO, CAR, VAN
+  licenseNumber  String?
+  vehiclePlate   String?
+  rating         Float    @default(0)
+  totalDeliveries Int     @default(0)
+  isAvailable    Boolean  @default(true)
+  currentLocation String?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  deliveries     Delivery[]
+}
+
+// Product Model
+model Product {
+  id          String   @id @default(cuid())
+  vendorId    String
+  vendor      Vendor   @relation(fields: [vendorId], references: [id])
+  
+  name        String
+  slug        String   @unique
+  description String?
+  category    String
+  subcategory String?
+  brand       String?
+  
+  price       Float
+  oldPrice    Float?
+  currency    String   @default("FCFA")
+  stock       Int      @default(0)
+  sku         String?
+  
+  images      String[] // Array of image URLs
+  mainImage   String?
+  
+  rating      Float    @default(0)
+  reviewCount Int      @default(0)
+  soldCount   Int      @default(0)
+  
+  isActive    Boolean  @default(true)
+  isFeatured  Boolean  @default(false)
+  tags        String[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  orderItems  OrderItem[]
+  reviews     Review[]
+  cartItems   CartItem[]
+  wishlist    WishlistItem[]
+  
+  @@index([vendorId])
+  @@index([category])
+  @@index([slug])
+  @@index([isActive])
+}
+
+// Order Model
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique
+  userId        String?
+  user          User?       @relation(fields: [userId], references: [id])
+  vendorId      String?
+  vendor        Vendor?     @relation(fields: [vendorId], references: [id])
+  
+  status        OrderStatus @default(PENDING)
+  subtotal      Float
+  shippingCost  Float       @default(0)
+  tax           Float       @default(0)
+  total         Float
+  
+  paymentMethod String?     // ORANGE_MONEY, WAVE, CARD, CASH
+  paymentStatus String      @default("PENDING")
+  paymentId     String?
+  
+  shippingAddress String
+  shippingCity    String
+  shippingPhone   String
+  trackingNumber  String?
+  
+  notes         String?
+  cancelledAt   DateTime?
+  cancelReason  String?
+  deliveredAt   DateTime?
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // Relations
+  items         OrderItem[]
+  delivery      Delivery?
+}
+
+// Order Item Model
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  
+  quantity  Int
+  price     Float
+  total     Float
+  
+  createdAt DateTime @default(now())
+}
+
+// Delivery Model
+model Delivery {
+  id              String   @id @default(cuid())
+  orderId         String   @unique
+  order           Order    @relation(fields: [orderId], references: [id])
+  deliveryPersonId String?
+  deliveryPerson  DeliveryPerson? @relation(fields: [deliveryPersonId], references: [id])
+  
+  status          String   @default("PENDING") // PENDING, PICKED_UP, IN_TRANSIT, DELIVERED, FAILED
+  pickupAddress   String?
+  pickupCity      String?
+  deliveryAddress String
+  deliveryCity    String
+  
+  estimatedDelivery DateTime?
+  actualDelivery    DateTime?
+  
+  trackingHistory Json?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Cart Model
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  items     CartItem[]
+  updatedAt DateTime   @updatedAt
+}
+
+// Cart Item Model
+model CartItem {
+  id        String  @id @default(cuid())
+  cartId    String
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  
+  quantity  Int     @default(1)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([cartId, productId])
+}
+
+// Review Model
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  vendorId  String?
+  vendor    Vendor?  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  orderId   String?
+  
+  rating    Int      @default(5)
+  title     String?
+  comment   String?
+  images    String[]
+  
+  isVerified Boolean @default(false)
+  isApproved Boolean @default(true)
+  helpfulCount Int  @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([productId])
+  @@index([vendorId])
+}
+
+// Address Model
+model Address {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  label     String? // Home, Work, etc.
+  fullName  String
+  phone     String
+  country   String
+  city      String
+  address   String
+  isDefault Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Session Model (for NextAuth.js compatibility)
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  
+  @@index([sessionToken])
+}
+
+// OTP Model (for SMS verification)
+model OTP {
+  id        String   @id @default(cuid())
+  phone     String
+  code      String
+  type      String   // REGISTER, LOGIN, PASSWORD_RESET
+  verified  Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  @@index([phone])
+  @@index([expiresAt])
+}
+
+// Notification Model
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type      String   // ORDER, PROMOTION, SYSTEM, MESSAGE
+  title     String
+  message   String
+  data      Json?
+  isRead    Boolean  @default(false)
+  
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([isRead])
+}
+
+// Wishlist Model
+model Wishlist {
+  id        String         @id @default(cuid())
+  userId    String         @unique
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     WishlistItem[]
+  updatedAt DateTime       @updatedAt
+}
+
+model WishlistItem {
+  id         String   @id @default(cuid())
+  wishlistId String
+  wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
+  
+  @@unique([wishlistId, productId])
+}
