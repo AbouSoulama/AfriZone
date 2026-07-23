@@ -1,4 +1,4 @@
-import { Package, Truck, MapPin, Clock, Shield, ArrowRight, Phone } from 'lucide-react';
+import { Package, Truck, MapPin, Clock, Shield, ArrowRight } from 'lucide-react';
 
 const features = [
   { icon: Truck, title: 'Livraison rapide', desc: '24-48h en ville' },

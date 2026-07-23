@@ -1,4 +1,4 @@
-import { Mail, Phone, MapPin, Send, CreditCard, Truck, Shield, Headphones } from 'lucide-react';
+import { Mail, MapPin, Send, CreditCard, Truck, Shield, Headphones } from 'lucide-react';
 
 const SocialIcon = ({ path }: { path: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d={path} /></svg>

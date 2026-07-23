@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { CartProvider } from './context/CartContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Header from './components/Header';
 import HeroCarousel from './components/HeroCarousel';
@@ -11,6 +12,10 @@ import Footer from './components/Footer';
 import CatalogPage from './pages/Catalog';
 import ProductDetailPage from './pages/ProductDetail';
 import VendorShopPage from './pages/VendorShop';
+import CartPage from './pages/Cart';
+import CheckoutPage from './pages/Checkout';
+import OrdersPage from './pages/Orders';
+import OrderDetailPage from './pages/OrderDetail';
 import VendorLayout from './pages/vendor/VendorLayout';
 import VendorDashboard from './pages/vendor/VendorDashboard';
 import VendorProductsPage from './pages/vendor/VendorProducts';
@@ -68,46 +73,52 @@ function HomePage() {
 export default function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/catalogue" element={<CatalogPage />} />
-          <Route path="/produit/:slug" element={<ProductDetailPage />} />
-          <Route path="/boutique/:slug" element={<VendorShopPage />} />
+      <CartProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/catalogue" element={<CatalogPage />} />
+            <Route path="/produit/:slug" element={<ProductDetailPage />} />
+            <Route path="/boutique/:slug" element={<VendorShopPage />} />
+            <Route path="/panier" element={<CartPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/commandes" element={<OrdersPage />} />
+            <Route path="/commandes/:id" element={<OrderDetailPage />} />
 
-          <Route path="/auth/login" element={<LoginPage />} />
-          <Route path="/auth/register/client" element={<RegisterClientPage />} />
-          <Route path="/auth/register/vendor" element={<RegisterVendorPage />} />
-          <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/auth/login" element={<LoginPage />} />
+            <Route path="/auth/register/client" element={<RegisterClientPage />} />
+            <Route path="/auth/register/vendor" element={<RegisterVendorPage />} />
+            <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
 
-          <Route
-            path="/vendeur"
-            element={
-              <ProtectedRoute roles={['vendeur']}>
-                <VendorLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<VendorDashboard />} />
-            <Route path="produits" element={<VendorProductsPage />} />
-            <Route path="produits/nouveau" element={<VendorProductFormPage />} />
-            <Route path="produits/:id" element={<VendorProductFormPage />} />
-          </Route>
+            <Route
+              path="/vendeur"
+              element={
+                <ProtectedRoute roles={['vendeur']}>
+                  <VendorLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<VendorDashboard />} />
+              <Route path="produits" element={<VendorProductsPage />} />
+              <Route path="produits/nouveau" element={<VendorProductFormPage />} />
+              <Route path="produits/:id" element={<VendorProductFormPage />} />
+            </Route>
 
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute roles={['admin']}>
-                <AdminLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="/admin/vendeurs" replace />} />
-            <Route path="vendeurs" element={<AdminVendorsPage />} />
-          </Route>
-        </Routes>
-      </Router>
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute roles={['admin']}>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="/admin/vendeurs" replace />} />
+              <Route path="vendeurs" element={<AdminVendorsPage />} />
+            </Route>
+          </Routes>
+        </Router>
+      </CartProvider>
     </AuthProvider>
   );
 }

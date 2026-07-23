@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, MapPin, User, Menu, X, ChevronDown, Truck, Shield, Headphones, CreditCard, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 
 const cities = ['Dakar', 'Ouagadougou', 'Bamako'];
 
@@ -18,6 +19,7 @@ const navItems = [
 export default function Header() {
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { itemCount } = useCart();
   const [city, setCity] = useState('Dakar');
   const [cityOpen, setCityOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -121,8 +123,17 @@ export default function Header() {
           </div>
 
           {/* Cart */}
-          <Link to="/catalogue" className="relative p-2 hover:bg-gray-100 rounded-full transition-colors" title="Catalogue">
+          <Link
+            to="/panier"
+            className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
+            title="Panier"
+          >
             <ShoppingCart size={22} className="text-[#1F2937]" />
+            {itemCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-[#FF6B00] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                {itemCount > 99 ? '99+' : itemCount}
+              </span>
+            )}
           </Link>
 
           {/* Auth */}
@@ -155,6 +166,20 @@ export default function Header() {
                           <p className="text-xs text-[#00A651] truncate">{user.vendor.shopName}</p>
                         )}
                       </div>
+                      <Link
+                        to="/commandes"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2 text-sm hover:bg-orange-50"
+                      >
+                        Mes commandes
+                      </Link>
+                      <Link
+                        to="/panier"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2 text-sm hover:bg-orange-50"
+                      >
+                        Panier
+                      </Link>
                       {user.role === 'vendeur' && (
                         <Link
                           to="/vendeur"
@@ -263,6 +288,22 @@ export default function Header() {
             >
               Catalogue
             </Link>
+            <Link
+              to="/panier"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
+            >
+              Panier{itemCount > 0 ? ` (${itemCount})` : ''}
+            </Link>
+            {isAuthenticated && (
+              <Link
+                to="/commandes"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
+              >
+                Mes commandes
+              </Link>
+            )}
             <Link
               to="/auth/register/vendor"
               onClick={() => setMobileMenuOpen(false)}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   CheckCircle,
@@ -12,16 +12,22 @@ import {
 } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import { fetchProductBySlug, formatPrice } from '../services/catalog';
 import type { CatalogProduct } from '../types/catalog';
 
 export default function ProductDetailPage() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const { addItem } = useCart();
   const [product, setProduct] = useState<CatalogProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState(0);
   const [cartMsg, setCartMsg] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -202,25 +208,59 @@ export default function ProductDetailPage() {
 
               <div className="flex flex-wrap gap-3 mb-6">
                 <button
-                  onClick={() => {
-                    setCartMsg('Panier bientôt disponible (Module 4).');
-                    setTimeout(() => setCartMsg(null), 3000);
+                  disabled={adding || product.stock <= 0}
+                  onClick={async () => {
+                    if (!isAuthenticated) {
+                      navigate('/auth/login', { state: { from: `/produit/${slug}` } });
+                      return;
+                    }
+                    setAdding(true);
+                    setCartMsg(null);
+                    try {
+                      await addItem(product.id, 1);
+                      setCartMsg('Ajouté au panier.');
+                      setTimeout(() => setCartMsg(null), 3000);
+                    } catch (e) {
+                      setCartMsg(e instanceof Error ? e.message : 'Erreur panier');
+                    } finally {
+                      setAdding(false);
+                    }
                   }}
-                  className="flex-1 min-w-[160px] inline-flex items-center justify-center gap-2 py-3.5 bg-[#FF6B00] hover:bg-[#E05E00] text-white rounded-xl font-bold"
+                  className="flex-1 min-w-[160px] inline-flex items-center justify-center gap-2 py-3.5 bg-[#FF6B00] hover:bg-[#E05E00] text-white rounded-xl font-bold disabled:opacity-50"
                 >
-                  <ShoppingCart size={18} /> Ajouter au panier
+                  <ShoppingCart size={18} /> {adding ? 'Ajout...' : 'Ajouter au panier'}
                 </button>
                 <button
-                  onClick={() => {
-                    setCartMsg('Checkout bientôt disponible (Module 4).');
-                    setTimeout(() => setCartMsg(null), 3000);
+                  disabled={adding || product.stock <= 0}
+                  onClick={async () => {
+                    if (!isAuthenticated) {
+                      navigate('/auth/login', { state: { from: `/produit/${slug}` } });
+                      return;
+                    }
+                    setAdding(true);
+                    setCartMsg(null);
+                    try {
+                      await addItem(product.id, 1);
+                      navigate('/checkout');
+                    } catch (e) {
+                      setCartMsg(e instanceof Error ? e.message : 'Erreur panier');
+                      setAdding(false);
+                    }
                   }}
-                  className="flex-1 min-w-[160px] py-3.5 bg-[#00A651] hover:bg-[#008A43] text-white rounded-xl font-bold"
+                  className="flex-1 min-w-[160px] py-3.5 bg-[#00A651] hover:bg-[#008A43] text-white rounded-xl font-bold disabled:opacity-50"
                 >
                   Acheter maintenant
                 </button>
               </div>
-              {cartMsg && <p className="text-sm text-amber-700 mb-4">{cartMsg}</p>}
+              {cartMsg && (
+                <p
+                  className={`text-sm mb-4 ${
+                    cartMsg.includes('Ajouté') ? 'text-green-700' : 'text-amber-700'
+                  }`}
+                >
+                  {cartMsg}
+                </p>
+              )}
 
               <div className="bg-white border border-gray-100 rounded-2xl p-5">
                 <h2 className="font-extrabold text-[#1F2937] mb-3">Description</h2>
