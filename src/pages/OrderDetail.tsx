@@ -10,8 +10,10 @@ import {
   fetchOrderById,
   ORDER_STATUS_LABELS,
   ORDER_TIMELINE,
+  PAYMENT_METHOD_LABELS,
   type OrderStatus,
   type OrderView,
+  type PaymentMethod,
 } from '../services/orders';
 
 function timelineIndex(status: OrderStatus): number {
@@ -178,9 +180,17 @@ export default function OrderDetailPage() {
               </p>
               <p>
                 <span className="text-gray-500">Paiement :</span>{' '}
-                {order.paymentMethod === 'cash'
-                  ? 'Cash à la livraison'
-                  : order.paymentMethod || '—'}
+                {order.paymentMethod && order.paymentMethod in PAYMENT_METHOD_LABELS
+                  ? PAYMENT_METHOD_LABELS[order.paymentMethod as PaymentMethod]
+                  : order.paymentMethod || '—'}{' '}
+                ·{' '}
+                <span className="font-semibold">
+                  {order.paymentStatus === 'paid'
+                    ? 'Payé'
+                    : order.paymentStatus === 'failed'
+                      ? 'Échoué'
+                      : 'En attente'}
+                </span>
               </p>
               {order.notes && (
                 <p>
@@ -194,7 +204,8 @@ export default function OrderDetailPage() {
               )}
             </div>
 
-            {order.status === 'pending' && (
+            {(order.status === 'pending' ||
+              (order.status === 'confirmed' && order.paymentStatus !== 'paid')) && (
               <button
                 onClick={onCancel}
                 disabled={busy}

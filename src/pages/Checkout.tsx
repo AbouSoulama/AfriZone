@@ -6,8 +6,17 @@ import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { formatPrice } from '../services/catalog';
-import { placeOrders, type PaymentMethod } from '../services/orders';
+import {
+  PAYMENT_METHOD_LABELS,
+  placeOrders,
+  type PaymentMethod,
+} from '../services/orders';
 import { CATALOG_CITIES } from '../types/catalog';
+
+const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; hint: string }[] = [
+  { id: 'orange_money', label: 'Orange Money', hint: 'Paiement immédiat' },
+  { id: 'wave', label: 'Wave', hint: 'Paiement immédiat' },
+];
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -17,7 +26,8 @@ export default function CheckoutPage() {
   const [city, setCity] = useState(user?.city || 'Dakar');
   const [phone, setPhone] = useState(user?.phone || '');
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('orange_money');
+  const [paymentPhone, setPaymentPhone] = useState(user?.phone || '');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [doneIds, setDoneIds] = useState<string[] | null>(null);
@@ -48,17 +58,13 @@ export default function CheckoutPage() {
         <main className="max-w-lg mx-auto px-4 py-16 text-center">
           <div className="bg-white border rounded-2xl p-8">
             <CheckCircle size={48} className="mx-auto text-[#00A651] mb-4" />
-            <h1 className="text-2xl font-extrabold mb-2">Commande enregistrée</h1>
+            <h1 className="text-2xl font-extrabold mb-2">Paiement confirmé</h1>
             <p className="text-gray-500 text-sm mb-6">
               {doneIds.length > 1
                 ? `${doneIds.length} commandes créées (un ticket par vendeur).`
-                : 'Votre commande a été créée avec succès.'}{' '}
-              Paiement :{' '}
-              {paymentMethod === 'cash'
-                ? 'Cash à la livraison'
-                : paymentMethod === 'orange_money'
-                  ? 'Orange Money (bientôt)'
-                  : 'Wave (bientôt)'}
+                : 'Votre commande a été payée et confirmée.'}{' '}
+              Via {PAYMENT_METHOD_LABELS[paymentMethod]}
+              {paymentPhone ? ` (${paymentPhone})` : ''}.
             </p>
             <div className="flex flex-col gap-2">
               <button
@@ -90,6 +96,7 @@ export default function CheckoutPage() {
         shippingPhone: phone,
         notes,
         paymentMethod,
+        paymentPhone,
       });
       await refreshCart();
       setDoneIds(ids);
@@ -134,7 +141,7 @@ export default function CheckoutPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-bold mb-2">Téléphone *</label>
+                <label className="block text-sm font-bold mb-2">Téléphone livraison *</label>
                 <input
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
@@ -155,29 +162,25 @@ export default function CheckoutPage() {
             </div>
 
             <div>
-              <h2 className="font-extrabold mb-3">Mode de paiement</h2>
-              <div className="space-y-2">
-                {(
-                  [
-                    { id: 'cash', label: 'Cash à la livraison', hint: 'Disponible maintenant' },
-                    { id: 'orange_money', label: 'Orange Money', hint: 'Bientôt' },
-                    { id: 'wave', label: 'Wave', hint: 'Bientôt' },
-                  ] as const
-                ).map((m) => (
+              <h2 className="font-extrabold mb-3">Paiement immédiat</h2>
+              <p className="text-xs text-gray-500 mb-3">
+                Le paiement se fait maintenant. Aucun cash à la livraison.
+              </p>
+              <div className="space-y-2 mb-4">
+                {PAYMENT_OPTIONS.map((m) => (
                   <label
                     key={m.id}
                     className={`flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer ${
                       paymentMethod === m.id
                         ? 'border-[#FF6B00] bg-orange-50'
                         : 'border-gray-200'
-                    } ${m.id !== 'cash' ? 'opacity-60' : ''}`}
+                    }`}
                   >
                     <span className="flex items-center gap-3">
                       <input
                         type="radio"
                         name="pay"
                         checked={paymentMethod === m.id}
-                        disabled={m.id !== 'cash'}
                         onChange={() => setPaymentMethod(m.id)}
                         className="accent-[#FF6B00]"
                       />
@@ -186,6 +189,18 @@ export default function CheckoutPage() {
                     <span className="text-xs text-gray-500">{m.hint}</span>
                   </label>
                 ))}
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">
+                  Numéro {PAYMENT_METHOD_LABELS[paymentMethod]} *
+                </label>
+                <input
+                  value={paymentPhone}
+                  onChange={(e) => setPaymentPhone(e.target.value)}
+                  required
+                  placeholder="+221 77 ..."
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none"
+                />
               </div>
             </div>
 
@@ -220,7 +235,7 @@ export default function CheckoutPage() {
                 <span>{formatPrice(summary?.shippingEstimate ?? 0)}</span>
               </div>
               <div className="flex justify-between text-base font-extrabold">
-                <span>Total</span>
+                <span>Total à payer</span>
                 <span className="text-[#FF6B00]">{formatPrice(summary?.total ?? 0)}</span>
               </div>
             </div>
@@ -229,7 +244,9 @@ export default function CheckoutPage() {
               disabled={loading}
               className="w-full py-3.5 bg-[#00A651] hover:bg-[#008A43] disabled:bg-gray-300 text-white rounded-xl font-bold"
             >
-              {loading ? 'Validation...' : 'Confirmer la commande'}
+              {loading
+                ? 'Paiement en cours...'
+                : `Payer ${formatPrice(summary?.total ?? 0)}`}
             </button>
           </aside>
         </form>

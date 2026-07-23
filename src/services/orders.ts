@@ -6,7 +6,7 @@ import {
   type CartItemRow,
 } from './cart';
 
-export type PaymentMethod = 'cash' | 'orange_money' | 'wave';
+export type PaymentMethod = 'orange_money' | 'wave';
 export type OrderStatus =
   | 'pending'
   | 'confirmed'
@@ -22,6 +22,8 @@ export interface CheckoutInput {
   shippingPhone: string;
   notes?: string;
   paymentMethod: PaymentMethod;
+  /** Numéro Mobile Money utilisé pour le paiement */
+  paymentPhone: string;
 }
 
 export interface OrderItemView {
@@ -74,12 +76,23 @@ function groupByVendor(items: CartItemRow[]): Map<string, CartItemRow[]> {
   return map;
 }
 
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  orange_money: 'Orange Money',
+  wave: 'Wave',
+};
+
 export async function placeOrders(
   userId: string,
   input: CheckoutInput
 ): Promise<string[]> {
   if (!input.shippingAddress.trim() || !input.shippingCity.trim() || !input.shippingPhone.trim()) {
     throw new Error('Adresse, ville et téléphone sont obligatoires.');
+  }
+  if (!input.paymentPhone.trim()) {
+    throw new Error('Indiquez le numéro Mobile Money pour payer.');
+  }
+  if (input.paymentMethod !== 'orange_money' && input.paymentMethod !== 'wave') {
+    throw new Error('Choisissez Orange Money ou Wave.');
   }
 
   const cart = await fetchCartSummary(userId);
@@ -96,6 +109,8 @@ export async function placeOrders(
 
   const groups = groupByVendor(cart.items);
   const createdOrderIds: string[] = [];
+  const paymentNote = `Payé via ${PAYMENT_METHOD_LABELS[input.paymentMethod]} (${input.paymentPhone.trim()})`;
+  const notesParts = [input.notes?.trim(), paymentNote].filter(Boolean);
 
   for (const [vendorId, items] of groups) {
     const subtotal = items.reduce((s, i) => s + i.product.price * i.quantity, 0);
@@ -103,22 +118,23 @@ export async function placeOrders(
     const total = subtotal + shippingCost;
     const orderNumber = generateClientOrderNumber();
 
+    // Paiement direct : commande confirmée + payée dès validation (MVP sans passerelle API)
     const { data: order, error } = await supabase
       .from('orders')
       .insert({
         order_number: orderNumber,
         user_id: userId,
         vendor_id: vendorId,
-        status: 'pending',
+        status: 'confirmed',
         subtotal,
         shipping_cost: shippingCost,
         total,
         payment_method: input.paymentMethod,
-        payment_status: input.paymentMethod === 'cash' ? 'pending' : 'pending',
+        payment_status: 'paid',
         shipping_address: input.shippingAddress.trim(),
         shipping_city: input.shippingCity.trim(),
         shipping_phone: input.shippingPhone.trim(),
-        notes: input.notes?.trim() || null,
+        notes: notesParts.join(' — ') || null,
       })
       .select('id')
       .single();
@@ -199,7 +215,7 @@ export async function cancelOrder(userId: string, orderId: string): Promise<void
   if (error) throw new Error(error.message);
   if (!order) throw new Error('Commande introuvable.');
   if (order.status !== 'pending') {
-    throw new Error('Seules les commandes en attente peuvent être annulées.');
+    throw new Error('Seules les commandes en attente (non payées) peuvent être annulées.');
   }
 
   const { error: updateError } = await supabase
