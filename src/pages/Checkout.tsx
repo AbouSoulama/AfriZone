@@ -7,16 +7,9 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { formatPrice } from '../services/catalog';
 import {
-  PAYMENT_METHOD_LABELS,
   placeOrders,
-  type PaymentMethod,
 } from '../services/orders';
 import { CATALOG_CITIES } from '../types/catalog';
-
-const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; hint: string }[] = [
-  { id: 'orange_money', label: 'Orange Money', hint: 'Paiement immédiat' },
-  { id: 'wave', label: 'Wave', hint: 'Paiement immédiat' },
-];
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -26,7 +19,6 @@ export default function CheckoutPage() {
   const [city, setCity] = useState(user?.city || 'Dakar');
   const [phone, setPhone] = useState(user?.phone || '');
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('orange_money');
   const [paymentPhone, setPaymentPhone] = useState(user?.phone || '');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -63,7 +55,7 @@ export default function CheckoutPage() {
               {doneIds.length > 1
                 ? `${doneIds.length} commandes créées (un ticket par vendeur).`
                 : 'Votre commande a été payée et confirmée.'}{' '}
-              Via {PAYMENT_METHOD_LABELS[paymentMethod]}
+              Via Mobile Money
               {paymentPhone ? ` (${paymentPhone})` : ''}.
             </p>
             <div className="flex flex-col gap-2">
@@ -95,7 +87,7 @@ export default function CheckoutPage() {
         shippingCity: city,
         shippingPhone: phone,
         notes,
-        paymentMethod,
+        paymentMethod: 'mobile_money',
         paymentPhone,
       });
       await refreshCart();
@@ -162,38 +154,13 @@ export default function CheckoutPage() {
             </div>
 
             <div>
-              <h2 className="font-extrabold mb-3">Paiement immédiat</h2>
-              <p className="text-xs text-gray-500 mb-3">
-                Le paiement se fait maintenant. Aucun cash à la livraison.
-              </p>
-              <div className="space-y-2 mb-4">
-                {PAYMENT_OPTIONS.map((m) => (
-                  <label
-                    key={m.id}
-                    className={`flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer ${
-                      paymentMethod === m.id
-                        ? 'border-[#FF6B00] bg-orange-50'
-                        : 'border-gray-200'
-                    }`}
-                  >
-                    <span className="flex items-center gap-3">
-                      <input
-                        type="radio"
-                        name="pay"
-                        checked={paymentMethod === m.id}
-                        onChange={() => setPaymentMethod(m.id)}
-                        className="accent-[#FF6B00]"
-                      />
-                      <span className="font-semibold text-sm">{m.label}</span>
-                    </span>
-                    <span className="text-xs text-gray-500">{m.hint}</span>
-                  </label>
-                ))}
+              <h2 className="font-extrabold mb-3">Mode de paiement</h2>
+              <div className="p-4 border-2 border-[#FF6B00] bg-orange-50 rounded-xl mb-4">
+                <p className="font-semibold text-sm">Mobile Money</p>
+                <p className="text-xs text-gray-500 mt-0.5">Paiement immédiat</p>
               </div>
               <div>
-                <label className="block text-sm font-bold mb-2">
-                  Numéro {PAYMENT_METHOD_LABELS[paymentMethod]} *
-                </label>
+                <label className="block text-sm font-bold mb-2">Numéro Mobile Money *</label>
                 <input
                   value={paymentPhone}
                   onChange={(e) => setPaymentPhone(e.target.value)}

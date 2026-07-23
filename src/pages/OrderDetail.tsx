@@ -13,7 +13,6 @@ import {
   PAYMENT_METHOD_LABELS,
   type OrderStatus,
   type OrderView,
-  type PaymentMethod,
 } from '../services/orders';
 
 function timelineIndex(status: OrderStatus): number {
@@ -180,9 +179,9 @@ export default function OrderDetailPage() {
               </p>
               <p>
                 <span className="text-gray-500">Paiement :</span>{' '}
-                {order.paymentMethod && order.paymentMethod in PAYMENT_METHOD_LABELS
-                  ? PAYMENT_METHOD_LABELS[order.paymentMethod as PaymentMethod]
-                  : order.paymentMethod || '—'}{' '}
+                {order.paymentMethod
+                  ? PAYMENT_METHOD_LABELS[order.paymentMethod] || 'Mobile Money'
+                  : '—'}{' '}
                 ·{' '}
                 <span className="font-semibold">
                   {order.paymentStatus === 'paid'

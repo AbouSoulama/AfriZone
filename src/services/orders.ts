@@ -6,7 +6,7 @@ import {
   type CartItemRow,
 } from './cart';
 
-export type PaymentMethod = 'orange_money' | 'wave';
+export type PaymentMethod = 'mobile_money';
 export type OrderStatus =
   | 'pending'
   | 'confirmed'
@@ -76,9 +76,10 @@ function groupByVendor(items: CartItemRow[]): Map<string, CartItemRow[]> {
   return map;
 }
 
-export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
-  orange_money: 'Orange Money',
-  wave: 'Wave',
+export const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  mobile_money: 'Mobile Money',
+  orange_money: 'Mobile Money',
+  wave: 'Mobile Money',
 };
 
 export async function placeOrders(
@@ -90,9 +91,6 @@ export async function placeOrders(
   }
   if (!input.paymentPhone.trim()) {
     throw new Error('Indiquez le numéro Mobile Money pour payer.');
-  }
-  if (input.paymentMethod !== 'orange_money' && input.paymentMethod !== 'wave') {
-    throw new Error('Choisissez Orange Money ou Wave.');
   }
 
   const cart = await fetchCartSummary(userId);
@@ -109,7 +107,7 @@ export async function placeOrders(
 
   const groups = groupByVendor(cart.items);
   const createdOrderIds: string[] = [];
-  const paymentNote = `Payé via ${PAYMENT_METHOD_LABELS[input.paymentMethod]} (${input.paymentPhone.trim()})`;
+  const paymentNote = `Payé via Mobile Money (${input.paymentPhone.trim()})`;
   const notesParts = [input.notes?.trim(), paymentNote].filter(Boolean);
 
   for (const [vendorId, items] of groups) {
@@ -118,7 +116,7 @@ export async function placeOrders(
     const total = subtotal + shippingCost;
     const orderNumber = generateClientOrderNumber();
 
-    // Paiement direct : commande confirmée + payée dès validation (MVP sans passerelle API)
+    // Paiement Mobile Money immédiat (MVP sans passerelle API)
     const { data: order, error } = await supabase
       .from('orders')
       .insert({
@@ -129,7 +127,7 @@ export async function placeOrders(
         subtotal,
         shipping_cost: shippingCost,
         total,
-        payment_method: input.paymentMethod,
+        payment_method: 'mobile_money',
         payment_status: 'paid',
         shipping_address: input.shippingAddress.trim(),
         shipping_city: input.shippingCity.trim(),
