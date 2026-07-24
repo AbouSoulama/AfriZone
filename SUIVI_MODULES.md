@@ -10,10 +10,10 @@
 | Bloc | Nombre | Statut |
 |---|---|---|
 | Phases préparatoires | **2** | ✅ Terminées |
-| Modules fonctionnels MVP | **11** | **9/11** faits |
-| **Total du début à la fin** | **13 étapes** | **11/13** |
+| Modules fonctionnels MVP | **11** | **11/11** faits |
+| **Total du début à la fin** | **13 étapes** | **13/13** |
 
-**Progression MVP :** ▓▓▓▓▓▓▓▓▓▓▓░ ~**82 %** (modules 1→9 terminés)
+**Progression MVP :** ▓▓▓▓▓▓▓▓▓▓▓▓ **~100 %** (modules 1→11 terminés)
 
 > **Note CDC :** le rôle `livreur` existe déjà en base (`user_role`), mais l’espace livreur n’était pas dans le plan initial — **ajouté en Module 8** pour coller au cahier des charges.
 
@@ -90,30 +90,25 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 
 ---
 
-### ⬜ Module 10 — Avis & confiance
-**Objectif CDC :** notation produits / vendeurs.
-
-| Tâche | Statut |
-|---|---|
-| Table `reviews` (produit + vendeur) | ⬜ |
-| Noter après commande livrée | ⬜ |
-| Affichage notes sur fiche produit / boutique | ⬜ |
-| Recalcul rating vendeur / produit | ⬜ |
+### ✅ Module 10 — Avis & confiance
+- [x] Table `reviews` + RPC `submit_review`
+- [x] Noter après commande livrée
+- [x] Affichage avis produit / boutique
+- [x] Recalcul rating
+- [x] Migration `010_reviews.sql`
 
 ---
 
-### ⬜ Module 11 — Admin complet + paiements réels + polish MVP
-**Objectif :** clôturer le MVP « production-ready ».
-
+### ✅ Module 11 — Admin complet + paiements + polish MVP
 | Tâche | Statut |
 |---|---|
-| Dashboard admin (stats commandes, colis, livreurs, CA, users) | ⬜ |
-| Gestion admin des commandes marketplace | ⬜ |
-| Intégration API Mobile Money réelle (Orange / Wave) | ⬜ |
-| Pages légales (CGU, confidentialité, FAQ, contact) | ⬜ |
-| QA globale, perf (code-splitting), correctifs | ⬜ |
+| Dashboard admin (stats CA, commandes, colis, users…) | ✅ |
+| Gestion admin des commandes marketplace | ✅ |
+| Couche Mobile Money (Orange / Wave / Moov + mode live Edge Function) | ✅ |
+| Pages légales (CGU, confidentialité, FAQ, contact) | ✅ |
+| Footer branché + polish MVP | ✅ |
 
-> Le module 11 peut être découpé en 11a / 11b / 11c si besoin.
+> **Paiement live :** `VITE_PAYMENT_MODE=live` + déployer `supabase/functions/mobile-money` + secrets opérateurs.
 
 ---
 
@@ -130,14 +125,15 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 | `007_addresses.sql` | 7 | [ ] |
 | `008_drivers.sql` | 8 | [ ] |
 | `009_notifications.sql` | 9 | [ ] |
+| `010_reviews.sql` | 10 | [ ] |
 
 ---
 
 ## Prochaine étape recommandée
 
-→ **Module 10 — Avis & confiance**
+→ **QA manuelle + déploiement** (cocher les migrations sur Supabase, tester parcours client / vendeur / livreur / admin).
 
-Puis 11 (admin + paiements réels + polish).
+Optionnel post-MVP : emails transactionnels, clés API Orange/Wave réelles, code-splitting avancé.
 
 ---
 

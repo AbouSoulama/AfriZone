@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, Star } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import ReviewForm from '../components/reviews/ReviewForm';
+import { StarRating } from '../components/reviews/StarRating';
 import { useAuth } from '../context/AuthContext';
 import { formatPrice } from '../services/catalog';
 import {
@@ -14,6 +16,7 @@ import {
   type OrderStatus,
   type OrderView,
 } from '../services/orders';
+import { fetchOrderReviews, type ReviewView } from '../services/reviews';
 
 function timelineIndex(status: OrderStatus): number {
   if (status === 'cancelled' || status === 'refunded') return -1;
@@ -27,12 +30,20 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [orderReviews, setOrderReviews] = useState<Record<string, ReviewView>>({});
+  const [openReviewFor, setOpenReviewFor] = useState<string | null>(null);
 
   const load = async () => {
     if (!user || !id) return;
     setLoading(true);
     try {
-      setOrder(await fetchOrderById(user.id, id));
+      const o = await fetchOrderById(user.id, id);
+      setOrder(o);
+      if (o?.status === 'delivered') {
+        setOrderReviews(await fetchOrderReviews(o.id, user.id));
+      } else {
+        setOrderReviews({});
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
     } finally {
@@ -131,26 +142,73 @@ export default function OrderDetailPage() {
 
             <div className="bg-white border border-gray-100 rounded-2xl p-6">
               <h2 className="font-extrabold mb-3">Articles</h2>
-              <ul className="space-y-3">
-                {order.items.map((item) => (
-                  <li key={item.id} className="flex items-center gap-3">
-                    <img
-                      src={
-                        item.productImage ||
-                        'https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=80&h=80&fit=crop'
-                      }
-                      alt=""
-                      className="w-14 h-14 rounded-lg object-cover"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm truncate">{item.productName}</p>
-                      <p className="text-xs text-gray-500">
-                        {item.quantity} × {formatPrice(item.price)}
-                      </p>
-                    </div>
-                    <p className="font-bold text-sm">{formatPrice(item.total)}</p>
-                  </li>
-                ))}
+              <ul className="space-y-4">
+                {order.items.map((item) => {
+                  const existing = orderReviews[item.productId];
+                  const showReview = order.status === 'delivered';
+                  return (
+                    <li key={item.id} className="border-b border-gray-50 last:border-0 pb-4 last:pb-0">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={
+                            item.productImage ||
+                            'https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=80&h=80&fit=crop'
+                          }
+                          alt=""
+                          className="w-14 h-14 rounded-lg object-cover"
+                        />
+                        <div className="flex-1 min-w-0">
+                          {item.productSlug ? (
+                            <Link
+                              to={`/produit/${item.productSlug}`}
+                              className="font-semibold text-sm truncate block hover:text-[#FF6B00]"
+                            >
+                              {item.productName}
+                            </Link>
+                          ) : (
+                            <p className="font-semibold text-sm truncate">{item.productName}</p>
+                          )}
+                          <p className="text-xs text-gray-500">
+                            {item.quantity} × {formatPrice(item.price)}
+                          </p>
+                          {existing && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <StarRating value={existing.rating} size={12} readOnly />
+                              <span className="text-[11px] text-green-700 font-semibold">Avis déposé</span>
+                            </div>
+                          )}
+                        </div>
+                        <p className="font-bold text-sm">{formatPrice(item.total)}</p>
+                      </div>
+
+                      {showReview && (
+                        <div className="mt-2">
+                          {openReviewFor === item.productId ? (
+                            <ReviewForm
+                              orderId={order.id}
+                              productId={item.productId}
+                              productName={item.productName || 'Produit'}
+                              existing={existing || null}
+                              onSaved={(r) => {
+                                setOrderReviews((prev) => ({ ...prev, [item.productId]: r }));
+                                setOpenReviewFor(null);
+                              }}
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setOpenReviewFor(item.productId)}
+                              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#FF6B00] hover:underline"
+                            >
+                              <Star size={14} />
+                              {existing ? 'Modifier mon avis' : 'Noter ce produit'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
               <div className="border-t mt-4 pt-4 space-y-1 text-sm">
                 <div className="flex justify-between">

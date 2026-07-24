@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle, MapPin, Package, Star, Store } from 'lucide-rea
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ProductCard from '../components/catalog/ProductCard';
+import ReviewsSection from '../components/reviews/ReviewsSection';
 import {
   fetchVendorBySlug,
   fetchVendorProducts,
@@ -105,6 +106,9 @@ export default function VendorShopPage() {
                       <span className="flex items-center gap-1">
                         <Star size={14} className="text-[#FFD700] fill-[#FFD700]" />{' '}
                         {vendor.rating.toFixed(1)}
+                        {vendor.reviewCount != null && vendor.reviewCount > 0
+                          ? ` (${vendor.reviewCount} avis)`
+                          : ''}
                       </span>
                       <span className="flex items-center gap-1">
                         <Package size={14} /> {vendor.totalSales.toLocaleString('fr-FR')} ventes
@@ -156,6 +160,8 @@ export default function VendorShopPage() {
                 ))}
               </div>
             )}
+
+            <ReviewsSection mode="vendor" targetId={vendor.id} title="Avis sur la boutique" />
           </>
         )}
       </main>

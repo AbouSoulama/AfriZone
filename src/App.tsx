@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { CityProvider } from './context/CityContext';
@@ -32,6 +32,17 @@ import VendorProductsPage from './pages/vendor/VendorProducts';
 import VendorProductFormPage from './pages/vendor/VendorProductForm';
 import VendorOrdersPage from './pages/vendor/VendorOrders';
 import VendorOrderDetailPage from './pages/vendor/VendorOrderDetail';
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboardPage from './pages/admin/AdminDashboard';
+import AdminOrdersPage from './pages/admin/AdminOrders';
+import AdminVendorsPage from './pages/admin/AdminVendors';
+import AdminDriversPage from './pages/admin/AdminDrivers';
+import AdminDeliveriesPage from './pages/admin/AdminDeliveries';
+import AdminParcelsPage from './pages/admin/AdminParcels';
+import TermsPage from './pages/legal/Terms';
+import PrivacyPage from './pages/legal/Privacy';
+import FaqPage from './pages/legal/Faq';
+import ContactPage from './pages/legal/Contact';
 import {
   LoginPage,
   RegisterChoicePage,
@@ -45,11 +56,6 @@ import DriverLayout from './pages/driver/DriverLayout';
 import DriverDashboard from './pages/driver/DriverDashboard';
 import DriverDeliveriesPage from './pages/driver/DriverDeliveries';
 import DriverDeliveryDetailPage from './pages/driver/DriverDeliveryDetail';
-import AdminDriversPage from './pages/admin/AdminDrivers';
-import AdminDeliveriesPage from './pages/admin/AdminDeliveries';
-import AdminLayout from './pages/admin/AdminLayout';
-import AdminVendorsPage from './pages/admin/AdminVendors';
-import AdminParcelsPage from './pages/admin/AdminParcels';
 
 function BackToTop() {
   const handleScroll = () => window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -118,6 +124,11 @@ export default function App() {
                 <Route path="adresses" element={<AccountAddressesPage />} />
               </Route>
 
+              <Route path="/cgu" element={<TermsPage />} />
+              <Route path="/confidentialite" element={<PrivacyPage />} />
+              <Route path="/faq" element={<FaqPage />} />
+              <Route path="/contact" element={<ContactPage />} />
+
               <Route path="/auth/login" element={<LoginPage />} />
               <Route path="/auth/register" element={<RegisterChoicePage />} />
               <Route path="/auth/register/client" element={<RegisterClientPage />} />
@@ -163,7 +174,8 @@ export default function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<Navigate to="/admin/vendeurs" replace />} />
+                <Route index element={<AdminDashboardPage />} />
+                <Route path="commandes" element={<AdminOrdersPage />} />
                 <Route path="vendeurs" element={<AdminVendorsPage />} />
                 <Route path="livreurs" element={<AdminDriversPage />} />
                 <Route path="livraisons" element={<AdminDeliveriesPage />} />

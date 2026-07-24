@@ -23,6 +23,7 @@ function mapVendor(row: Record<string, unknown> | null | undefined): CatalogVend
     country: row.country as string,
     city: row.city as string,
     rating: Number(row.rating ?? 0),
+    reviewCount: Number(row.review_count ?? 0),
     totalSales: Number(row.total_sales ?? 0),
     status: row.status as string,
   };
@@ -64,7 +65,7 @@ const PRODUCT_SELECT = `
   *,
   vendors!inner (
     id, shop_name, shop_slug, shop_description, shop_category, shop_logo_url,
-    vendor_code, country, city, rating, total_sales, status
+    vendor_code, country, city, rating, review_count, total_sales, status
   )
 `;
 
@@ -72,7 +73,7 @@ const PRODUCT_SELECT_OPTIONAL = `
   *,
   vendors (
     id, shop_name, shop_slug, shop_description, shop_category, shop_logo_url,
-    vendor_code, country, city, rating, total_sales, status
+    vendor_code, country, city, rating, review_count, total_sales, status
   )
 `;
 

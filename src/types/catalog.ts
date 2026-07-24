@@ -12,6 +12,7 @@ export interface CatalogVendor {
   country: string;
   city: string;
   rating: number;
+  reviewCount?: number;
   totalSales: number;
   status: string;
 }

@@ -6,7 +6,7 @@ import {
   type CartItemRow,
 } from './cart';
 
-export type PaymentMethod = 'mobile_money';
+export type PaymentMethod = 'mobile_money' | 'orange_money' | 'wave' | 'moov_money';
 export type OrderStatus =
   | 'pending'
   | 'confirmed'
@@ -24,6 +24,8 @@ export interface CheckoutInput {
   paymentMethod: PaymentMethod;
   /** Numéro Mobile Money utilisé pour le paiement */
   paymentPhone: string;
+  /** Référence transaction retournée par la couche paiement */
+  paymentTransactionId?: string;
 }
 
 export interface OrderItemView {
@@ -34,6 +36,7 @@ export interface OrderItemView {
   total: number;
   productName?: string;
   productImage?: string | null;
+  productSlug?: string | null;
 }
 
 export interface OrderView {
@@ -78,8 +81,9 @@ function groupByVendor(items: CartItemRow[]): Map<string, CartItemRow[]> {
 
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   mobile_money: 'Mobile Money',
-  orange_money: 'Mobile Money',
-  wave: 'Mobile Money',
+  orange_money: 'Orange Money',
+  wave: 'Wave',
+  moov_money: 'Moov Money',
 };
 
 export async function placeOrders(
@@ -107,7 +111,10 @@ export async function placeOrders(
 
   const groups = groupByVendor(cart.items);
   const createdOrderIds: string[] = [];
-  const paymentNote = `Payé via Mobile Money (${input.paymentPhone.trim()})`;
+  const methodLabel = PAYMENT_METHOD_LABELS[input.paymentMethod] || 'Mobile Money';
+  const paymentNote = `Payé via ${methodLabel} (${input.paymentPhone.trim()})${
+    input.paymentTransactionId ? ` · réf. ${input.paymentTransactionId}` : ''
+  }`;
   const notesParts = [input.notes?.trim(), paymentNote].filter(Boolean);
 
   for (const [vendorId, items] of groups) {
@@ -116,7 +123,6 @@ export async function placeOrders(
     const total = subtotal + shippingCost;
     const orderNumber = generateClientOrderNumber();
 
-    // Paiement Mobile Money immédiat (MVP sans passerelle API)
     const { data: order, error } = await supabase
       .from('orders')
       .insert({
@@ -127,7 +133,7 @@ export async function placeOrders(
         subtotal,
         shipping_cost: shippingCost,
         total,
-        payment_method: 'mobile_money',
+        payment_method: input.paymentMethod,
         payment_status: 'paid',
         shipping_address: input.shippingAddress.trim(),
         shipping_city: input.shippingCity.trim(),
@@ -166,7 +172,7 @@ export async function fetchMyOrders(userId: string): Promise<OrderView[]> {
       vendors ( shop_name ),
       order_items (
         id, product_id, quantity, price, total,
-        products ( name, main_image, images )
+        products ( name, main_image, images, slug )
       )
     `
     )
@@ -189,7 +195,7 @@ export async function fetchOrderById(
       vendors ( shop_name ),
       order_items (
         id, product_id, quantity, price, total,
-        products ( name, main_image, images )
+        products ( name, main_image, images, slug )
       )
     `
     )
@@ -258,6 +264,7 @@ function mapOrder(row: Record<string, unknown>): OrderView {
         total: Number(item.total),
         productName: (p?.name as string) || 'Produit',
         productImage: (p?.main_image as string) || images[0] || null,
+        productSlug: (p?.slug as string) || null,
       };
     }),
   };

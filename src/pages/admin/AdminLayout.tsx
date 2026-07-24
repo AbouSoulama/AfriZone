@@ -1,6 +1,25 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bike, LogOut, Package, Shield, Truck, Users } from 'lucide-react';
+import {
+  ArrowLeft,
+  Bike,
+  LayoutDashboard,
+  LogOut,
+  Package,
+  Shield,
+  ShoppingBag,
+  Truck,
+  Users,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+
+const NAV = [
+  { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/admin/commandes', label: 'Commandes', icon: ShoppingBag },
+  { to: '/admin/vendeurs', label: 'Vendeurs', icon: Users },
+  { to: '/admin/livreurs', label: 'Livreurs', icon: Bike },
+  { to: '/admin/livraisons', label: 'Courses', icon: Truck },
+  { to: '/admin/colis', label: 'Colis', icon: Package },
+];
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();
@@ -17,46 +36,23 @@ export default function AdminLayout() {
           <p className="text-xs text-gray-400 mt-2">{user?.fullName}</p>
         </div>
         <nav className="flex-1 p-3 space-y-1">
-          <NavLink
-            to="/admin/vendeurs"
-            className={({ isActive }) =>
-              `flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold ${
-                isActive ? 'bg-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800'
-              }`
-            }
-          >
-            <Users size={18} /> Vendeurs
-          </NavLink>
-          <NavLink
-            to="/admin/livreurs"
-            className={({ isActive }) =>
-              `flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold ${
-                isActive ? 'bg-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800'
-              }`
-            }
-          >
-            <Bike size={18} /> Livreurs
-          </NavLink>
-          <NavLink
-            to="/admin/livraisons"
-            className={({ isActive }) =>
-              `flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold ${
-                isActive ? 'bg-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800'
-              }`
-            }
-          >
-            <Truck size={18} /> Courses
-          </NavLink>
-          <NavLink
-            to="/admin/colis"
-            className={({ isActive }) =>
-              `flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold ${
-                isActive ? 'bg-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800'
-              }`
-            }
-          >
-            <Package size={18} /> Colis
-          </NavLink>
+          {NAV.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold ${
+                    isActive ? 'bg-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800'
+                  }`
+                }
+              >
+                <Icon size={18} /> {item.label}
+              </NavLink>
+            );
+          })}
         </nav>
         <div className="p-3 border-t border-gray-700 space-y-1">
           <Link to="/" className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-300">
@@ -76,18 +72,15 @@ export default function AdminLayout() {
 
       <main className="flex-1 p-4 md:p-8">
         <div className="md:hidden mb-4 flex gap-2 flex-wrap">
-          <Link to="/admin/vendeurs" className="px-3 py-1.5 bg-[#FF6B00] text-white rounded-full text-xs font-bold">
-            Vendeurs
-          </Link>
-          <Link to="/admin/livreurs" className="px-3 py-1.5 bg-gray-800 text-white rounded-full text-xs font-bold">
-            Livreurs
-          </Link>
-          <Link to="/admin/livraisons" className="px-3 py-1.5 bg-gray-800 text-white rounded-full text-xs font-bold">
-            Courses
-          </Link>
-          <Link to="/admin/colis" className="px-3 py-1.5 bg-gray-800 text-white rounded-full text-xs font-bold">
-            Colis
-          </Link>
+          {NAV.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className="px-3 py-1.5 bg-gray-800 text-white rounded-full text-xs font-bold"
+            >
+              {item.label}
+            </Link>
+          ))}
           <Link to="/" className="px-3 py-1.5 bg-gray-200 rounded-full text-xs font-bold">
             Site
           </Link>

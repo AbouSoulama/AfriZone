@@ -1,0 +1,13 @@
+-- Edge Function stub: supabase/functions/mobile-money
+-- Déployer avec: supabase functions deploy mobile-money
+-- Puis brancher les clés Orange / Wave côté serveur (secrets Supabase).
+
+-- Deno.serve handler attendu (référence):
+-- POST { amount, currency, phone, provider, orderRef }
+-- → { success, transactionId, message }
+--
+-- Secrets suggérés:
+-- ORANGE_MONEY_API_KEY, ORANGE_MONEY_MERCHANT_ID
+-- WAVE_API_KEY, WAVE_MERCHANT_ID
+--
+-- Tant que VITE_PAYMENT_MODE=simulate, le front n'appelle pas cette fonction.

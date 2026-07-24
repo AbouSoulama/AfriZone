@@ -8,6 +8,12 @@ import { useCart } from '../context/CartContext';
 import { formatPrice } from '../services/catalog';
 import { placeOrders } from '../services/orders';
 import { fetchDefaultAddress, fetchMyAddresses, type AddressView } from '../services/account';
+import {
+  chargeMobileMoney,
+  MOBILE_MONEY_PROVIDERS,
+  providerLabel,
+  type MobileMoneyProvider,
+} from '../services/payments';
 import { CATALOG_CITIES } from '../types/catalog';
 
 export default function CheckoutPage() {
@@ -21,6 +27,7 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState(user?.phone || '');
   const [notes, setNotes] = useState('');
   const [paymentPhone, setPaymentPhone] = useState(user?.phone || '');
+  const [provider, setProvider] = useState<MobileMoneyProvider>('orange_money');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [doneIds, setDoneIds] = useState<string[] | null>(null);
@@ -84,7 +91,7 @@ export default function CheckoutPage() {
               {doneIds.length > 1
                 ? `${doneIds.length} commandes créées (un ticket par vendeur).`
                 : 'Votre commande a été payée et confirmée.'}{' '}
-              Via Mobile Money
+              Via {providerLabel(provider)}
               {paymentPhone ? ` (${paymentPhone})` : ''}.
             </p>
             <div className="flex flex-col gap-2">
@@ -111,13 +118,20 @@ export default function CheckoutPage() {
     setLoading(true);
     setError(null);
     try {
+      const charge = await chargeMobileMoney({
+        amount: summary?.total ?? 0,
+        phone: paymentPhone,
+        provider,
+      });
+
       const ids = await placeOrders(user.id, {
         shippingAddress: address,
         shippingCity: city,
         shippingPhone: phone,
         notes,
-        paymentMethod: 'mobile_money',
+        paymentMethod: provider,
         paymentPhone,
+        paymentTransactionId: charge.transactionId,
       });
       await refreshCart();
       setDoneIds(ids);
@@ -207,12 +221,27 @@ export default function CheckoutPage() {
 
             <div>
               <h2 className="font-extrabold mb-3">Mode de paiement</h2>
-              <div className="p-4 border-2 border-[#FF6B00] bg-orange-50 rounded-xl mb-4">
-                <p className="font-semibold text-sm">Mobile Money</p>
-                <p className="text-xs text-gray-500 mt-0.5">Paiement immédiat</p>
+              <div className="grid sm:grid-cols-3 gap-2 mb-4">
+                {MOBILE_MONEY_PROVIDERS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setProvider(p.id)}
+                    className={`p-3 border-2 rounded-xl text-left transition-colors ${
+                      provider === p.id
+                        ? 'border-[#FF6B00] bg-orange-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <p className="font-semibold text-sm">{p.label}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{p.hint}</p>
+                  </button>
+                ))}
               </div>
               <div>
-                <label className="block text-sm font-bold mb-2">Numéro Mobile Money *</label>
+                <label className="block text-sm font-bold mb-2">
+                  Numéro {providerLabel(provider)} *
+                </label>
                 <input
                   value={paymentPhone}
                   onChange={(e) => setPaymentPhone(e.target.value)}
@@ -220,6 +249,9 @@ export default function CheckoutPage() {
                   placeholder="+221 77 ..."
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none"
                 />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Vous recevrez une demande de confirmation sur ce numéro (simulation MVP ou API live).
+                </p>
               </div>
             </div>
 

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import ReviewsSection from '../components/reviews/ReviewsSection';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { fetchProductBySlug, formatPrice } from '../services/catalog';
@@ -270,6 +271,10 @@ export default function ProductDetailPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {!loading && product && (
+          <ReviewsSection mode="product" targetId={product.id} title="Avis sur ce produit" />
         )}
       </main>
       <Footer />
