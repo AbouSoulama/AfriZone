@@ -5,6 +5,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ProductCard from '../components/catalog/ProductCard';
 import { fetchProducts } from '../services/catalog';
+import { useCity } from '../context/CityContext';
 import {
   CATALOG_CATEGORIES,
   CATALOG_CITIES,
@@ -16,17 +17,27 @@ import {
 
 export default function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { city: selectedCity, setCity: setSelectedCity } = useCity();
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mobileFilters, setMobileFilters] = useState(false);
 
+  // Si l'URL n'a pas de ville, appliquer la ville mémorisée
+  useEffect(() => {
+    if (!searchParams.get('city') && selectedCity) {
+      const next = new URLSearchParams(searchParams);
+      next.set('city', selectedCity);
+      setSearchParams(next, { replace: true });
+    }
+  }, [selectedCity, searchParams, setSearchParams]);
+
   const filters: CatalogFilters = useMemo(
     () => ({
       q: searchParams.get('q') || undefined,
       category: searchParams.get('category') || undefined,
-      city: searchParams.get('city') || undefined,
+      city: searchParams.get('city') || selectedCity || undefined,
       minPrice: searchParams.get('min') ? Number(searchParams.get('min')) : undefined,
       maxPrice: searchParams.get('max') ? Number(searchParams.get('max')) : undefined,
       condition: (searchParams.get('condition') as ProductCondition) || undefined,
@@ -35,7 +46,7 @@ export default function CatalogPage() {
       page: Number(searchParams.get('page') || 1),
       pageSize: 12,
     }),
-    [searchParams]
+    [searchParams, selectedCity]
   );
 
   const [draftMin, setDraftMin] = useState(searchParams.get('min') || '');
@@ -79,6 +90,7 @@ export default function CatalogPage() {
     if (!value) next.delete(key);
     else next.set(key, value);
     if (key !== 'page') next.delete('page');
+    if (key === 'city' && value) setSelectedCity(value);
     setSearchParams(next);
   };
 

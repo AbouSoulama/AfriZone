@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { CityProvider } from './context/CityContext';
 import { NotificationsProvider } from './context/NotificationsContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Header from './components/Header';
@@ -93,6 +94,7 @@ function HomePage() {
 export default function App() {
   return (
     <AuthProvider>
+      <CityProvider>
       <NotificationsProvider>
         <CartProvider>
           <Router>
@@ -171,6 +173,7 @@ export default function App() {
           </Router>
         </CartProvider>
       </NotificationsProvider>
+      </CityProvider>
     </AuthProvider>
   );
 }

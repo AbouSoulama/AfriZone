@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, MapPin, User, Menu, X, ChevronDown, Truck, Shield, Headphones, CreditCard, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useCity } from '../context/CityContext';
 import NotificationBell from './NotificationBell';
-
-const cities = ['Dakar', 'Ouagadougou', 'Bamako'];
 
 const navItems = [
   { label: 'Toutes les catégories', to: '/catalogue' },
@@ -19,9 +18,10 @@ const navItems = [
 
 export default function Header() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const { itemCount } = useCart();
-  const [city, setCity] = useState('Dakar');
+  const { city, setCity, cities } = useCity();
   const [cityOpen, setCityOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -112,7 +112,11 @@ export default function Header() {
                     onClick={() => {
                       setCity(c);
                       setCityOpen(false);
-                      navigate(`/catalogue?city=${encodeURIComponent(c)}`);
+                      if (location.pathname.startsWith('/catalogue')) {
+                        const params = new URLSearchParams(location.search);
+                        params.set('city', c);
+                        navigate(`/catalogue?${params.toString()}`);
+                      }
                     }}
                     className={`w-full text-left px-4 py-2 text-sm hover:bg-orange-50 hover:text-[#FF6B00] transition-colors ${city === c ? 'text-[#FF6B00] font-semibold bg-orange-50' : ''}`}
                   >
@@ -299,13 +303,20 @@ export default function Header() {
             <select
               value={city}
               onChange={(e) => {
-                setCity(e.target.value);
-                navigate(`/catalogue?city=${encodeURIComponent(e.target.value)}`);
+                const next = e.target.value;
+                setCity(next);
+                if (location.pathname.startsWith('/catalogue')) {
+                  const params = new URLSearchParams(location.search);
+                  params.set('city', next);
+                  navigate(`/catalogue?${params.toString()}`);
+                }
               }}
               className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
             >
               {cities.map((c) => (
-                <option key={c}>{c}</option>
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
             </select>
           </div>

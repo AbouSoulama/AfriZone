@@ -177,12 +177,21 @@ export async function fetchProductBySlug(slug: string): Promise<CatalogProduct |
   return mapProduct(data as ProductRow);
 }
 
-export async function fetchFeaturedProducts(limit = 8): Promise<CatalogProduct[]> {
-  const { data, error } = await supabase
+export async function fetchFeaturedProducts(
+  limit = 8,
+  city?: string
+): Promise<CatalogProduct[]> {
+  let query = supabase
     .from('products')
     .select(PRODUCT_SELECT)
     .eq('is_active', true)
-    .eq('vendors.status', 'approved')
+    .eq('vendors.status', 'approved');
+
+  if (city) {
+    query = query.eq('vendors.city', city);
+  }
+
+  const { data, error } = await query
     .order('is_featured', { ascending: false })
     .order('sold_count', { ascending: false })
     .limit(limit);
@@ -194,11 +203,17 @@ export async function fetchFeaturedProducts(limit = 8): Promise<CatalogProduct[]
   return (data ?? []).map((row) => mapProduct(row as ProductRow));
 }
 
-export async function fetchFeaturedVendors(limit = 8): Promise<CatalogVendor[]> {
-  const { data, error } = await supabase
-    .from('vendors')
-    .select('*')
-    .eq('status', 'approved')
+export async function fetchFeaturedVendors(
+  limit = 8,
+  city?: string
+): Promise<CatalogVendor[]> {
+  let query = supabase.from('vendors').select('*').eq('status', 'approved');
+
+  if (city) {
+    query = query.eq('city', city);
+  }
+
+  const { data, error } = await query
     .order('rating', { ascending: false })
     .order('total_sales', { ascending: false })
     .limit(limit);

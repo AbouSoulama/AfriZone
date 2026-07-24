@@ -10,6 +10,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { fetchFeaturedVendors } from '../services/catalog';
+import { useCity } from '../context/CityContext';
 import type { CatalogVendor } from '../types/catalog';
 
 function SellerCard({ seller }: { seller: CatalogVendor }) {
@@ -83,6 +84,7 @@ function SellerCard({ seller }: { seller: CatalogVendor }) {
 }
 
 export default function Sellers() {
+  const { city } = useCity();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -90,11 +92,18 @@ export default function Sellers() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchFeaturedVendors(8).then((list) => {
-      setSellers(list);
-      setLoading(false);
+    let cancelled = false;
+    setLoading(true);
+    fetchFeaturedVendors(8, city).then((list) => {
+      if (!cancelled) {
+        setSellers(list);
+        setLoading(false);
+      }
     });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [city]);
 
   const checkScroll = () => {
     if (!scrollRef.current) return;
@@ -119,7 +128,9 @@ export default function Sellers() {
             <h2 className="text-2xl md:text-3xl font-extrabold text-[#1F2937]">
               Vendeurs <span className="text-[#00A651]">vedettes</span>
             </h2>
-            <p className="text-sm text-gray-500 mt-1">Les meilleurs vendeurs vérifiés par AfriZone</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Les meilleurs vendeurs vérifiés à {city}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button

@@ -3,16 +3,19 @@ import { Link } from 'react-router-dom';
 import { Flame, Tag, ChevronRight } from 'lucide-react';
 import ProductCard from './catalog/ProductCard';
 import { fetchFeaturedProducts } from '../services/catalog';
+import { useCity } from '../context/CityContext';
 import type { CatalogProduct } from '../types/catalog';
 
 export default function Products() {
+  const { city } = useCity();
   const [activeTab, setActiveTab] = useState('popular');
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    fetchFeaturedProducts(8).then((list) => {
+    setLoading(true);
+    fetchFeaturedProducts(8, city).then((list) => {
       if (!cancelled) {
         setProducts(list);
         setLoading(false);
@@ -21,7 +24,7 @@ export default function Products() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [city]);
 
   const tabs = [
     { id: 'popular', label: 'Populaires', icon: Flame },
@@ -48,7 +51,9 @@ export default function Products() {
           <h2 className="text-2xl md:text-3xl font-extrabold text-[#1F2937]">
             Produits <span className="text-[#FF6B00]">populaires</span>
           </h2>
-          <p className="text-sm text-gray-500 mt-1">Ce que nos clients adorent en ce moment</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Ce que nos clients adorent à {city}
+          </p>
         </div>
         <div className="flex items-center gap-2 bg-gray-100 rounded-full p-1">
           {tabs.map((tab) => {
@@ -79,13 +84,9 @@ export default function Products() {
         </div>
       ) : visible.length === 0 ? (
         <div className="bg-white border border-gray-100 rounded-2xl p-8 text-center">
-          <p className="text-gray-600 mb-3">Aucun produit en base pour le moment.</p>
-          <p className="text-xs text-gray-400 mb-4">
-            Exécutez <code className="bg-gray-100 px-1 rounded">003_seed_demo_catalog.sql</code> dans
-            Supabase SQL Editor.
-          </p>
+          <p className="text-gray-600 mb-3">Aucun produit trouvé à {city} pour le moment.</p>
           <Link
-            to="/catalogue"
+            to={`/catalogue?city=${encodeURIComponent(city)}`}
             className="inline-flex items-center gap-2 text-[#FF6B00] font-bold text-sm"
           >
             Voir le catalogue <ChevronRight size={16} />
@@ -101,7 +102,7 @@ export default function Products() {
 
       <div className="text-center mt-8">
         <Link
-          to="/catalogue"
+          to={`/catalogue?city=${encodeURIComponent(city)}`}
           className="inline-flex items-center gap-2 px-6 py-3 bg-white border-2 border-[#FF6B00] text-[#FF6B00] rounded-full font-bold text-sm hover:bg-[#FF6B00] hover:text-white transition-all"
         >
           Voir tous les produits <ChevronRight size={16} />
