@@ -20,6 +20,8 @@ import VendorLayout from './pages/vendor/VendorLayout';
 import VendorDashboard from './pages/vendor/VendorDashboard';
 import VendorProductsPage from './pages/vendor/VendorProducts';
 import VendorProductFormPage from './pages/vendor/VendorProductForm';
+import VendorOrdersPage from './pages/vendor/VendorOrders';
+import VendorOrderDetailPage from './pages/vendor/VendorOrderDetail';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminVendorsPage from './pages/admin/AdminVendors';
 import {
@@ -100,6 +102,8 @@ export default function App() {
               }
             >
               <Route index element={<VendorDashboard />} />
+              <Route path="commandes" element={<VendorOrdersPage />} />
+              <Route path="commandes/:id" element={<VendorOrderDetailPage />} />
               <Route path="produits" element={<VendorProductsPage />} />
               <Route path="produits/nouveau" element={<VendorProductFormPage />} />
               <Route path="produits/:id" element={<VendorProductFormPage />} />

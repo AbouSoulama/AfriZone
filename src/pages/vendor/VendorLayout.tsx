@@ -1,9 +1,10 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, LogOut, Store, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, Package, LogOut, Store, ArrowLeft, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const nav = [
   { to: '/vendeur', end: true, label: 'Tableau de bord', icon: LayoutDashboard },
+  { to: '/vendeur/commandes', end: false, label: 'Commandes', icon: ShoppingBag },
   { to: '/vendeur/produits', end: false, label: 'Mes produits', icon: Package },
 ];
 

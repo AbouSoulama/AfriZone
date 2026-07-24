@@ -263,6 +263,8 @@ function mapOrder(row: Record<string, unknown>): OrderView {
   };
 }
 
+export { mapOrder };
+
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: 'En attente',
   confirmed: 'Confirmée',
