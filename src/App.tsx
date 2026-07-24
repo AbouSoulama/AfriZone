@@ -16,6 +16,10 @@ import CartPage from './pages/Cart';
 import CheckoutPage from './pages/Checkout';
 import OrdersPage from './pages/Orders';
 import OrderDetailPage from './pages/OrderDetail';
+import ParcelSendPage from './pages/ParcelSend';
+import ParcelListPage from './pages/ParcelList';
+import ParcelDetailPage from './pages/ParcelDetail';
+import ParcelTrackPage from './pages/ParcelTrack';
 import VendorLayout from './pages/vendor/VendorLayout';
 import VendorDashboard from './pages/vendor/VendorDashboard';
 import VendorProductsPage from './pages/vendor/VendorProducts';
@@ -24,6 +28,7 @@ import VendorOrdersPage from './pages/vendor/VendorOrders';
 import VendorOrderDetailPage from './pages/vendor/VendorOrderDetail';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminVendorsPage from './pages/admin/AdminVendors';
+import AdminParcelsPage from './pages/admin/AdminParcels';
 import {
   LoginPage,
   RegisterClientPage,
@@ -86,6 +91,10 @@ export default function App() {
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/commandes" element={<OrdersPage />} />
             <Route path="/commandes/:id" element={<OrderDetailPage />} />
+            <Route path="/colis" element={<ParcelSendPage />} />
+            <Route path="/colis/mes-envois" element={<ParcelListPage />} />
+            <Route path="/colis/:id" element={<ParcelDetailPage />} />
+            <Route path="/suivi" element={<ParcelTrackPage />} />
 
             <Route path="/auth/login" element={<LoginPage />} />
             <Route path="/auth/register/client" element={<RegisterClientPage />} />
@@ -119,6 +128,7 @@ export default function App() {
             >
               <Route index element={<Navigate to="/admin/vendeurs" replace />} />
               <Route path="vendeurs" element={<AdminVendorsPage />} />
+              <Route path="colis" element={<AdminParcelsPage />} />
             </Route>
           </Routes>
         </Router>

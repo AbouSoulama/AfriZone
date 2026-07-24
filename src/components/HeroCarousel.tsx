@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, ShoppingBag, Zap, Gift, Truck, Shield, Headphones, RefreshCw } from 'lucide-react';
 
 const slides = [
@@ -8,6 +9,7 @@ const slides = [
     subtitle: 'Votre marketplace africaine',
     description: 'Découvrez des milliers de produits authentiques et soutenez les vendeurs locaux africains.',
     cta: 'Découvrir maintenant',
+    to: '/catalogue',
     bg: 'from-[#FF6B00] via-[#FF8533] to-[#FF6B00]',
     accent: '#00A651',
     icon: ShoppingBag,
@@ -19,6 +21,7 @@ const slides = [
     subtitle: 'Offre limitée',
     description: 'Smartphones, ordinateurs, accessoires — Les meilleures marques aux meilleurs prix.',
     cta: 'Voir les offres',
+    to: '/catalogue?category=%C3%89lectronique',
     bg: 'from-[#00A651] via-[#33B874] to-[#00A651]',
     accent: '#FF6B00',
     icon: Zap,
@@ -30,6 +33,7 @@ const slides = [
     subtitle: 'Dès 15 000 FCFA',
     description: 'Profitez de la livraison gratuite sur toutes vos commandes dans Dakar et Ouagadougou.',
     cta: 'Commander',
+    to: '/catalogue',
     bg: 'from-[#1F2937] via-[#374151] to-[#1F2937]',
     accent: '#FF6B00',
     icon: Truck,
@@ -41,6 +45,7 @@ const slides = [
     subtitle: 'Partout en Afrique',
     description: 'Expédiez vos colis en toute sécurité avec notre service de livraison fiable.',
     cta: 'Envoyer un colis',
+    to: '/colis',
     bg: 'from-[#FF6B00] via-[#E05E00] to-[#FF6B00]',
     accent: '#00A651',
     icon: Gift,
@@ -101,13 +106,14 @@ export default function HeroCarousel() {
                   <p className="text-sm md:text-base opacity-80 mb-6 leading-relaxed">
                     {slide.description}
                   </p>
-                  <button
+                  <Link
+                    to={slide.to}
                     className="inline-flex items-center gap-2 px-6 py-3 bg-white rounded-full font-bold text-sm shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
                     style={{ color: slide.accent }}
                   >
                     {slide.cta}
                     <ChevronRight size={16} />
-                  </button>
+                  </Link>
                 </div>
                 <div className="hidden md:flex flex-shrink-0 ml-8">
                   <div className="w-52 h-52 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">

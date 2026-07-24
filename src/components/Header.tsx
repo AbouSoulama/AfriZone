@@ -13,7 +13,7 @@ const navItems = [
   { label: 'Maison', to: '/catalogue?category=Maison' },
   { label: 'Beauté', to: '/catalogue?category=Beaut%C3%A9' },
   { label: 'Alimentation', to: '/catalogue?category=Alimentation' },
-  { label: 'Envoi de Colis', to: '/catalogue' },
+  { label: 'Envoi de Colis', to: '/colis' },
 ];
 
 export default function Header() {
@@ -174,6 +174,13 @@ export default function Header() {
                         Mes commandes
                       </Link>
                       <Link
+                        to="/colis/mes-envois"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2 text-sm hover:bg-orange-50"
+                      >
+                        Mes envois
+                      </Link>
+                      <Link
                         to="/panier"
                         onClick={() => setUserMenuOpen(false)}
                         className="block px-4 py-2 text-sm hover:bg-orange-50"
@@ -304,6 +311,20 @@ export default function Header() {
                 Mes commandes
               </Link>
             )}
+            <Link
+              to="/colis"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
+            >
+              Envoi de colis
+            </Link>
+            <Link
+              to="/suivi"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
+            >
+              Suivre un colis
+            </Link>
             <Link
               to="/auth/register/vendor"
               onClick={() => setMobileMenuOpen(false)}
