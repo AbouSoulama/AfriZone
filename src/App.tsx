@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Header from './components/Header';
 import HeroCarousel from './components/HeroCarousel';
@@ -20,6 +21,7 @@ import ParcelSendPage from './pages/ParcelSend';
 import ParcelListPage from './pages/ParcelList';
 import ParcelDetailPage from './pages/ParcelDetail';
 import ParcelTrackPage from './pages/ParcelTrack';
+import NotificationsPage from './pages/Notifications';
 import AccountLayout from './pages/account/AccountLayout';
 import AccountProfilePage from './pages/account/AccountProfile';
 import AccountAddressesPage from './pages/account/AccountAddresses';
@@ -91,81 +93,84 @@ function HomePage() {
 export default function App() {
   return (
     <AuthProvider>
-      <CartProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/catalogue" element={<CatalogPage />} />
-            <Route path="/produit/:slug" element={<ProductDetailPage />} />
-            <Route path="/boutique/:slug" element={<VendorShopPage />} />
-            <Route path="/panier" element={<CartPage />} />
-            <Route path="/checkout" element={<CheckoutPage />} />
-            <Route path="/commandes" element={<OrdersPage />} />
-            <Route path="/commandes/:id" element={<OrderDetailPage />} />
-            <Route path="/colis" element={<ParcelSendPage />} />
-            <Route path="/colis/mes-envois" element={<ParcelListPage />} />
-            <Route path="/colis/:id" element={<ParcelDetailPage />} />
-            <Route path="/suivi" element={<ParcelTrackPage />} />
+      <NotificationsProvider>
+        <CartProvider>
+          <Router>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/catalogue" element={<CatalogPage />} />
+              <Route path="/produit/:slug" element={<ProductDetailPage />} />
+              <Route path="/boutique/:slug" element={<VendorShopPage />} />
+              <Route path="/panier" element={<CartPage />} />
+              <Route path="/checkout" element={<CheckoutPage />} />
+              <Route path="/commandes" element={<OrdersPage />} />
+              <Route path="/commandes/:id" element={<OrderDetailPage />} />
+              <Route path="/colis" element={<ParcelSendPage />} />
+              <Route path="/colis/mes-envois" element={<ParcelListPage />} />
+              <Route path="/colis/:id" element={<ParcelDetailPage />} />
+              <Route path="/suivi" element={<ParcelTrackPage />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
 
-            <Route path="/compte" element={<AccountLayout />}>
-              <Route index element={<AccountProfilePage />} />
-              <Route path="adresses" element={<AccountAddressesPage />} />
-            </Route>
+              <Route path="/compte" element={<AccountLayout />}>
+                <Route index element={<AccountProfilePage />} />
+                <Route path="adresses" element={<AccountAddressesPage />} />
+              </Route>
 
-            <Route path="/auth/login" element={<LoginPage />} />
-            <Route path="/auth/register" element={<RegisterChoicePage />} />
-            <Route path="/auth/register/client" element={<RegisterClientPage />} />
-            <Route path="/auth/register/vendor" element={<RegisterVendorPage />} />
-            <Route path="/auth/register/driver" element={<RegisterDriverPage />} />
-            <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/auth/login" element={<LoginPage />} />
+              <Route path="/auth/register" element={<RegisterChoicePage />} />
+              <Route path="/auth/register/client" element={<RegisterClientPage />} />
+              <Route path="/auth/register/vendor" element={<RegisterVendorPage />} />
+              <Route path="/auth/register/driver" element={<RegisterDriverPage />} />
+              <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
 
-            <Route
-              path="/vendeur"
-              element={
-                <ProtectedRoute roles={['vendeur']}>
-                  <VendorLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<VendorDashboard />} />
-              <Route path="commandes" element={<VendorOrdersPage />} />
-              <Route path="commandes/:id" element={<VendorOrderDetailPage />} />
-              <Route path="produits" element={<VendorProductsPage />} />
-              <Route path="produits/nouveau" element={<VendorProductFormPage />} />
-              <Route path="produits/:id" element={<VendorProductFormPage />} />
-            </Route>
+              <Route
+                path="/vendeur"
+                element={
+                  <ProtectedRoute roles={['vendeur']}>
+                    <VendorLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<VendorDashboard />} />
+                <Route path="commandes" element={<VendorOrdersPage />} />
+                <Route path="commandes/:id" element={<VendorOrderDetailPage />} />
+                <Route path="produits" element={<VendorProductsPage />} />
+                <Route path="produits/nouveau" element={<VendorProductFormPage />} />
+                <Route path="produits/:id" element={<VendorProductFormPage />} />
+              </Route>
 
-            <Route
-              path="/livreur"
-              element={
-                <ProtectedRoute roles={['livreur']}>
-                  <DriverLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<DriverDashboard />} />
-              <Route path="courses" element={<DriverDeliveriesPage />} />
-              <Route path="courses/:id" element={<DriverDeliveryDetailPage />} />
-            </Route>
+              <Route
+                path="/livreur"
+                element={
+                  <ProtectedRoute roles={['livreur']}>
+                    <DriverLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<DriverDashboard />} />
+                <Route path="courses" element={<DriverDeliveriesPage />} />
+                <Route path="courses/:id" element={<DriverDeliveryDetailPage />} />
+              </Route>
 
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute roles={['admin']}>
-                  <AdminLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Navigate to="/admin/vendeurs" replace />} />
-              <Route path="vendeurs" element={<AdminVendorsPage />} />
-              <Route path="livreurs" element={<AdminDriversPage />} />
-              <Route path="livraisons" element={<AdminDeliveriesPage />} />
-              <Route path="colis" element={<AdminParcelsPage />} />
-            </Route>
-          </Routes>
-        </Router>
-      </CartProvider>
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute roles={['admin']}>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Navigate to="/admin/vendeurs" replace />} />
+                <Route path="vendeurs" element={<AdminVendorsPage />} />
+                <Route path="livreurs" element={<AdminDriversPage />} />
+                <Route path="livraisons" element={<AdminDeliveriesPage />} />
+                <Route path="colis" element={<AdminParcelsPage />} />
+              </Route>
+            </Routes>
+          </Router>
+        </CartProvider>
+      </NotificationsProvider>
     </AuthProvider>
   );
 }

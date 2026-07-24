@@ -10,10 +10,10 @@
 | Bloc | Nombre | Statut |
 |---|---|---|
 | Phases préparatoires | **2** | ✅ Terminées |
-| Modules fonctionnels MVP | **11** | **8/11** faits |
-| **Total du début à la fin** | **13 étapes** | **10/13** |
+| Modules fonctionnels MVP | **11** | **9/11** faits |
+| **Total du début à la fin** | **13 étapes** | **11/13** |
 
-**Progression MVP :** ▓▓▓▓▓▓▓▓▓▓░░ ~**73 %** (modules 1→8 terminés)
+**Progression MVP :** ▓▓▓▓▓▓▓▓▓▓▓░ ~**82 %** (modules 1→9 terminés)
 
 > **Note CDC :** le rôle `livreur` existe déjà en base (`user_role`), mais l’espace livreur n’était pas dans le plan initial — **ajouté en Module 8** pour coller au cahier des charges.
 
@@ -80,15 +80,13 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 
 ---
 
-### ⬜ Module 9 — Notifications
-**Objectif CDC :** informer client / vendeur / livreur des événements clés.
-
-| Tâche | Statut |
-|---|---|
-| Table `notifications` + RLS | ⬜ |
-| Cloche / centre de notifications in-app | ⬜ |
-| Événements : commande, statut, colis, livreur, validation | ⬜ |
-| (Optionnel) emails Supabase / Resend | ⬜ |
+### ✅ Module 9 — Notifications
+- [x] Table `notifications` + RLS + triggers
+- [x] Cloche Header + badge non lus
+- [x] Centre `/notifications`
+- [x] Événements : commande, colis, course livreur, validation vendeur/livreur
+- [x] Migration `009_notifications.sql`
+- [ ] (Optionnel) emails Supabase / Resend
 
 ---
 
@@ -131,14 +129,15 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 | `006_parcels.sql` | 6 | [ ] |
 | `007_addresses.sql` | 7 | [ ] |
 | `008_drivers.sql` | 8 | [ ] |
+| `009_notifications.sql` | 9 | [ ] |
 
 ---
 
 ## Prochaine étape recommandée
 
-→ **Module 9 — Notifications**
+→ **Module 10 — Avis & confiance**
 
-Puis 10 (avis) → 11 (admin + paiements réels + polish).
+Puis 11 (admin + paiements réels + polish).
 
 ---
 

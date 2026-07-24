@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, MapPin, User, Menu, X, ChevronDown, Truck, Shield, Headphones, CreditCard, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import NotificationBell from './NotificationBell';
 
 const cities = ['Dakar', 'Ouagadougou', 'Bamako'];
 
@@ -122,7 +123,8 @@ export default function Header() {
             )}
           </div>
 
-          {/* Cart */}
+          {/* Notifications + Cart */}
+          {isAuthenticated && <NotificationBell />}
           <Link
             to="/panier"
             className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -176,6 +178,13 @@ export default function Header() {
                         className="block px-4 py-2 text-sm hover:bg-orange-50 font-semibold"
                       >
                         Mon compte
+                      </Link>
+                      <Link
+                        to="/notifications"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2 text-sm hover:bg-orange-50"
+                      >
+                        Notifications
                       </Link>
                       <Link
                         to="/commandes"
