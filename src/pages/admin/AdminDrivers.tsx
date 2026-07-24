@@ -19,7 +19,7 @@ const FILTERS: { key: VendorStatus | 'all'; label: string }[] = [
 
 export default function AdminDriversPage() {
   const { user } = useAuth();
-  const [filter, setFilter] = useState<VendorStatus | 'all'>('pending');
+  const [filter, setFilter] = useState<VendorStatus | 'all'>('all');
   const [rows, setRows] = useState<AdminDriverRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,18 +71,25 @@ export default function AdminDriversPage() {
       <p className="text-sm text-gray-500 mb-6">Validez les candidatures livreurs.</p>
 
       <div className="flex gap-2 overflow-x-auto mb-5">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setFilter(f.key)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ${
-              filter === f.key ? 'bg-[#FF6B00] text-white' : 'bg-white border border-gray-200'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+        {FILTERS.map((f) => {
+          const pendingCount =
+            f.key === 'pending' ? rows.filter((r) => r.status === 'pending').length : 0;
+          return (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFilter(f.key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ${
+                filter === f.key ? 'bg-[#FF6B00] text-white' : 'bg-white border border-gray-200'
+              }`}
+            >
+              {f.label}
+              {f.key === 'pending' && filter === 'all' && pendingCount > 0
+                ? ` (${pendingCount})`
+                : ''}
+            </button>
+          );
+        })}
       </div>
 
       {error && (
@@ -102,7 +109,11 @@ export default function AdminDriversPage() {
           {rows.map((d) => (
             <div
               key={d.id}
-              className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+              className={`bg-white rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border ${
+                d.status === 'pending'
+                  ? 'border-amber-300 ring-1 ring-amber-100 bg-amber-50/30'
+                  : 'border-gray-100'
+              }`}
             >
               <div>
                 <p className="font-mono font-bold text-[#FF6B00]">{d.driverCode}</p>

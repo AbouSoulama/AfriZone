@@ -63,19 +63,26 @@ export async function fetchVendorsForAdmin(
     profilesById = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]));
   }
 
-  return rows.map((row) => {
-    const profile = profilesById[row.user_id as string];
-    return mapVendor({
-      ...row,
-      profiles: profile
-        ? {
-            full_name: profile.full_name,
-            phone: profile.phone,
-            email: profile.email,
-          }
-        : null,
+  return rows
+    .map((row) => {
+      const profile = profilesById[row.user_id as string];
+      return mapVendor({
+        ...row,
+        profiles: profile
+          ? {
+              full_name: profile.full_name,
+              phone: profile.phone,
+              email: profile.email,
+            }
+          : null,
+      });
+    })
+    .sort((a, b) => {
+      // En attente d'abord, puis plus récent
+      if (a.status === 'pending' && b.status !== 'pending') return -1;
+      if (b.status === 'pending' && a.status !== 'pending') return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
-  });
 }
 
 export async function updateVendorStatus(

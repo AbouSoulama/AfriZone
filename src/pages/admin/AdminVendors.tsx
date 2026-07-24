@@ -11,7 +11,7 @@ import type { VendorStatus } from '../../types/auth';
 
 export default function AdminVendorsPage() {
   const { user } = useAuth();
-  const [filter, setFilter] = useState<VendorStatus | 'all'>('pending');
+  const [filter, setFilter] = useState<VendorStatus | 'all'>('all');
   const [vendors, setVendors] = useState<AdminVendorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,11 +77,11 @@ export default function AdminVendorsPage() {
           onChange={(e) => setFilter(e.target.value as VendorStatus | 'all')}
           className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
         >
+          <option value="all">Tous</option>
           <option value="pending">En attente</option>
           <option value="approved">Approuvés</option>
           <option value="rejected">Refusés</option>
           <option value="suspended">Suspendus</option>
-          <option value="all">Tous</option>
         </select>
       </div>
 
@@ -100,7 +100,14 @@ export default function AdminVendorsPage() {
       ) : (
         <div className="space-y-4">
           {vendors.map((v) => (
-            <div key={v.id} className="bg-white border border-gray-100 rounded-2xl p-5">
+            <div
+              key={v.id}
+              className={`bg-white rounded-2xl p-5 border ${
+                v.status === 'pending'
+                  ? 'border-amber-300 ring-1 ring-amber-100 bg-amber-50/30'
+                  : 'border-gray-100'
+              }`}
+            >
               <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                 <div>
                   <div className="flex flex-wrap items-center gap-2 mb-1">

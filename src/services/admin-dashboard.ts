@@ -8,6 +8,7 @@ import {
 
 export interface AdminDashboardStats {
   usersTotal: number;
+  clientsTotal: number;
   vendorsPending: number;
   vendorsApproved: number;
   driversPending: number;
@@ -15,6 +16,7 @@ export interface AdminDashboardStats {
   ordersTotal: number;
   ordersDelivered: number;
   ordersOpen: number;
+  ordersByStatus: Record<string, number>;
   revenuePaid: number;
   parcelsTotal: number;
   parcelsActive: number;
@@ -22,46 +24,106 @@ export interface AdminDashboardStats {
   reviewsTotal: number;
 }
 
-export async function fetchAdminDashboardStats(): Promise<AdminDashboardStats> {
+export interface AdminRecentOrder {
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  total: number;
+  createdAt: string;
+  vendorName: string | null;
+  shippingCity: string;
+  paymentStatus: string;
+}
+
+export interface AdminPendingVendor {
+  id: string;
+  shopName: string;
+  city: string;
+  createdAt: string;
+}
+
+export interface AdminPendingDriver {
+  id: string;
+  driverCode: string;
+  city: string;
+  createdAt: string;
+}
+
+export interface AdminDashboardData {
+  stats: AdminDashboardStats;
+  recentOrders: AdminRecentOrder[];
+  pendingVendors: AdminPendingVendor[];
+  pendingDrivers: AdminPendingDriver[];
+}
+
+async function safeCount(
+  table: string,
+  filters?: { column: string; value: string }
+): Promise<number> {
+  let query = supabase.from(table).select('id', { count: 'exact', head: true });
+  if (filters) query = query.eq(filters.column, filters.value);
+  const { count, error } = await query;
+  if (error) {
+    console.warn(`admin count ${table}`, error.message);
+    return 0;
+  }
+  return count ?? 0;
+}
+
+export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
   const [
-    users,
+    usersTotal,
+    clientsTotal,
     vendorsPending,
     vendorsApproved,
     driversPending,
     driversApproved,
-    orders,
-    parcels,
-    products,
-    reviews,
+    reviewsTotal,
+    ordersRes,
+    parcelsRes,
+    recentOrdersRes,
+    pendingVendorsRes,
+    pendingDriversRes,
+    productsRes,
   ] = await Promise.all([
-    supabase.from('profiles').select('id', { count: 'exact', head: true }),
-    supabase
-      .from('vendors')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending'),
-    supabase
-      .from('vendors')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'approved'),
-    supabase
-      .from('drivers')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending'),
-    supabase
-      .from('drivers')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'approved'),
+    safeCount('profiles'),
+    safeCount('profiles', { column: 'role', value: 'client' }),
+    safeCount('vendors', { column: 'status', value: 'pending' }),
+    safeCount('vendors', { column: 'status', value: 'approved' }),
+    safeCount('drivers', { column: 'status', value: 'pending' }),
+    safeCount('drivers', { column: 'status', value: 'approved' }),
+    safeCount('reviews'),
     supabase.from('orders').select('id, status, total, payment_status'),
     supabase.from('parcel_shipments').select('id, status'),
+    supabase
+      .from('orders')
+      .select(
+        'id, order_number, status, total, created_at, shipping_city, payment_status, vendors(shop_name)'
+      )
+      .order('created_at', { ascending: false })
+      .limit(8),
+    supabase
+      .from('vendors')
+      .select('id, shop_name, city, created_at')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(5),
+    supabase
+      .from('drivers')
+      .select('id, driver_code, city, created_at')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(5),
     supabase
       .from('products')
       .select('id', { count: 'exact', head: true })
       .eq('is_active', true),
-    supabase.from('reviews').select('id', { count: 'exact', head: true }),
   ]);
 
-  const orderRows = orders.data ?? [];
-  const parcelRows = parcels.data ?? [];
+  const productsActive = productsRes.error ? 0 : productsRes.count ?? 0;
+
+  const orderRows = ordersRes.error ? [] : ordersRes.data ?? [];
+  const parcelRows = parcelsRes.error ? [] : parcelsRes.data ?? [];
 
   const openStatuses = new Set(['pending', 'confirmed', 'processing', 'shipped']);
   const activeParcel = new Set([
@@ -72,23 +134,72 @@ export async function fetchAdminDashboardStats(): Promise<AdminDashboardStats> {
     'out_for_delivery',
   ]);
 
-  return {
-    usersTotal: users.count ?? 0,
-    vendorsPending: vendorsPending.count ?? 0,
-    vendorsApproved: vendorsApproved.count ?? 0,
-    driversPending: driversPending.count ?? 0,
-    driversApproved: driversApproved.count ?? 0,
+  const ordersByStatus: Record<string, number> = {};
+  for (const o of orderRows) {
+    const s = String(o.status);
+    ordersByStatus[s] = (ordersByStatus[s] || 0) + 1;
+  }
+
+  const stats: AdminDashboardStats = {
+    usersTotal,
+    clientsTotal,
+    vendorsPending,
+    vendorsApproved,
+    driversPending,
+    driversApproved,
     ordersTotal: orderRows.length,
     ordersDelivered: orderRows.filter((o) => o.status === 'delivered').length,
     ordersOpen: orderRows.filter((o) => openStatuses.has(o.status as string)).length,
+    ordersByStatus,
     revenuePaid: orderRows
-      .filter((o) => o.payment_status === 'paid' && o.status !== 'cancelled' && o.status !== 'refunded')
+      .filter(
+        (o) =>
+          o.payment_status === 'paid' &&
+          o.status !== 'cancelled' &&
+          o.status !== 'refunded'
+      )
       .reduce((s, o) => s + Number(o.total ?? 0), 0),
     parcelsTotal: parcelRows.length,
     parcelsActive: parcelRows.filter((p) => activeParcel.has(p.status as string)).length,
-    productsActive: products.count ?? 0,
-    reviewsTotal: reviews.count ?? 0,
+    productsActive,
+    reviewsTotal,
   };
+
+  const recentOrders: AdminRecentOrder[] = (recentOrdersRes.data ?? []).map((row) => {
+    const vendor = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
+    return {
+      id: row.id as string,
+      orderNumber: row.order_number as string,
+      status: row.status as OrderStatus,
+      total: Number(row.total),
+      createdAt: row.created_at as string,
+      vendorName: vendor ? ((vendor as { shop_name?: string }).shop_name ?? null) : null,
+      shippingCity: (row.shipping_city as string) || '',
+      paymentStatus: (row.payment_status as string) || 'pending',
+    };
+  });
+
+  const pendingVendors: AdminPendingVendor[] = (pendingVendorsRes.data ?? []).map((v) => ({
+    id: v.id as string,
+    shopName: v.shop_name as string,
+    city: v.city as string,
+    createdAt: v.created_at as string,
+  }));
+
+  const pendingDrivers: AdminPendingDriver[] = (pendingDriversRes.data ?? []).map((d) => ({
+    id: d.id as string,
+    driverCode: d.driver_code as string,
+    city: d.city as string,
+    createdAt: d.created_at as string,
+  }));
+
+  return { stats, recentOrders, pendingVendors, pendingDrivers };
+}
+
+/** @deprecated use fetchAdminDashboardData */
+export async function fetchAdminDashboardStats(): Promise<AdminDashboardStats> {
+  const data = await fetchAdminDashboardData();
+  return data.stats;
 }
 
 export async function fetchAdminOrders(status?: OrderStatus | 'all'): Promise<OrderView[]> {

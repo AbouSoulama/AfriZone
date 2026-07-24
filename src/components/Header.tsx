@@ -231,11 +231,11 @@ export default function Header() {
                       )}
                       {user.role === 'admin' && (
                         <Link
-                          to="/admin/vendeurs"
+                          to="/admin"
                           onClick={() => setUserMenuOpen(false)}
                           className="block px-4 py-2 text-sm hover:bg-orange-50 text-[#FF6B00] font-semibold"
                         >
-                          Administration
+                          Tableau de bord admin
                         </Link>
                       )}
                       <button

@@ -72,17 +72,23 @@ export async function fetchDriversForAdmin(
     profilesById = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]));
   }
 
-  return rows.map((row) => {
-    const base = mapDriver(row);
-    const profile = profilesById[row.user_id as string];
-    return {
-      ...base,
-      createdAt: row.created_at as string,
-      ownerName: profile?.full_name ?? null,
-      ownerPhone: profile?.phone ?? null,
-      ownerEmail: profile?.email ?? null,
-    };
-  });
+  return rows
+    .map((row) => {
+      const base = mapDriver(row);
+      const profile = profilesById[row.user_id as string];
+      return {
+        ...base,
+        createdAt: row.created_at as string,
+        ownerName: profile?.full_name ?? null,
+        ownerPhone: profile?.phone ?? null,
+        ownerEmail: profile?.email ?? null,
+      };
+    })
+    .sort((a, b) => {
+      if (a.status === 'pending' && b.status !== 'pending') return -1;
+      if (b.status === 'pending' && a.status !== 'pending') return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 }
 
 export async function updateDriverStatus(
