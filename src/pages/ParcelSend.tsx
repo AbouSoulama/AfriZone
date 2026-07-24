@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { CheckCircle, Package, Search } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import { formatPrice } from '../services/catalog';
+import { fetchDefaultAddress } from '../services/account';
 import {
   createParcel,
   estimateParcelPrice,
@@ -33,6 +34,23 @@ export default function ParcelSendPage() {
   const [loading, setLoading] = useState(false);
   const [doneId, setDoneId] = useState<string | null>(null);
   const [tracking, setTracking] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    setSenderName(user.fullName || '');
+    setSenderPhone(user.phone || '');
+    setPaymentPhone(user.phone || '');
+    if (user.city) setPickupCity(user.city);
+    fetchDefaultAddress(user.id)
+      .then((def) => {
+        if (!def) return;
+        setSenderName(def.fullName);
+        setSenderPhone(def.phone);
+        setPickupAddress(def.address);
+        setPickupCity(def.city);
+      })
+      .catch(() => undefined);
+  }, [user]);
 
   const price = useMemo(
     () => estimateParcelPrice(weightKg, pickupCity, deliveryCity, parcelType),

@@ -145,8 +145,12 @@ export default function Header() {
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
                     className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
                   >
-                    <div className="w-8 h-8 rounded-full bg-[#FF6B00] text-white flex items-center justify-center text-sm font-bold">
-                      {user.fullName.charAt(0).toUpperCase()}
+                    <div className="w-8 h-8 rounded-full bg-[#FF6B00] text-white flex items-center justify-center text-sm font-bold overflow-hidden">
+                      {user.avatarUrl ? (
+                        <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        user.fullName.charAt(0).toUpperCase()
+                      )}
                     </div>
                     <span className="text-sm font-semibold text-[#1F2937] max-w-[120px] truncate">
                       {user.fullName.split(' ')[0]}
@@ -166,6 +170,13 @@ export default function Header() {
                           <p className="text-xs text-[#00A651] truncate">{user.vendor.shopName}</p>
                         )}
                       </div>
+                      <Link
+                        to="/compte"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2 text-sm hover:bg-orange-50 font-semibold"
+                      >
+                        Mon compte
+                      </Link>
                       <Link
                         to="/commandes"
                         onClick={() => setUserMenuOpen(false)}
@@ -196,6 +207,15 @@ export default function Header() {
                           Espace vendeur
                         </Link>
                       )}
+                      {user.role === 'livreur' && (
+                        <Link
+                          to="/livreur"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="block px-4 py-2 text-sm hover:bg-orange-50 text-[#FF6B00] font-semibold"
+                        >
+                          Espace livreur
+                        </Link>
+                      )}
                       {user.role === 'admin' && (
                         <Link
                           to="/admin/vendeurs"
@@ -222,7 +242,7 @@ export default function Header() {
                   <Link to="/auth/login" className="px-4 py-2 text-sm font-semibold text-[#1F2937] hover:text-[#FF6B00] transition-colors">
                     Connexion
                   </Link>
-                  <Link to="/auth/register/client" className="px-4 py-2 text-sm font-semibold bg-[#00A651] text-white rounded-lg hover:bg-[#008A43] transition-colors shadow-sm">
+                  <Link to="/auth/register" className="px-4 py-2 text-sm font-semibold bg-[#00A651] text-white rounded-lg hover:bg-[#008A43] transition-colors shadow-sm">
                     Inscription
                   </Link>
                 </div>
@@ -303,13 +323,22 @@ export default function Header() {
               Panier{itemCount > 0 ? ` (${itemCount})` : ''}
             </Link>
             {isAuthenticated && (
-              <Link
-                to="/commandes"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
-              >
-                Mes commandes
-              </Link>
+              <>
+                <Link
+                  to="/compte"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
+                >
+                  Mon compte
+                </Link>
+                <Link
+                  to="/commandes"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
+                >
+                  Mes commandes
+                </Link>
+              </>
             )}
             <Link
               to="/colis"
@@ -332,6 +361,13 @@ export default function Header() {
             >
               Devenir vendeur
             </Link>
+            <Link
+              to="/auth/register/driver"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
+            >
+              Devenir livreur
+            </Link>
           </nav>
           <div className="flex gap-2 mt-4">
             {isAuthenticated && user ? (
@@ -353,7 +389,7 @@ export default function Header() {
                   Connexion
                 </Link>
                 <Link
-                  to="/auth/register/client"
+                  to="/auth/register"
                   className="flex-1 px-4 py-2.5 text-sm font-semibold bg-[#00A651] text-white rounded-lg text-center"
                 >
                   Inscription

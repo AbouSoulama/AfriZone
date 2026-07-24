@@ -37,6 +37,7 @@ export default function Login() {
     if (result.success) {
       if (result.role === 'admin') navigate('/admin/vendeurs');
       else if (result.role === 'vendeur') navigate('/vendeur');
+      else if (result.role === 'livreur') navigate('/livreur');
       else navigate('/');
     } else {
       setError(result.error || 'Une erreur est survenue');
@@ -154,16 +155,13 @@ export default function Login() {
 
           <div className="space-y-3">
             <p className="text-center text-sm text-gray-600">
-              Pas encore de compte?{' '}
-              <Link to="/auth/register/client" className="text-[#00A651] font-bold hover:underline">
-                S&apos;inscrire en tant que Client
+              Pas encore de compte ?{' '}
+              <Link to="/auth/register" className="text-[#00A651] font-bold hover:underline">
+                S&apos;inscrire
               </Link>
             </p>
-            <p className="text-center text-sm text-gray-600">
-              Vous êtes vendeur?{' '}
-              <Link to="/auth/register/vendor" className="text-[#FF6B00] font-bold hover:underline">
-                Créer une boutique
-              </Link>
+            <p className="text-center text-xs text-gray-400">
+              Client · Vendeur · Livreur
             </p>
           </div>
         </div>

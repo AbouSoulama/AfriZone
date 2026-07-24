@@ -25,13 +25,17 @@ import type {
   RegisterData,
   VendorProfile,
   VendorRegisterData,
+  DriverRegisterData,
+  DriverProfile as AuthDriverProfile,
   UserRole,
 } from '../types/auth';
+import { createDriverApplication, mapDriver } from '../services/drivers';
 
 interface AuthContextType extends AuthState {
   login: (identifier: string, password: string) => Promise<AuthResult>;
   register: (data: RegisterData) => Promise<AuthResult>;
   registerVendor: (data: VendorRegisterData) => Promise<AuthResult>;
+  registerDriver: (data: DriverRegisterData) => Promise<AuthResult>;
   logout: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<AuthResult>;
   updatePassword: (password: string) => Promise<AuthResult>;
@@ -40,7 +44,11 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function mapProfile(row: Record<string, unknown>, vendor?: VendorProfile | null): AuthUser {
+function mapProfile(
+  row: Record<string, unknown>,
+  vendor?: VendorProfile | null,
+  driver?: AuthDriverProfile | null
+): AuthUser {
   return {
     id: row.id as string,
     fullName: row.full_name as string,
@@ -52,6 +60,20 @@ function mapProfile(row: Record<string, unknown>, vendor?: VendorProfile | null)
     verified: Boolean(row.verified),
     createdAt: row.created_at as string,
     vendor: vendor ?? null,
+    driver: driver
+      ? {
+          id: driver.id,
+          userId: driver.userId,
+          status: driver.status,
+          driverCode: driver.driverCode,
+          vehicleType: driver.vehicleType,
+          vehiclePlate: driver.vehiclePlate,
+          city: driver.city,
+          country: driver.country,
+          zones: driver.zones,
+          totalDeliveries: driver.totalDeliveries,
+        }
+      : null,
   };
 }
 
@@ -154,8 +176,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (vendorRow) vendor = mapVendor(vendorRow);
     }
 
+    let driver: AuthDriverProfile | null = null;
+    if (profile.role === 'livreur') {
+      const { data: driverRow } = await supabase
+        .from('drivers')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (driverRow) {
+        const d = mapDriver(driverRow);
+        driver = {
+          id: d.id,
+          userId: d.userId,
+          status: d.status,
+          driverCode: d.driverCode,
+          vehicleType: d.vehicleType,
+          vehiclePlate: d.vehiclePlate,
+          city: d.city,
+          country: d.country,
+          zones: d.zones,
+          totalDeliveries: d.totalDeliveries,
+        };
+      }
+    }
+
     setState({
-      user: mapProfile(profile, vendor),
+      user: mapProfile(profile, vendor, driver),
       isAuthenticated: true,
       isLoading: false,
     });
@@ -229,6 +275,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return {
               success: false,
               error: 'Votre compte vendeur n’est pas actif. Contactez le support.',
+            };
+          }
+        }
+
+        if (profile?.role === 'livreur') {
+          const { data: driver } = await supabase
+            .from('drivers')
+            .select('status, driver_code')
+            .eq('user_id', data.user.id)
+            .maybeSingle();
+
+          if (!driver) {
+            await supabase.auth.signOut();
+            return {
+              success: false,
+              error:
+                "Votre inscription livreur est incomplète. Recommencez l'inscription livreur.",
+            };
+          }
+          if (driver.status === 'pending') {
+            await supabase.auth.signOut();
+            return {
+              success: false,
+              error: `Compte livreur (${driver.driver_code}) en attente de validation admin.`,
+            };
+          }
+          if (driver.status === 'rejected' || driver.status === 'suspended') {
+            await supabase.auth.signOut();
+            return {
+              success: false,
+              error: 'Votre compte livreur n’est pas actif. Contactez le support.',
             };
           }
         }
@@ -464,6 +541,102 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const registerDriver = async (data: DriverRegisterData): Promise<AuthResult> => {
+    try {
+      if (data.password !== data.confirmPassword) {
+        return { success: false, error: 'Les mots de passe ne correspondent pas.' };
+      }
+      if (!data.acceptTerms) {
+        return { success: false, error: 'Vous devez accepter les conditions.' };
+      }
+      const idErr = validateIdDocument(data.idDocument);
+      if (idErr) return { success: false, error: idErr };
+      if (!data.zones.length) {
+        return { success: false, error: 'Sélectionnez au moins une zone.' };
+      }
+
+      const phone = normalizePhone(data.phone);
+      const email = data.email?.trim()
+        ? data.email.trim().toLowerCase()
+        : authEmailFromPhone(phone);
+
+      const { data: existingPhone } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('phone', phone)
+        .maybeSingle();
+      if (existingPhone) {
+        return { success: false, error: 'Ce numéro de téléphone est déjà utilisé.' };
+      }
+
+      const { data: authData, error } = await supabase.auth.signUp({
+        email,
+        password: data.password,
+        options: {
+          data: {
+            full_name: data.fullName,
+            phone,
+            city: data.city,
+            role: 'livreur',
+          },
+        },
+      });
+      if (error) return { success: false, error: mapAuthError(error.message) };
+      if (!authData.user) {
+        return { success: false, error: 'Inscription impossible.' };
+      }
+
+      const userId = authData.user.id;
+      await supabase
+        .from('profiles')
+        .update({
+          phone,
+          full_name: data.fullName,
+          city: data.city,
+          email: isSyntheticAuthEmail(email) ? null : email,
+          role: 'livreur',
+        })
+        .eq('id', userId);
+
+      let idDocumentPath: string;
+      try {
+        idDocumentPath = await uploadPrivateFile(
+          'vendor-documents',
+          userId,
+          data.idDocument!,
+          'driver-identity'
+        );
+      } catch {
+        await supabase.auth.signOut();
+        return {
+          success: false,
+          error: "Impossible d'uploader la pièce d'identité.",
+        };
+      }
+
+      const driver = await createDriverApplication(userId, {
+        vehicleType: data.vehicleType,
+        vehiclePlate: data.vehiclePlate,
+        city: data.city,
+        country: data.country,
+        zones: data.zones,
+        licenseNumber: data.licenseNumber,
+        idDocumentType: data.idDocumentType,
+        idDocumentPath,
+      });
+
+      await supabase.auth.signOut();
+      return { success: true, vendorCode: driver.driverCode };
+    } catch (e) {
+      console.error(e);
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error: e instanceof Error ? e.message : "Erreur lors de l'inscription livreur.",
+      };
+    }
+  };
+
   const logout = async () => {
     await supabase.auth.signOut();
     setState({ user: null, isAuthenticated: false, isLoading: false });
@@ -499,6 +672,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         registerVendor,
+        registerDriver,
         logout,
         requestPasswordReset,
         updatePassword,

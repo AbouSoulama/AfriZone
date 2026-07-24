@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { CheckCircle } from 'lucide-react';
 import Header from '../components/Header';
@@ -6,15 +6,16 @@ import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { formatPrice } from '../services/catalog';
-import {
-  placeOrders,
-} from '../services/orders';
+import { placeOrders } from '../services/orders';
+import { fetchDefaultAddress, fetchMyAddresses, type AddressView } from '../services/account';
 import { CATALOG_CITIES } from '../types/catalog';
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { summary, refreshCart } = useCart();
+  const [addresses, setAddresses] = useState<AddressView[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState(user?.city || 'Dakar');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -23,6 +24,34 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [doneIds, setDoneIds] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        const list = await fetchMyAddresses(user.id);
+        setAddresses(list);
+        const def = list.find((a) => a.isDefault) || list[0] || (await fetchDefaultAddress(user.id));
+        if (def) {
+          setSelectedAddressId(def.id);
+          setAddress(def.address);
+          setCity(def.city);
+          setPhone(def.phone);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [user]);
+
+  const applyAddress = (id: string) => {
+    setSelectedAddressId(id);
+    const a = addresses.find((x) => x.id === id);
+    if (!a) return;
+    setAddress(a.address);
+    setCity(a.city);
+    setPhone(a.phone);
+  };
 
   if (!authLoading && !isAuthenticated) {
     return <Navigate to="/auth/login" replace state={{ from: '/checkout' }} />;
@@ -106,7 +135,30 @@ export default function CheckoutPage() {
         <h1 className="text-2xl md:text-3xl font-extrabold mb-6">Checkout</h1>
         <form onSubmit={onSubmit} className="grid lg:grid-cols-[1fr_320px] gap-6">
           <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
-            <h2 className="font-extrabold">Adresse de livraison</h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-extrabold">Adresse de livraison</h2>
+              <Link to="/compte/adresses" className="text-xs font-semibold text-[#FF6B00]">
+                Gérer mes adresses
+              </Link>
+            </div>
+            {addresses.length > 0 && (
+              <div>
+                <label className="block text-sm font-bold mb-2">Choisir une adresse enregistrée</label>
+                <select
+                  value={selectedAddressId}
+                  onChange={(e) => applyAddress(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-white"
+                >
+                  {addresses.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {(a.label || 'Adresse') +
+                        (a.isDefault ? ' ★' : '') +
+                        ` — ${a.address}, ${a.city}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-bold mb-2">Adresse *</label>
               <input

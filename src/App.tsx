@@ -20,22 +20,33 @@ import ParcelSendPage from './pages/ParcelSend';
 import ParcelListPage from './pages/ParcelList';
 import ParcelDetailPage from './pages/ParcelDetail';
 import ParcelTrackPage from './pages/ParcelTrack';
+import AccountLayout from './pages/account/AccountLayout';
+import AccountProfilePage from './pages/account/AccountProfile';
+import AccountAddressesPage from './pages/account/AccountAddresses';
 import VendorLayout from './pages/vendor/VendorLayout';
 import VendorDashboard from './pages/vendor/VendorDashboard';
 import VendorProductsPage from './pages/vendor/VendorProducts';
 import VendorProductFormPage from './pages/vendor/VendorProductForm';
 import VendorOrdersPage from './pages/vendor/VendorOrders';
 import VendorOrderDetailPage from './pages/vendor/VendorOrderDetail';
-import AdminLayout from './pages/admin/AdminLayout';
-import AdminVendorsPage from './pages/admin/AdminVendors';
-import AdminParcelsPage from './pages/admin/AdminParcels';
 import {
   LoginPage,
+  RegisterChoicePage,
   RegisterClientPage,
   RegisterVendorPage,
+  RegisterDriverPage,
   ForgotPasswordPage,
   ResetPasswordPage,
 } from './pages/auth';
+import DriverLayout from './pages/driver/DriverLayout';
+import DriverDashboard from './pages/driver/DriverDashboard';
+import DriverDeliveriesPage from './pages/driver/DriverDeliveries';
+import DriverDeliveryDetailPage from './pages/driver/DriverDeliveryDetail';
+import AdminDriversPage from './pages/admin/AdminDrivers';
+import AdminDeliveriesPage from './pages/admin/AdminDeliveries';
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminVendorsPage from './pages/admin/AdminVendors';
+import AdminParcelsPage from './pages/admin/AdminParcels';
 
 function BackToTop() {
   const handleScroll = () => window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -96,9 +107,16 @@ export default function App() {
             <Route path="/colis/:id" element={<ParcelDetailPage />} />
             <Route path="/suivi" element={<ParcelTrackPage />} />
 
+            <Route path="/compte" element={<AccountLayout />}>
+              <Route index element={<AccountProfilePage />} />
+              <Route path="adresses" element={<AccountAddressesPage />} />
+            </Route>
+
             <Route path="/auth/login" element={<LoginPage />} />
+            <Route path="/auth/register" element={<RegisterChoicePage />} />
             <Route path="/auth/register/client" element={<RegisterClientPage />} />
             <Route path="/auth/register/vendor" element={<RegisterVendorPage />} />
+            <Route path="/auth/register/driver" element={<RegisterDriverPage />} />
             <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
 
@@ -119,6 +137,19 @@ export default function App() {
             </Route>
 
             <Route
+              path="/livreur"
+              element={
+                <ProtectedRoute roles={['livreur']}>
+                  <DriverLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<DriverDashboard />} />
+              <Route path="courses" element={<DriverDeliveriesPage />} />
+              <Route path="courses/:id" element={<DriverDeliveryDetailPage />} />
+            </Route>
+
+            <Route
               path="/admin"
               element={
                 <ProtectedRoute roles={['admin']}>
@@ -128,6 +159,8 @@ export default function App() {
             >
               <Route index element={<Navigate to="/admin/vendeurs" replace />} />
               <Route path="vendeurs" element={<AdminVendorsPage />} />
+              <Route path="livreurs" element={<AdminDriversPage />} />
+              <Route path="livraisons" element={<AdminDeliveriesPage />} />
               <Route path="colis" element={<AdminParcelsPage />} />
             </Route>
           </Routes>

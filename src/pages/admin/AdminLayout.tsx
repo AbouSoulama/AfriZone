@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { ArrowLeft, LogOut, Package, Shield, Users } from 'lucide-react';
+import { ArrowLeft, Bike, LogOut, Package, Shield, Truck, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function AdminLayout() {
@@ -26,6 +26,26 @@ export default function AdminLayout() {
             }
           >
             <Users size={18} /> Vendeurs
+          </NavLink>
+          <NavLink
+            to="/admin/livreurs"
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold ${
+                isActive ? 'bg-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800'
+              }`
+            }
+          >
+            <Bike size={18} /> Livreurs
+          </NavLink>
+          <NavLink
+            to="/admin/livraisons"
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold ${
+                isActive ? 'bg-[#FF6B00]' : 'text-gray-300 hover:bg-gray-800'
+              }`
+            }
+          >
+            <Truck size={18} /> Courses
           </NavLink>
           <NavLink
             to="/admin/colis"
@@ -56,16 +76,16 @@ export default function AdminLayout() {
 
       <main className="flex-1 p-4 md:p-8">
         <div className="md:hidden mb-4 flex gap-2 flex-wrap">
-          <Link
-            to="/admin/vendeurs"
-            className="px-3 py-1.5 bg-[#FF6B00] text-white rounded-full text-xs font-bold"
-          >
+          <Link to="/admin/vendeurs" className="px-3 py-1.5 bg-[#FF6B00] text-white rounded-full text-xs font-bold">
             Vendeurs
           </Link>
-          <Link
-            to="/admin/colis"
-            className="px-3 py-1.5 bg-gray-800 text-white rounded-full text-xs font-bold"
-          >
+          <Link to="/admin/livreurs" className="px-3 py-1.5 bg-gray-800 text-white rounded-full text-xs font-bold">
+            Livreurs
+          </Link>
+          <Link to="/admin/livraisons" className="px-3 py-1.5 bg-gray-800 text-white rounded-full text-xs font-bold">
+            Courses
+          </Link>
+          <Link to="/admin/colis" className="px-3 py-1.5 bg-gray-800 text-white rounded-full text-xs font-bold">
             Colis
           </Link>
           <Link to="/" className="px-3 py-1.5 bg-gray-200 rounded-full text-xs font-bold">

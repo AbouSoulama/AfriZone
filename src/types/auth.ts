@@ -31,8 +31,22 @@ export interface VendorProfile {
   idDocumentType?: string | null;
 }
 
+export interface DriverProfile {
+  id: string;
+  userId: string;
+  status: VendorStatus;
+  driverCode: string;
+  vehicleType: string;
+  vehiclePlate: string | null;
+  city: string;
+  country: string;
+  zones: string[];
+  totalDeliveries: number;
+}
+
 export interface AuthUser extends Profile {
   vendor?: VendorProfile | null;
+  driver?: DriverProfile | null;
 }
 
 export interface AuthState {
@@ -67,6 +81,23 @@ export interface VendorRegisterData {
   shopDescription: string;
   shopLogo: File | null;
   commerceRegister?: string;
+  acceptTerms: boolean;
+}
+
+export interface DriverRegisterData {
+  fullName: string;
+  phone: string;
+  email?: string;
+  password: string;
+  confirmPassword: string;
+  city: string;
+  country: 'SN' | 'BF' | 'ML';
+  vehicleType: 'moto' | 'voiture' | 'velo' | 'camionnette';
+  vehiclePlate?: string;
+  zones: string[];
+  licenseNumber?: string;
+  idDocument: File | null;
+  idDocumentType: 'cni' | 'passport' | 'permis';
   acceptTerms: boolean;
 }
 

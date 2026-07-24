@@ -117,6 +117,11 @@ export default function RegisterClient() {
           </Link>
           <h1 className="text-2xl font-extrabold text-[#1F2937] mt-3">Créer un compte Client</h1>
           <p className="text-gray-500 text-sm mt-1">Accédez aux meilleures offres africaines</p>
+          <p className="text-xs mt-2">
+            <Link to="/auth/register" className="text-[#FF6B00] font-semibold hover:underline">
+              ← Changer de type de compte
+            </Link>
+          </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">

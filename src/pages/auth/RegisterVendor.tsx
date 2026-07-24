@@ -262,6 +262,11 @@ export default function RegisterVendor() {
           <p className="text-gray-500 text-sm mt-1">
             Inscription en 2 étapes — différente du compte client
           </p>
+          <p className="text-xs mt-2">
+            <Link to="/auth/register" className="text-[#FF6B00] font-semibold hover:underline">
+              ← Changer de type de compte
+            </Link>
+          </p>
         </div>
 
         <div className="flex items-center gap-2 mb-2">
