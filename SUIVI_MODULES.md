@@ -143,6 +143,7 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 | `010_reviews.sql` | 10 | [ ] |
 | `011_admin_management.sql` | 11+ | [ ] |
 | `012_geolocation_badges.sql` | 12–13 | [ ] |
+| `013_fix_rls_recursion.sql` | fix | [ ] |
 
 ---
 
