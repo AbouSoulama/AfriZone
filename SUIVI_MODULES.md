@@ -10,10 +10,10 @@
 | Bloc | Nombre | Statut |
 |---|---|---|
 | Phases préparatoires | **2** | ✅ Terminées |
-| Modules fonctionnels MVP | **11** | **11/11** faits |
-| **Total du début à la fin** | **13 étapes** | **13/13** |
+| Modules fonctionnels MVP | **13** | **13/13** faits |
+| **Total du début à la fin** | **15 étapes** | **15/15** |
 
-**Progression MVP :** ▓▓▓▓▓▓▓▓▓▓▓▓ **~100 %** (modules 1→11 terminés)
+**Progression MVP :** ▓▓▓▓▓▓▓▓▓▓▓▓ **~100 %** (+ géoloc & badges CDC)
 
 > **Note CDC :** le rôle `livreur` existe déjà en base (`user_role`), mais l’espace livreur n’était pas dans le plan initial — **ajouté en Module 8** pour coller au cahier des charges.
 
@@ -112,6 +112,21 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 
 ---
 
+### ✅ Module 12 — Géolocalisation *(CDC)*
+- [x] Position GPS livreur en temps réel (RPC + logs)
+- [x] Page client `/suivi-livraison/:id` + lien depuis commande
+- [x] Partage GPS côté livreur + carte OSM
+- [x] Optimisation d’itinéraire (plus proche voisin) sur courses actives
+- [x] Migration `012_geolocation_badges.sql`
+
+### ✅ Module 13 — Badges vendeurs *(CDC)*
+- [x] Badges **Vérifié**, **Gold Seller**, **Top Rated**
+- [x] Affichage boutique / accueil / fiche produit
+- [x] Attribution auto + bascule manuelle admin
+- [x] Inclus dans migration `012_geolocation_badges.sql`
+
+---
+
 ## Migrations SQL à cocher
 
 | Fichier | Module | Exécuté sur Supabase ? |
@@ -127,14 +142,13 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 | `009_notifications.sql` | 9 | [ ] |
 | `010_reviews.sql` | 10 | [ ] |
 | `011_admin_management.sql` | 11+ | [ ] |
+| `012_geolocation_badges.sql` | 12–13 | [ ] |
 
 ---
 
 ## Prochaine étape recommandée
 
-→ **QA manuelle + déploiement** (cocher les migrations sur Supabase, tester parcours client / vendeur / livreur / admin).
-
-Optionnel post-MVP : emails transactionnels, clés API Orange/Wave réelles, code-splitting avancé.
+→ Exécuter `012_geolocation_badges.sql`, activer **Realtime** sur la table `deliveries` (Supabase → Database → Replication), puis tester une course livreur + suivi client.
 
 ---
 

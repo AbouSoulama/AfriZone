@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
-  CheckCircle,
   MapPin,
   Package,
   ShoppingCart,
@@ -13,6 +12,7 @@ import {
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ReviewsSection from '../components/reviews/ReviewsSection';
+import VendorBadges from '../components/vendors/VendorBadges';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { fetchProductBySlug, formatPrice } from '../services/catalog';
@@ -196,11 +196,11 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
                       <p className="font-bold text-[#1F2937] truncate">{product.vendor.shopName}</p>
-                      <CheckCircle size={14} className="text-[#00A651] shrink-0" />
                     </div>
-                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                    <VendorBadges vendor={product.vendor} size="sm" />
+                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                       <MapPin size={12} /> {product.vendor.city} · {product.vendor.vendorCode}
                     </p>
                   </div>

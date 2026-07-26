@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, MapPin, Package, Star, Store } from 'lucide-react';
+import { ArrowLeft, MapPin, Package, Star, Store } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ProductCard from '../components/catalog/ProductCard';
 import ReviewsSection from '../components/reviews/ReviewsSection';
+import VendorBadges from '../components/vendors/VendorBadges';
 import {
   fetchVendorBySlug,
   fetchVendorProducts,
@@ -93,9 +94,7 @@ export default function VendorShopPage() {
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
                       <h1 className="text-2xl font-extrabold text-[#1F2937]">{vendor.shopName}</h1>
-                      <span className="inline-flex items-center gap-1 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full text-[10px] font-bold text-[#00A651]">
-                        <CheckCircle size={12} /> Vérifié
-                      </span>
+                      <VendorBadges vendor={vendor} />
                     </div>
                     <p className="text-sm text-gray-500 font-mono">{vendor.vendorCode}</p>
                     <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-gray-600">

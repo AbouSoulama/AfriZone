@@ -13,6 +13,8 @@ export interface AdminVendorRow extends CatalogVendor {
   ownerName?: string | null;
   ownerPhone?: string | null;
   ownerEmail?: string | null;
+  isGoldSeller?: boolean;
+  isTopRated?: boolean;
 }
 
 function mapVendor(row: Record<string, unknown>): AdminVendorRow {
@@ -32,6 +34,8 @@ function mapVendor(row: Record<string, unknown>): AdminVendorRow {
     reviewCount: Number(row.review_count ?? 0),
     totalSales: Number(row.total_sales ?? 0),
     status: row.status as string,
+    isGoldSeller: Boolean(row.is_gold_seller),
+    isTopRated: Boolean(row.is_top_rated),
     address: (row.address as string) ?? null,
     idDocumentUrl: (row.id_document_url as string) ?? null,
     idDocumentType: (row.id_document_type as string) ?? null,
@@ -121,6 +125,8 @@ export async function updateVendorAdmin(
     city: string;
     country: string;
     address: string | null;
+    isGoldSeller: boolean;
+    isTopRated: boolean;
   }>
 ): Promise<void> {
   const payload: Record<string, unknown> = {};
@@ -130,6 +136,8 @@ export async function updateVendorAdmin(
   if (patch.city !== undefined) payload.city = patch.city;
   if (patch.country !== undefined) payload.country = patch.country;
   if (patch.address !== undefined) payload.address = patch.address;
+  if (patch.isGoldSeller !== undefined) payload.is_gold_seller = patch.isGoldSeller;
+  if (patch.isTopRated !== undefined) payload.is_top_rated = patch.isTopRated;
 
   const { error } = await supabase.from('vendors').update(payload).eq('id', vendorId);
   if (error) throw new Error(error.message);

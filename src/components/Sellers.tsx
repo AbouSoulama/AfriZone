@@ -3,14 +3,13 @@ import { Link } from 'react-router-dom';
 import {
   ChevronLeft,
   ChevronRight,
-  CheckCircle,
-  Award,
   Star,
   Store,
   MapPin,
 } from 'lucide-react';
 import { fetchFeaturedVendors } from '../services/catalog';
 import { useCity } from '../context/CityContext';
+import VendorBadges from './vendors/VendorBadges';
 import type { CatalogVendor } from '../types/catalog';
 
 function SellerCard({ seller }: { seller: CatalogVendor }) {
@@ -24,16 +23,9 @@ function SellerCard({ seller }: { seller: CatalogVendor }) {
             className="absolute inset-0 w-full h-full object-cover opacity-30"
           />
         )}
-        <div className="absolute top-2 right-2 flex items-center gap-1 bg-[#00A651] text-white px-2 py-1 rounded-full text-[10px] font-extrabold shadow-lg">
-          <CheckCircle size={11} />
-          VÉRIFIÉ
+        <div className="absolute top-2 left-2 right-2">
+          <VendorBadges vendor={seller} size="sm" />
         </div>
-        {seller.rating >= 4.8 && (
-          <div className="absolute top-2 left-2 flex items-center gap-1 bg-gradient-to-r from-yellow-400 to-amber-500 text-white px-2 py-1 rounded-full text-[10px] font-extrabold shadow-lg">
-            <Award size={11} className="fill-white" />
-            TOP
-          </div>
-        )}
       </div>
 
       <div className="relative px-4 -mt-8">

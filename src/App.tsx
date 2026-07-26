@@ -41,6 +41,7 @@ import AdminDeliveriesPage from './pages/admin/AdminDeliveries';
 import AdminParcelsPage from './pages/admin/AdminParcels';
 import AdminUsersPage from './pages/admin/AdminUsers';
 import AdminCatalogPage from './pages/admin/AdminCatalog';
+import DeliveryTrackPage from './pages/DeliveryTrack';
 import TermsPage from './pages/legal/Terms';
 import PrivacyPage from './pages/legal/Privacy';
 import FaqPage from './pages/legal/Faq';
@@ -119,6 +120,7 @@ export default function App() {
               <Route path="/colis/mes-envois" element={<ParcelListPage />} />
               <Route path="/colis/:id" element={<ParcelDetailPage />} />
               <Route path="/suivi" element={<ParcelTrackPage />} />
+              <Route path="/suivi-livraison/:id" element={<DeliveryTrackPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
 
               <Route path="/compte" element={<AccountLayout />}>

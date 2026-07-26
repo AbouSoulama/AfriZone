@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, Star } from 'lucide-react';
+import { ArrowLeft, Check, Navigation, Star } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ReviewForm from '../components/reviews/ReviewForm';
@@ -17,6 +17,7 @@ import {
   type OrderView,
 } from '../services/orders';
 import { fetchOrderReviews, type ReviewView } from '../services/reviews';
+import { fetchLiveDeliveryByOrder } from '../services/geolocation';
 
 function timelineIndex(status: OrderStatus): number {
   if (status === 'cancelled' || status === 'refunded') return -1;
@@ -32,6 +33,7 @@ export default function OrderDetailPage() {
   const [busy, setBusy] = useState(false);
   const [orderReviews, setOrderReviews] = useState<Record<string, ReviewView>>({});
   const [openReviewFor, setOpenReviewFor] = useState<string | null>(null);
+  const [liveDeliveryId, setLiveDeliveryId] = useState<string | null>(null);
 
   const load = async () => {
     if (!user || !id) return;
@@ -43,6 +45,12 @@ export default function OrderDetailPage() {
         setOrderReviews(await fetchOrderReviews(o.id, user.id));
       } else {
         setOrderReviews({});
+      }
+      if (o && !['cancelled', 'refunded', 'pending'].includes(o.status)) {
+        const live = await fetchLiveDeliveryByOrder(o.id);
+        setLiveDeliveryId(live?.id ?? null);
+      } else {
+        setLiveDeliveryId(null);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
@@ -137,6 +145,15 @@ export default function OrderDetailPage() {
                     );
                   })}
                 </div>
+              )}
+
+              {liveDeliveryId && order.status !== 'delivered' && (
+                <Link
+                  to={`/suivi-livraison/${liveDeliveryId}`}
+                  className="mt-2 inline-flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] text-white rounded-xl text-sm font-bold"
+                >
+                  <Navigation size={16} /> Suivre le livreur en direct
+                </Link>
               )}
             </div>
 

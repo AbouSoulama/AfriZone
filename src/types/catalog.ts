@@ -15,6 +15,9 @@ export interface CatalogVendor {
   reviewCount?: number;
   totalSales: number;
   status: string;
+  /** Badges CDC */
+  isGoldSeller?: boolean;
+  isTopRated?: boolean;
 }
 
 export interface CatalogProduct {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CheckCircle, Eye, Trash2, XCircle } from 'lucide-react';
 import AdminModal from '../../components/admin/AdminModal';
 import { DocPreview } from '../../components/admin/DocPreview';
+import VendorBadges from '../../components/vendors/VendorBadges';
 import { useAuth } from '../../context/AuthContext';
 import {
   deleteVendorAdmin,
@@ -37,6 +38,8 @@ export default function AdminVendorsPage() {
     city: '',
     country: '',
     address: '',
+    isGoldSeller: false,
+    isTopRated: false,
   });
 
   const load = async () => {
@@ -64,6 +67,8 @@ export default function AdminVendorsPage() {
       city: v.city,
       country: v.country,
       address: v.address || '',
+      isGoldSeller: Boolean(v.isGoldSeller),
+      isTopRated: Boolean(v.isTopRated),
     });
     setDocUrl(null);
     if (v.idDocumentUrl) {
@@ -108,6 +113,8 @@ export default function AdminVendorsPage() {
         city: edit.city,
         country: edit.country,
         address: edit.address || null,
+        isGoldSeller: edit.isGoldSeller,
+        isTopRated: edit.isTopRated,
       });
       await load();
       setSelected(null);
@@ -197,6 +204,9 @@ export default function AdminVendorsPage() {
                     >
                       {STATUS_LABEL[v.status] || v.status}
                     </span>
+                  </div>
+                  <div className="mb-2">
+                    <VendorBadges vendor={v} size="sm" />
                   </div>
                   <p className="text-sm text-gray-600">
                     {v.ownerName} · {v.ownerPhone} · {v.ownerEmail}
@@ -312,6 +322,28 @@ export default function AdminVendorsPage() {
                   rows={3}
                   className="w-full border-2 rounded-xl px-3 py-2 resize-none"
                 />
+                <div className="pt-2 space-y-2 border-t">
+                  <p className="text-xs font-bold text-gray-500 uppercase">Badges</p>
+                  <label className="flex items-center gap-2 text-sm font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={edit.isGoldSeller}
+                      onChange={(e) => setEdit({ ...edit, isGoldSeller: e.target.checked })}
+                    />
+                    Gold Seller
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={edit.isTopRated}
+                      onChange={(e) => setEdit({ ...edit, isTopRated: e.target.checked })}
+                    />
+                    Top Rated
+                  </label>
+                  <p className="text-[11px] text-gray-400">
+                    « Vérifié » = boutique approuvée. Gold auto si ≥50 ventes. Top Rated auto si note ≥4.5 et ≥5 avis.
+                  </p>
+                </div>
               </div>
             </div>
 
