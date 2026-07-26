@@ -128,8 +128,16 @@ export async function updateShopAdmin(
 }
 
 export async function deleteShopAdmin(shopId: string): Promise<void> {
-  const { error } = await supabase.from('vendors').delete().eq('id', shopId);
-  if (error) throw new Error(error.message);
+  const { error } = await supabase.rpc('admin_delete_vendor', {
+    p_vendor_id: shopId,
+  });
+  if (error) {
+    throw new Error(
+      error.message.includes('function') || error.message.includes('schema cache')
+        ? 'Suppression boutique indisponible : exécutez la migration 015_fix_admin_deletes.sql'
+        : error.message
+    );
+  }
 }
 
 export async function updateProductAdmin(
@@ -157,6 +165,14 @@ export async function updateProductAdmin(
 }
 
 export async function deleteProductAdmin(productId: string): Promise<void> {
-  const { error } = await supabase.from('products').delete().eq('id', productId);
-  if (error) throw new Error(error.message);
+  const { error } = await supabase.rpc('admin_delete_product', {
+    p_product_id: productId,
+  });
+  if (error) {
+    throw new Error(
+      error.message.includes('function') || error.message.includes('schema cache')
+        ? 'Suppression produit indisponible : exécutez la migration 015_fix_admin_deletes.sql'
+        : error.message
+    );
+  }
 }

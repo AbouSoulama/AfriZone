@@ -146,15 +146,15 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 | `012_geolocation_badges.sql` | 12–13 | [ ] |
 | `013_fix_rls_recursion.sql` | fix | [ ] |
 | `014_order_emails.sql` | 9+ emails | [ ] |
+| `015_fix_admin_deletes.sql` | fix admin | [ ] |
 
 ---
 
 ## Prochaine étape recommandée
 
-1. Exécuter `014_order_emails.sql` sur Supabase  
-2. Déployer `order-emails` + secrets Resend (`RESEND_API_KEY`, `EMAIL_HOOK_SECRET`, `APP_URL`)  
-3. Remplir `app_settings` (`supabase_url`, `email_hook_secret`)  
-4. Tester un achat → emails client + admin, puis chaque changement de statut jusqu’à livré
+1. Exécuter `015_fix_admin_deletes.sql` (suppressions admin users / boutiques / produits)  
+2. Exécuter `014_order_emails.sql` + config Resend si pas encore fait  
+3. Tester suppressions depuis `/admin`
 
 ---
 

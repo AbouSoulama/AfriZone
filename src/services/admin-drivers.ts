@@ -114,8 +114,16 @@ export async function updateDriverStatus(
 }
 
 export async function deleteDriverAdmin(driverId: string): Promise<void> {
-  const { error } = await supabase.from('drivers').delete().eq('id', driverId);
-  if (error) throw new Error(error.message);
+  const { error } = await supabase.rpc('admin_delete_driver', {
+    p_driver_id: driverId,
+  });
+  if (error) {
+    throw new Error(
+      error.message.includes('function') || error.message.includes('schema cache')
+        ? 'Suppression livreur indisponible : exécutez la migration 015_fix_admin_deletes.sql'
+        : error.message
+    );
+  }
 }
 
 export async function fetchApprovedDrivers(): Promise<DriverProfile[]> {

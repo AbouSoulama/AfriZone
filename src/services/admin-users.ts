@@ -70,7 +70,13 @@ export async function deleteUserAdmin(userId: string): Promise<void> {
   const { error } = await supabase.rpc('admin_delete_auth_user', {
     p_user_id: userId,
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    throw new Error(
+      error.message.includes('function') || error.message.includes('schema cache')
+        ? 'Suppression utilisateur indisponible : exécutez les migrations 011 puis 015_fix_admin_deletes.sql'
+        : error.message
+    );
+  }
 }
 
 export const ROLE_LABELS: Record<UserRole, string> = {

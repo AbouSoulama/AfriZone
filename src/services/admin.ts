@@ -144,8 +144,16 @@ export async function updateVendorAdmin(
 }
 
 export async function deleteVendorAdmin(vendorId: string): Promise<void> {
-  const { error } = await supabase.from('vendors').delete().eq('id', vendorId);
-  if (error) throw new Error(error.message);
+  const { error } = await supabase.rpc('admin_delete_vendor', {
+    p_vendor_id: vendorId,
+  });
+  if (error) {
+    throw new Error(
+      error.message.includes('function') || error.message.includes('schema cache')
+        ? 'Suppression vendeur indisponible : exécutez la migration 015_fix_admin_deletes.sql'
+        : error.message
+    );
+  }
 }
 
 export async function getVendorDocumentUrl(path: string): Promise<string | null> {
