@@ -126,6 +126,7 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 | `008_drivers.sql` | 8 | [ ] |
 | `009_notifications.sql` | 9 | [ ] |
 | `010_reviews.sql` | 10 | [ ] |
+| `011_admin_management.sql` | 11+ | [ ] |
 
 ---
 

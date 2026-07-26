@@ -39,6 +39,8 @@ import AdminVendorsPage from './pages/admin/AdminVendors';
 import AdminDriversPage from './pages/admin/AdminDrivers';
 import AdminDeliveriesPage from './pages/admin/AdminDeliveries';
 import AdminParcelsPage from './pages/admin/AdminParcels';
+import AdminUsersPage from './pages/admin/AdminUsers';
+import AdminCatalogPage from './pages/admin/AdminCatalog';
 import TermsPage from './pages/legal/Terms';
 import PrivacyPage from './pages/legal/Privacy';
 import FaqPage from './pages/legal/Faq';
@@ -176,6 +178,8 @@ export default function App() {
               >
                 <Route index element={<AdminDashboardPage />} />
                 <Route path="commandes" element={<AdminOrdersPage />} />
+                <Route path="utilisateurs" element={<AdminUsersPage />} />
+                <Route path="catalogue" element={<AdminCatalogPage />} />
                 <Route path="vendeurs" element={<AdminVendorsPage />} />
                 <Route path="livreurs" element={<AdminDriversPage />} />
                 <Route path="livraisons" element={<AdminDeliveriesPage />} />

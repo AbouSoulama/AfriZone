@@ -5,16 +5,19 @@ import {
   LayoutDashboard,
   LogOut,
   Package,
-  Shield,
   ShoppingBag,
+  Store,
   Truck,
   Users,
+  UserSquare2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const NAV = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/commandes', label: 'Commandes', icon: ShoppingBag },
+  { to: '/admin/utilisateurs', label: 'Utilisateurs', icon: UserSquare2 },
+  { to: '/admin/catalogue', label: 'Boutiques', icon: Store },
   { to: '/admin/vendeurs', label: 'Vendeurs', icon: Users },
   { to: '/admin/livreurs', label: 'Livreurs', icon: Bike },
   { to: '/admin/livraisons', label: 'Courses', icon: Truck },
@@ -29,13 +32,21 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-gray-50 flex">
       <aside className="hidden md:flex w-64 flex-col bg-[#1F2937] text-white">
         <div className="p-5 border-b border-gray-700">
-          <div className="flex items-center gap-2">
-            <Shield size={20} className="text-[#FF6B00]" />
-            <span className="font-extrabold">Admin AfriZone</span>
+          <div className="flex items-center gap-3">
+            <img
+              src="/logo-afrizone.png"
+              alt="AfriZone"
+              className="h-10 w-10 object-contain bg-white rounded-xl p-1"
+            />
+            <div>
+              <span className="font-extrabold block leading-tight">Admin AfriZone</span>
+              <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[140px]">
+                {user?.fullName}
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-gray-400 mt-2">{user?.fullName}</p>
         </div>
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {NAV.map((item) => {
             const Icon = item.icon;
             return (
@@ -70,7 +81,18 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 p-4 md:p-8">
+      <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
+        <div className="md:hidden mb-4 flex items-center gap-3">
+          <img
+            src="/logo-afrizone.png"
+            alt="AfriZone"
+            className="h-9 w-9 object-contain bg-white rounded-lg p-0.5 border"
+          />
+          <div>
+            <p className="font-extrabold text-sm">Admin AfriZone</p>
+            <p className="text-xs text-gray-500">{user?.fullName}</p>
+          </div>
+        </div>
         <div className="md:hidden mb-4 flex gap-2 flex-wrap">
           {NAV.map((item) => (
             <Link
@@ -81,9 +103,6 @@ export default function AdminLayout() {
               {item.label}
             </Link>
           ))}
-          <Link to="/" className="px-3 py-1.5 bg-gray-200 rounded-full text-xs font-bold">
-            Site
-          </Link>
         </div>
         <Outlet />
       </main>

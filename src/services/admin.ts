@@ -7,6 +7,8 @@ export interface AdminVendorRow extends CatalogVendor {
   address: string | null;
   idDocumentUrl: string | null;
   idDocumentType: string | null;
+  commerceRegister: string | null;
+  rejectionReason: string | null;
   createdAt: string;
   ownerName?: string | null;
   ownerPhone?: string | null;
@@ -27,11 +29,14 @@ function mapVendor(row: Record<string, unknown>): AdminVendorRow {
     country: row.country as string,
     city: row.city as string,
     rating: Number(row.rating ?? 0),
+    reviewCount: Number(row.review_count ?? 0),
     totalSales: Number(row.total_sales ?? 0),
     status: row.status as string,
     address: (row.address as string) ?? null,
     idDocumentUrl: (row.id_document_url as string) ?? null,
     idDocumentType: (row.id_document_type as string) ?? null,
+    commerceRegister: (row.commerce_register as string) ?? null,
+    rejectionReason: (row.rejection_reason as string) ?? null,
     createdAt: row.created_at as string,
     ownerName: (profile?.full_name as string) ?? null,
     ownerPhone: (profile?.phone as string) ?? null,
@@ -78,7 +83,6 @@ export async function fetchVendorsForAdmin(
       });
     })
     .sort((a, b) => {
-      // En attente d'abord, puis plus récent
       if (a.status === 'pending' && b.status !== 'pending') return -1;
       if (b.status === 'pending' && a.status !== 'pending') return 1;
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -108,12 +112,40 @@ export async function updateVendorStatus(
   if (error) throw new Error(error.message);
 }
 
+export async function updateVendorAdmin(
+  vendorId: string,
+  patch: Partial<{
+    shopName: string;
+    shopDescription: string | null;
+    shopCategory: string | null;
+    city: string;
+    country: string;
+    address: string | null;
+  }>
+): Promise<void> {
+  const payload: Record<string, unknown> = {};
+  if (patch.shopName !== undefined) payload.shop_name = patch.shopName;
+  if (patch.shopDescription !== undefined) payload.shop_description = patch.shopDescription;
+  if (patch.shopCategory !== undefined) payload.shop_category = patch.shopCategory;
+  if (patch.city !== undefined) payload.city = patch.city;
+  if (patch.country !== undefined) payload.country = patch.country;
+  if (patch.address !== undefined) payload.address = patch.address;
+
+  const { error } = await supabase.from('vendors').update(payload).eq('id', vendorId);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteVendorAdmin(vendorId: string): Promise<void> {
+  const { error } = await supabase.from('vendors').delete().eq('id', vendorId);
+  if (error) throw new Error(error.message);
+}
+
 export async function getVendorDocumentUrl(path: string): Promise<string | null> {
   if (!path) return null;
   if (path.startsWith('http')) return path;
   const { data, error } = await supabase.storage
     .from('vendor-documents')
-    .createSignedUrl(path, 60 * 10);
+    .createSignedUrl(path, 60 * 30);
   if (error) {
     console.error(error);
     return null;

@@ -113,6 +113,11 @@ export async function updateDriverStatus(
   if (error) throw new Error(error.message);
 }
 
+export async function deleteDriverAdmin(driverId: string): Promise<void> {
+  const { error } = await supabase.from('drivers').delete().eq('id', driverId);
+  if (error) throw new Error(error.message);
+}
+
 export async function fetchApprovedDrivers(): Promise<DriverProfile[]> {
   const { data, error } = await supabase
     .from('drivers')
