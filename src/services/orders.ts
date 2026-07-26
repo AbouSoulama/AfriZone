@@ -6,7 +6,12 @@ import {
   type CartItemRow,
 } from './cart';
 
-export type PaymentMethod = 'mobile_money' | 'orange_money' | 'wave' | 'moov_money';
+export type PaymentMethod =
+  | 'mobile_money'
+  | 'orange_money'
+  | 'wave'
+  | 'moov_money'
+  | 'mtn_money';
 export type OrderStatus =
   | 'pending'
   | 'confirmed'
@@ -84,6 +89,7 @@ export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   orange_money: 'Orange Money',
   wave: 'Wave',
   moov_money: 'Moov Money',
+  mtn_money: 'MTN Money',
 };
 
 export async function placeOrders(

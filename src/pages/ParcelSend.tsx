@@ -13,6 +13,15 @@ import {
   PARCEL_TYPE_LABELS,
   type ParcelType,
 } from '../services/parcels';
+import {
+  chargeMobileMoney,
+  MOBILE_MONEY_OPERATORS,
+  PAYMENT_CHANNELS,
+  providerLabel,
+  type MobileMoneyOperator,
+  type MobileMoneyProvider,
+  type PaymentChannel,
+} from '../services/payments';
 
 export default function ParcelSendPage() {
   const navigate = useNavigate();
@@ -30,10 +39,14 @@ export default function ParcelSendPage() {
   const [contentDescription, setContentDescription] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [paymentPhone, setPaymentPhone] = useState(user?.phone || '');
+  const [channel, setChannel] = useState<PaymentChannel>('mobile_money');
+  const [operator, setOperator] = useState<MobileMoneyOperator>('orange_money');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [doneId, setDoneId] = useState<string | null>(null);
   const [tracking, setTracking] = useState<string | null>(null);
+
+  const provider: MobileMoneyProvider = channel === 'wave' ? 'wave' : operator;
 
   useEffect(() => {
     if (!user) return;
@@ -69,7 +82,7 @@ export default function ParcelSendPage() {
           <div className="bg-white border rounded-2xl p-8">
             <CheckCircle size={48} className="mx-auto text-[#00A651] mb-4" />
             <h1 className="text-2xl font-extrabold mb-2">Colis enregistré</h1>
-            <p className="text-gray-500 text-sm mb-2">Paiement Mobile Money confirmé.</p>
+            <p className="text-gray-500 text-sm mb-2">Paiement confirmé.</p>
             <p className="font-mono font-bold text-[#FF6B00] text-lg mb-6">{tracking}</p>
             <div className="flex flex-col gap-2">
               <button
@@ -95,6 +108,11 @@ export default function ParcelSendPage() {
     setLoading(true);
     setError(null);
     try {
+      const charge = await chargeMobileMoney({
+        amount: price,
+        phone: paymentPhone,
+        provider,
+      });
       const parcel = await createParcel(user.id, {
         senderName,
         senderPhone,
@@ -109,6 +127,8 @@ export default function ParcelSendPage() {
         contentDescription,
         specialInstructions,
         paymentPhone,
+        paymentMethod: provider,
+        paymentTransactionId: charge.transactionId,
       });
       setDoneId(parcel.id);
       setTracking(parcel.trackingNumber);
@@ -130,7 +150,7 @@ export default function ParcelSendPage() {
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold">Envoyer un colis</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Dakar · Ouagadougou · Bamako — paiement Mobile Money immédiat.
+              Dakar · Ouagadougou · Bamako — paiement Wave ou Mobile Money.
             </p>
           </div>
           <div className="flex gap-2">
@@ -299,11 +319,44 @@ export default function ParcelSendPage() {
               </div>
               <div>
                 <h3 className="font-extrabold mb-2">Paiement</h3>
-                <div className="p-4 border-2 border-[#FF6B00] bg-orange-50 rounded-xl mb-3">
-                  <p className="font-semibold text-sm">Mobile Money</p>
-                  <p className="text-xs text-gray-500">Paiement immédiat</p>
+                <div className="grid sm:grid-cols-2 gap-2 mb-3">
+                  {PAYMENT_CHANNELS.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setChannel(c.id)}
+                      className={`p-3 border-2 rounded-xl text-left transition-colors ${
+                        channel === c.id
+                          ? 'border-[#FF6B00] bg-orange-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <p className="font-semibold text-sm">{c.label}</p>
+                      <p className="text-xs text-gray-500">{c.hint}</p>
+                    </button>
+                  ))}
                 </div>
-                <label className="block text-sm font-bold mb-2">Numéro Mobile Money *</label>
+                {channel === 'mobile_money' && (
+                  <div className="grid sm:grid-cols-3 gap-2 mb-3">
+                    {MOBILE_MONEY_OPERATORS.map((op) => (
+                      <button
+                        key={op.id}
+                        type="button"
+                        onClick={() => setOperator(op.id)}
+                        className={`p-2.5 border-2 rounded-xl text-left transition-colors ${
+                          operator === op.id
+                            ? 'border-[#FF6B00] bg-orange-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <p className="font-semibold text-xs">{op.label}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <label className="block text-sm font-bold mb-2">
+                  Numéro {providerLabel(provider)} *
+                </label>
                 <input
                   value={paymentPhone}
                   onChange={(e) => setPaymentPhone(e.target.value)}

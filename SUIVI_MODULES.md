@@ -86,7 +86,8 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 - [x] Centre `/notifications`
 - [x] Événements : commande, colis, course livreur, validation vendeur/livreur
 - [x] Migration `009_notifications.sql`
-- [ ] (Optionnel) emails Supabase / Resend
+- [x] Emails transactionnels commandes (client + admin, payé → livré) — migration `014` + Edge Function `order-emails`
+- [ ] Configurer Resend + `app_settings` (voir README `order-emails`)
 
 ---
 
@@ -104,7 +105,7 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 |---|---|
 | Dashboard admin (stats CA, commandes, colis, users…) | ✅ |
 | Gestion admin des commandes marketplace | ✅ |
-| Couche Mobile Money (Orange / Wave / Moov + mode live Edge Function) | ✅ |
+| Couche paiement (Mobile Money opérateurs + Wave + mode live Edge Function) | ✅ |
 | Pages légales (CGU, confidentialité, FAQ, contact) | ✅ |
 | Footer branché + polish MVP | ✅ |
 
@@ -144,12 +145,16 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 | `011_admin_management.sql` | 11+ | [ ] |
 | `012_geolocation_badges.sql` | 12–13 | [ ] |
 | `013_fix_rls_recursion.sql` | fix | [ ] |
+| `014_order_emails.sql` | 9+ emails | [ ] |
 
 ---
 
 ## Prochaine étape recommandée
 
-→ Exécuter `012_geolocation_badges.sql`, activer **Realtime** sur la table `deliveries` (Supabase → Database → Replication), puis tester une course livreur + suivi client.
+1. Exécuter `014_order_emails.sql` sur Supabase  
+2. Déployer `order-emails` + secrets Resend (`RESEND_API_KEY`, `EMAIL_HOOK_SECRET`, `APP_URL`)  
+3. Remplir `app_settings` (`supabase_url`, `email_hook_secret`)  
+4. Tester un achat → emails client + admin, puis chaque changement de statut jusqu’à livré
 
 ---
 

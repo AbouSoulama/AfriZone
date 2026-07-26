@@ -93,7 +93,7 @@ export default function Footer() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { icon: Truck, title: 'Livraison rapide', desc: '24-48h' },
-              { icon: CreditCard, title: 'Paiement sécurisé', desc: 'Mobile Money' },
+              { icon: CreditCard, title: 'Paiement sécurisé', desc: 'Mobile Money & Wave' },
               { icon: Shield, title: 'Garantie qualité', desc: 'Produits vérifiés' },
               { icon: Headphones, title: 'Support', desc: 'FAQ & Contact' },
             ].map((f) => {
@@ -189,7 +189,7 @@ export default function Footer() {
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-400">Nous acceptons :</span>
               <div className="flex items-center gap-2">
-                {['Orange Money', 'Wave', 'Moov Money'].map((m) => (
+                {['Orange Money', 'Moov Money', 'MTN Money', 'Wave'].map((m) => (
                   <div
                     key={m}
                     className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[10px] font-bold text-gray-300"

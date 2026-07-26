@@ -11,11 +11,11 @@ const FAQ = [
   },
   {
     q: 'Quels moyens de paiement sont acceptés ?',
-    a: 'Orange Money, Wave et Moov Money selon votre pays. Le paiement est confirmé avant la préparation de la commande.',
+    a: 'Mobile Money (Orange Money, Moov Money, MTN Money) et Wave, selon votre pays. Le paiement est confirmé avant la préparation de la commande.',
   },
   {
     q: 'Puis-je suivre ma livraison ?',
-    a: 'Oui : suivez le statut dans Mes commandes. Pour un envoi de colis indépendant, utilisez la page Suivi avec le numéro de tracking.',
+    a: 'Oui : suivez le statut dans Mes commandes. Vous recevez aussi un email à chaque étape (paiement → préparation → livraison → livré). Pour un envoi de colis indépendant, utilisez la page Suivi avec le numéro de tracking.',
   },
   {
     q: 'Comment devenir vendeur ?',

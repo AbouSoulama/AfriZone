@@ -26,6 +26,8 @@ export interface ParcelInput {
   contentDescription: string;
   specialInstructions?: string;
   paymentPhone: string;
+  paymentMethod?: string;
+  paymentTransactionId?: string;
 }
 
 export interface ParcelView {
@@ -162,7 +164,7 @@ export async function createParcel(userId: string, input: ParcelInput): Promise<
     throw new Error('Tous les champs obligatoires doivent être remplis.');
   }
   if (!input.paymentPhone.trim()) {
-    throw new Error('Indiquez le numéro Mobile Money pour payer.');
+    throw new Error('Indiquez le numéro de paiement.');
   }
   if (input.weightKg <= 0 || input.weightKg > 50) {
     throw new Error('Le poids doit être entre 0,1 et 50 kg.');
@@ -175,7 +177,19 @@ export async function createParcel(userId: string, input: ParcelInput): Promise<
     input.parcelType
   );
   const trackingNumber = generateTrackingNumber();
-  const note = `Payé via Mobile Money (${input.paymentPhone.trim()})`;
+  const methodLabel =
+    input.paymentMethod === 'wave'
+      ? 'Wave'
+      : input.paymentMethod === 'orange_money'
+        ? 'Orange Money'
+        : input.paymentMethod === 'moov_money'
+          ? 'Moov Money'
+          : input.paymentMethod === 'mtn_money'
+            ? 'MTN Money'
+            : 'Mobile Money';
+  const note = `Payé via ${methodLabel} (${input.paymentPhone.trim()})${
+    input.paymentTransactionId ? ` · réf. ${input.paymentTransactionId}` : ''
+  }`;
   const instructions = [input.specialInstructions?.trim(), note].filter(Boolean).join(' — ');
 
   const { data, error } = await supabase

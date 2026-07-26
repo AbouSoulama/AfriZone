@@ -30,9 +30,9 @@ export default function TermsPage() {
           <section>
             <h2 className="font-extrabold text-[#1F2937] text-base mb-2">3. Commandes & paiements</h2>
             <p>
-              Les paiements s’effectuent via Mobile Money (Orange Money, Wave, Moov Money selon
-              disponibilité). Une commande confirmée engage le vendeur à préparer et expédier les
-              articles dans les délais indiqués.
+              Les paiements s’effectuent via Mobile Money (Orange Money, Moov Money, MTN Money) ou
+              Wave, selon disponibilité. Une commande confirmée engage le vendeur à préparer et
+              expédier les articles dans les délais indiqués.
             </p>
           </section>
           <section>

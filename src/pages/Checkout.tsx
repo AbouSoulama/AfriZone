@@ -10,9 +10,12 @@ import { placeOrders } from '../services/orders';
 import { fetchDefaultAddress, fetchMyAddresses, type AddressView } from '../services/account';
 import {
   chargeMobileMoney,
-  MOBILE_MONEY_PROVIDERS,
+  MOBILE_MONEY_OPERATORS,
+  PAYMENT_CHANNELS,
   providerLabel,
+  type MobileMoneyOperator,
   type MobileMoneyProvider,
+  type PaymentChannel,
 } from '../services/payments';
 import { CATALOG_CITIES } from '../types/catalog';
 
@@ -27,10 +30,13 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState(user?.phone || '');
   const [notes, setNotes] = useState('');
   const [paymentPhone, setPaymentPhone] = useState(user?.phone || '');
-  const [provider, setProvider] = useState<MobileMoneyProvider>('orange_money');
+  const [channel, setChannel] = useState<PaymentChannel>('mobile_money');
+  const [operator, setOperator] = useState<MobileMoneyOperator>('orange_money');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [doneIds, setDoneIds] = useState<string[] | null>(null);
+
+  const provider: MobileMoneyProvider = channel === 'wave' ? 'wave' : operator;
 
   useEffect(() => {
     if (!user) return;
@@ -221,23 +227,47 @@ export default function CheckoutPage() {
 
             <div>
               <h2 className="font-extrabold mb-3">Mode de paiement</h2>
-              <div className="grid sm:grid-cols-3 gap-2 mb-4">
-                {MOBILE_MONEY_PROVIDERS.map((p) => (
+              <div className="grid sm:grid-cols-2 gap-2 mb-3">
+                {PAYMENT_CHANNELS.map((c) => (
                   <button
-                    key={p.id}
+                    key={c.id}
                     type="button"
-                    onClick={() => setProvider(p.id)}
+                    onClick={() => setChannel(c.id)}
                     className={`p-3 border-2 rounded-xl text-left transition-colors ${
-                      provider === p.id
+                      channel === c.id
                         ? 'border-[#FF6B00] bg-orange-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <p className="font-semibold text-sm">{p.label}</p>
-                    <p className="text-[11px] text-gray-500 mt-0.5">{p.hint}</p>
+                    <p className="font-semibold text-sm">{c.label}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{c.hint}</p>
                   </button>
                 ))}
               </div>
+              {channel === 'mobile_money' && (
+                <div className="mb-4">
+                  <p className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">
+                    Opérateur Mobile Money
+                  </p>
+                  <div className="grid sm:grid-cols-3 gap-2">
+                    {MOBILE_MONEY_OPERATORS.map((op) => (
+                      <button
+                        key={op.id}
+                        type="button"
+                        onClick={() => setOperator(op.id)}
+                        className={`p-3 border-2 rounded-xl text-left transition-colors ${
+                          operator === op.id
+                            ? 'border-[#FF6B00] bg-orange-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <p className="font-semibold text-sm">{op.label}</p>
+                        <p className="text-[11px] text-gray-500 mt-0.5">{op.hint}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-bold mb-2">
                   Numéro {providerLabel(provider)} *
