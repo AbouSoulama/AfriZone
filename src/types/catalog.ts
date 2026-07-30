@@ -58,6 +58,9 @@ export type CatalogSort =
 export interface CatalogFilters {
   q?: string;
   category?: string;
+  /** Code pays : SN | BF | ML */
+  country?: string;
+  /** @deprecated utiliser country */
   city?: string;
   minPrice?: number;
   maxPrice?: number;
@@ -86,4 +89,72 @@ export const CATALOG_CATEGORIES = [
   'Auto',
 ] as const;
 
+/** Pays couverts par AfriZone (sélecteur principal du site) */
+export const CATALOG_COUNTRIES = [
+  { code: 'BF', label: 'Burkina Faso', capital: 'Ouagadougou' },
+  { code: 'ML', label: 'Mali', capital: 'Bamako' },
+  { code: 'SN', label: 'Sénégal', capital: 'Dakar' },
+] as const;
+
+export type CatalogCountryCode = (typeof CATALOG_COUNTRIES)[number]['code'];
+
+/** Villes par pays (adresses / checkout — pas le filtre catalogue) */
+export const CITIES_BY_COUNTRY: Record<CatalogCountryCode, string[]> = {
+  SN: ['Dakar', 'Thies', 'Saint-Louis', 'Ziguinchor', 'Kaolack', 'Touba'],
+  BF: ['Ouagadougou', 'Bobo-Dioulasso', 'Koudougou', 'Banfora', 'Ouahigouya', 'Kaya'],
+  ML: ['Bamako', 'Sikasso', 'Segou', 'Mopti', 'Kayes'],
+};
+
+/** @deprecated préférer CATALOG_COUNTRIES — conservé pour compat */
 export const CATALOG_CITIES = ['Dakar', 'Ouagadougou', 'Bamako'] as const;
+
+export function countryLabel(code?: string | null): string {
+  if (!code) return '';
+  const found = CATALOG_COUNTRIES.find((c) => c.code === code);
+  return found?.label || code;
+}
+
+export function countryCodeFromLabelOrCity(raw?: string | null): CatalogCountryCode | null {
+  if (!raw) return null;
+  const t = raw.trim();
+  const byCode = CATALOG_COUNTRIES.find((c) => c.code === t.toUpperCase());
+  if (byCode) return byCode.code;
+
+  const lower = t
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  if (
+    lower.includes('burkina') ||
+    lower.includes('ouaga') ||
+    lower.includes('bobo') ||
+    lower === 'bf'
+  ) {
+    return 'BF';
+  }
+  if (lower.includes('mali') || lower.includes('bamako') || lower.includes('sikasso') || lower === 'ml') {
+    return 'ML';
+  }
+  if (
+    lower.includes('senegal') ||
+    lower.includes('dakar') ||
+    lower.includes('thies') ||
+    lower === 'sn'
+  ) {
+    return 'SN';
+  }
+
+  const byLabel = CATALOG_COUNTRIES.find(
+    (c) =>
+      c.label
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase() === lower
+  );
+  return byLabel?.code ?? null;
+}
+
+export function capitalForCountry(code: CatalogCountryCode): string {
+  return CATALOG_COUNTRIES.find((c) => c.code === code)?.capital || 'Dakar';
+}

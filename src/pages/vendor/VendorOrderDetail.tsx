@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, Truck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { formatPrice } from '../../services/catalog';
 import { getVendorIdForUser } from '../../services/vendor';
@@ -16,6 +16,12 @@ import {
 } from '../../services/vendor-orders';
 import type { OrderStatus } from '../../services/orders';
 import { PAYMENT_METHOD_LABELS } from '../../services/orders';
+import {
+  fetchVendorDeliveryByOrder,
+  orderHasVendorDeliveryMode,
+  startVendorSelfDelivery,
+  type DeliveryView,
+} from '../../services/vendor-deliveries';
 
 const NEXT_ACTION_LABEL: Partial<Record<OrderStatus, string>> = {
   confirmed: 'Passer en préparation',
@@ -35,6 +41,8 @@ export default function VendorOrderDetailPage() {
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [order, setOrder] = useState<VendorOrderView | null>(null);
   const [tracking, setTracking] = useState('');
+  const [selfDelivery, setSelfDelivery] = useState(false);
+  const [delivery, setDelivery] = useState<DeliveryView | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +54,13 @@ export default function VendorOrderDetailPage() {
       const data = await fetchVendorOrderById(vId, orderId);
       setOrder(data);
       setTracking(data?.trackingNumber || '');
+      const isSelf = await orderHasVendorDeliveryMode(orderId);
+      setSelfDelivery(isSelf);
+      if (isSelf) {
+        setDelivery(await fetchVendorDeliveryByOrder(vId, orderId));
+      } else {
+        setDelivery(null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
     } finally {
@@ -77,6 +92,23 @@ export default function VendorOrderDetailPage() {
 
   const onAdvance = async () => {
     if (!vendorId || !order || !next) return;
+    if (next === 'shipped' && selfDelivery) {
+      setBusy(true);
+      setError(null);
+      try {
+        const deliveryId = await startVendorSelfDelivery(order.id);
+        await load(vendorId, order.id);
+        // rester sur la page commande ; lien vers livraison
+        if (deliveryId) {
+          /* delivery chargé via load */
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Erreur');
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     if (next === 'shipped' && !tracking.trim() && !order.trackingNumber) {
       setError('Indiquez un numéro de suivi avant de passer en livraison.');
       return;
@@ -139,6 +171,11 @@ export default function VendorOrderDetailPage() {
                 <p className="text-sm text-gray-500">
                   {new Date(order.createdAt).toLocaleString('fr-FR')}
                 </p>
+                {selfDelivery && (
+                  <p className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-[#FF6B00] bg-orange-50 px-2 py-1 rounded-full">
+                    <Truck size={12} /> Vous livrez vous-même
+                  </p>
+                )}
               </div>
               <span className="inline-block text-xs font-bold px-3 py-1 rounded-full bg-orange-50 text-[#FF6B00]">
                 {ORDER_STATUS_LABELS[order.status]}
@@ -168,11 +205,27 @@ export default function VendorOrderDetailPage() {
             )}
           </div>
 
+          {selfDelivery && delivery && (
+            <div className="bg-orange-50 border border-orange-100 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="font-extrabold text-sm">Course de livraison active</p>
+                <p className="text-xs text-gray-600 mt-1">
+                  Partagez votre GPS et mettez à jour le statut jusqu’à la remise au client.
+                </p>
+              </div>
+              <Link
+                to={`/vendeur/livraisons/${delivery.id}`}
+                className="px-4 py-2.5 bg-[#FF6B00] text-white rounded-xl text-sm font-bold text-center"
+              >
+                Ouvrir le suivi GPS
+              </Link>
+            </div>
+          )}
+
           <div className="bg-white border border-gray-100 rounded-2xl p-6 text-sm space-y-2">
             <h2 className="font-extrabold mb-2">Client & livraison</h2>
             <p>
-              <span className="text-gray-500">Client :</span>{' '}
-              {order.customerName || '—'}
+              <span className="text-gray-500">Client :</span> {order.customerName || '—'}
             </p>
             <p>
               <span className="text-gray-500">Tél. client :</span>{' '}
@@ -242,30 +295,52 @@ export default function VendorOrderDetailPage() {
           {next && (
             <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
               <h2 className="font-extrabold">Actions</h2>
-              {(next === 'shipped' || order.status === 'processing' || order.trackingNumber) && (
-                <div>
-                  <label className="block text-sm font-bold mb-2">
-                    Numéro de suivi {next === 'shipped' ? '*' : '(optionnel)'}
-                  </label>
-                  <input
-                    value={tracking}
-                    onChange={(e) => setTracking(e.target.value)}
-                    placeholder="AZ-TRACK-..."
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none"
-                  />
+              {next === 'shipped' && selfDelivery ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600">
+                    Cette commande est en mode <strong>Je livre moi-même</strong>. En démarrant,
+                    vous devenez le livreur AfriZone pour ce colis (GPS + suivi client).
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onAdvance}
+                    disabled={busy}
+                    className="w-full py-3 bg-[#FF6B00] hover:bg-[#E05E00] disabled:opacity-50 text-white rounded-xl font-bold inline-flex items-center justify-center gap-2"
+                  >
+                    <Truck size={18} />
+                    {busy ? 'Démarrage...' : 'Démarrer ma livraison'}
+                  </button>
                 </div>
+              ) : (
+                <>
+                  {(next === 'shipped' ||
+                    order.status === 'processing' ||
+                    order.trackingNumber) && (
+                    <div>
+                      <label className="block text-sm font-bold mb-2">
+                        Numéro de suivi {next === 'shipped' ? '*' : '(optionnel)'}
+                      </label>
+                      <input
+                        value={tracking}
+                        onChange={(e) => setTracking(e.target.value)}
+                        placeholder="AZ-TRACK-..."
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none"
+                      />
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onAdvance}
+                    disabled={busy}
+                    className="w-full py-3 bg-[#00A651] hover:bg-[#008A43] disabled:opacity-50 text-white rounded-xl font-bold"
+                  >
+                    {busy
+                      ? 'Mise à jour...'
+                      : NEXT_ACTION_LABEL[order.status] ||
+                        `Passer à : ${ORDER_STATUS_LABELS[next]}`}
+                  </button>
+                </>
               )}
-              <button
-                type="button"
-                onClick={onAdvance}
-                disabled={busy}
-                className="w-full py-3 bg-[#00A651] hover:bg-[#008A43] disabled:opacity-50 text-white rounded-xl font-bold"
-              >
-                {busy
-                  ? 'Mise à jour...'
-                  : NEXT_ACTION_LABEL[order.status] ||
-                    `Passer à : ${ORDER_STATUS_LABELS[next]}`}
-              </button>
             </div>
           )}
 

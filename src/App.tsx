@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
-import { CityProvider } from './context/CityContext';
+import { CountryProvider } from './context/CountryContext';
 import { NotificationsProvider } from './context/NotificationsContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Header from './components/Header';
@@ -32,6 +32,8 @@ import VendorProductsPage from './pages/vendor/VendorProducts';
 import VendorProductFormPage from './pages/vendor/VendorProductForm';
 import VendorOrdersPage from './pages/vendor/VendorOrders';
 import VendorOrderDetailPage from './pages/vendor/VendorOrderDetail';
+import VendorDeliveriesPage from './pages/vendor/VendorDeliveries';
+import VendorDeliveryDetailPage from './pages/vendor/VendorDeliveryDetail';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboardPage from './pages/admin/AdminDashboard';
 import AdminOrdersPage from './pages/admin/AdminOrders';
@@ -103,30 +105,30 @@ function HomePage() {
 export default function App() {
   return (
     <AuthProvider>
-      <CityProvider>
-      <NotificationsProvider>
-        <CartProvider>
-          <Router>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/catalogue" element={<CatalogPage />} />
-              <Route path="/produit/:slug" element={<ProductDetailPage />} />
-              <Route path="/boutique/:slug" element={<VendorShopPage />} />
-              <Route path="/panier" element={<CartPage />} />
-              <Route path="/checkout" element={<CheckoutPage />} />
-              <Route path="/commandes" element={<OrdersPage />} />
-              <Route path="/commandes/:id" element={<OrderDetailPage />} />
-              <Route path="/colis" element={<ParcelSendPage />} />
-              <Route path="/colis/mes-envois" element={<ParcelListPage />} />
-              <Route path="/colis/:id" element={<ParcelDetailPage />} />
-              <Route path="/suivi" element={<ParcelTrackPage />} />
-              <Route path="/suivi-livraison/:id" element={<DeliveryTrackPage />} />
-              <Route path="/notifications" element={<NotificationsPage />} />
+      <CountryProvider>
+        <NotificationsProvider>
+          <CartProvider>
+            <Router>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/catalogue" element={<CatalogPage />} />
+                <Route path="/produit/:slug" element={<ProductDetailPage />} />
+                <Route path="/boutique/:slug" element={<VendorShopPage />} />
+                <Route path="/panier" element={<CartPage />} />
+                <Route path="/checkout" element={<CheckoutPage />} />
+                <Route path="/commandes" element={<OrdersPage />} />
+                <Route path="/commandes/:id" element={<OrderDetailPage />} />
+                <Route path="/colis" element={<ParcelSendPage />} />
+                <Route path="/colis/mes-envois" element={<ParcelListPage />} />
+                <Route path="/colis/:id" element={<ParcelDetailPage />} />
+                <Route path="/suivi" element={<ParcelTrackPage />} />
+                <Route path="/suivi-livraison/:id" element={<DeliveryTrackPage />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
 
-              <Route path="/compte" element={<AccountLayout />}>
-                <Route index element={<AccountProfilePage />} />
-                <Route path="adresses" element={<AccountAddressesPage />} />
-              </Route>
+                <Route path="/compte" element={<AccountLayout />}>
+                  <Route index element={<AccountProfilePage />} />
+                  <Route path="adresses" element={<AccountAddressesPage />} />
+                </Route>
 
               <Route path="/cgu" element={<TermsPage />} />
               <Route path="/confidentialite" element={<PrivacyPage />} />
@@ -152,6 +154,8 @@ export default function App() {
                 <Route index element={<VendorDashboard />} />
                 <Route path="commandes" element={<VendorOrdersPage />} />
                 <Route path="commandes/:id" element={<VendorOrderDetailPage />} />
+                <Route path="livraisons" element={<VendorDeliveriesPage />} />
+                <Route path="livraisons/:id" element={<VendorDeliveryDetailPage />} />
                 <Route path="produits" element={<VendorProductsPage />} />
                 <Route path="produits/nouveau" element={<VendorProductFormPage />} />
                 <Route path="produits/:id" element={<VendorProductFormPage />} />
@@ -191,7 +195,7 @@ export default function App() {
           </Router>
         </CartProvider>
       </NotificationsProvider>
-      </CityProvider>
+      </CountryProvider>
     </AuthProvider>
   );
 }

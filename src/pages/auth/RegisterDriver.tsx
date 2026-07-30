@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bike, CheckCircle, Upload } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { CATALOG_CITIES } from '../../types/catalog';
+import { CATALOG_COUNTRIES, CITIES_BY_COUNTRY } from '../../types/catalog';
 import { VEHICLE_LABELS, type VehicleType } from '../../services/drivers';
 
 const COUNTRIES = [
@@ -122,7 +122,11 @@ export default function RegisterDriverPage() {
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-bold mb-1">Pays *</label>
-              <select value={country} onChange={(e) => setCountry(e.target.value as 'SN' | 'BF' | 'ML')} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white">
+              <select value={country} onChange={(e) => {
+                const next = e.target.value as 'SN' | 'BF' | 'ML';
+                setCountry(next);
+                setCity(CITIES_BY_COUNTRY[next][0]);
+              }} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white">
                 {COUNTRIES.map((c) => (
                   <option key={c.code} value={c.code}>{c.label}</option>
                 ))}
@@ -131,7 +135,7 @@ export default function RegisterDriverPage() {
             <div>
               <label className="block text-sm font-bold mb-1">Ville *</label>
               <select value={city} onChange={(e) => setCity(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white">
-                {CATALOG_CITIES.map((c) => (
+                {(CITIES_BY_COUNTRY[country] || []).map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
@@ -152,18 +156,18 @@ export default function RegisterDriverPage() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-bold mb-2">Zones desservies *</label>
+            <label className="block text-sm font-bold mb-2">Zones desservies (pays) *</label>
             <div className="flex flex-wrap gap-2">
-              {CATALOG_CITIES.map((z) => (
+              {CATALOG_COUNTRIES.map((z) => (
                 <button
-                  key={z}
+                  key={z.code}
                   type="button"
-                  onClick={() => toggleZone(z)}
+                  onClick={() => toggleZone(z.code)}
                   className={`px-3 py-1.5 rounded-full text-xs font-bold border-2 ${
-                    zones.includes(z) ? 'border-[#FF6B00] bg-orange-50 text-[#FF6B00]' : 'border-gray-200'
+                    zones.includes(z.code) ? 'border-[#FF6B00] bg-orange-50 text-[#FF6B00]' : 'border-gray-200'
                   }`}
                 >
-                  {z}
+                  {z.label}
                 </button>
               ))}
             </div>

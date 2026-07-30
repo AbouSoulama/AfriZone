@@ -11,7 +11,9 @@ import {
   type AdminUserRow,
 } from '../../services/admin-users';
 import type { UserRole } from '../../types/auth';
-import { CATALOG_CITIES } from '../../types/catalog';
+import { CITIES_BY_COUNTRY } from '../../types/catalog';
+
+const ALL_CITIES = Object.values(CITIES_BY_COUNTRY).flat();
 
 const ROLE_FILTERS: Array<UserRole | 'all'> = ['all', 'client', 'vendeur', 'livreur', 'admin'];
 
@@ -260,7 +262,7 @@ export default function AdminUsersPage() {
                 onChange={(e) => setForm({ ...form, city: e.target.value })}
                 className="w-full border-2 rounded-xl px-3 py-2"
               >
-                {CATALOG_CITIES.map((c) => (
+                {ALL_CITIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>

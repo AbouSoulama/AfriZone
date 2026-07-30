@@ -49,8 +49,6 @@ const footerColumns: Record<string, Array<{ label: string; to: string }>> = {
   ],
 };
 
-const cities = ['Dakar', 'Ouagadougou', 'Bamako'];
-
 export default function Footer() {
   return (
     <footer className="bg-[#1F2937] text-white">
@@ -173,15 +171,19 @@ export default function Footer() {
         <div className="max-w-7xl mx-auto px-4 py-5">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-bold text-gray-400 mb-2">VILLES DESSERVIES :</p>
+              <p className="text-xs font-bold text-gray-400 mb-2">PAYS DESSERVIS :</p>
               <div className="flex flex-wrap gap-x-4 gap-y-1">
-                {cities.map((city) => (
+                {[
+                  { label: 'Burkina Faso', code: 'BF' },
+                  { label: 'Mali', code: 'ML' },
+                  { label: 'Sénégal', code: 'SN' },
+                ].map((p) => (
                   <Link
-                    key={city}
-                    to={`/catalogue?city=${encodeURIComponent(city)}`}
+                    key={p.code}
+                    to={`/catalogue?country=${p.code}`}
                     className="text-xs text-gray-500 hover:text-white transition-colors"
                   >
-                    {city}
+                    {p.label}
                   </Link>
                 ))}
               </div>

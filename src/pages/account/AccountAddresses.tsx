@@ -11,7 +11,11 @@ import {
   type AddressInput,
   type AddressView,
 } from '../../services/account';
-import { CATALOG_CITIES } from '../../types/catalog';
+import {
+  CITIES_BY_COUNTRY,
+  capitalForCountry,
+  type CatalogCountryCode,
+} from '../../types/catalog';
 
 const emptyForm: AddressInput = {
   label: '',
@@ -168,7 +172,13 @@ export default function AccountAddressesPage() {
               <label className="block text-xs font-bold mb-1">Pays *</label>
               <select
                 value={form.country}
-                onChange={(e) => setForm({ ...form, country: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    country: e.target.value,
+                    city: capitalForCountry((e.target.value as CatalogCountryCode) || 'SN'),
+                  })
+                }
                 className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm bg-white"
               >
                 {ADDRESS_COUNTRIES.map((c) => (
@@ -215,11 +225,13 @@ export default function AccountAddressesPage() {
               onChange={(e) => setForm({ ...form, city: e.target.value })}
               className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm bg-white"
             >
-              {CATALOG_CITIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+              {(CITIES_BY_COUNTRY[(form.country as CatalogCountryCode) || 'SN'] || []).map(
+                (c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                )
+              )}
             </select>
           </div>
           <label className="flex items-center gap-2 text-sm">

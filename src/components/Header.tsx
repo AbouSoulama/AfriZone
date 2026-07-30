@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, MapPin, User, Menu, X, ChevronDown, Truck, Shield, Headphones, CreditCard, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { useCity } from '../context/CityContext';
+import { useCountry } from '../context/CountryContext';
 import NotificationBell from './NotificationBell';
 
 const navItems = [
@@ -21,8 +21,8 @@ export default function Header() {
   const location = useLocation();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const { itemCount } = useCart();
-  const { city, setCity, cities } = useCity();
-  const [cityOpen, setCityOpen] = useState(false);
+  const { country, countryName, setCountry, countries } = useCountry();
+  const [countryOpen, setCountryOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,7 +39,7 @@ export default function Header() {
     const q = searchQuery.trim();
     const params = new URLSearchParams();
     if (q) params.set('q', q);
-    if (city) params.set('city', city);
+    if (country) params.set('country', country);
     navigate(`/catalogue?${params.toString()}`);
     setMobileMenuOpen(false);
   };
@@ -97,30 +97,31 @@ export default function Header() {
           {/* City selector */}
           <div className="relative hidden lg:block">
             <button
-              onClick={() => setCityOpen(!cityOpen)}
+              onClick={() => setCountryOpen(!countryOpen)}
               className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg hover:border-[#FF6B00] transition-colors text-sm"
             >
               <MapPin size={16} className="text-[#FF6B00]" />
-              <span className="font-medium">{city}</span>
-              <ChevronDown size={14} className={`transition-transform ${cityOpen ? 'rotate-180' : ''}`} />
+              <span className="font-medium">{countryName}</span>
+              <ChevronDown size={14} className={`transition-transform ${countryOpen ? 'rotate-180' : ''}`} />
             </button>
-            {cityOpen && (
-              <div className="absolute top-full mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 animate-fade-in">
-                {cities.map((c) => (
+            {countryOpen && (
+              <div className="absolute top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 animate-fade-in">
+                {countries.map((c) => (
                   <button
-                    key={c}
+                    key={c.code}
                     onClick={() => {
-                      setCity(c);
-                      setCityOpen(false);
+                      setCountry(c.code);
+                      setCountryOpen(false);
                       if (location.pathname.startsWith('/catalogue')) {
                         const params = new URLSearchParams(location.search);
-                        params.set('city', c);
+                        params.set('country', c.code);
+                        params.delete('city');
                         navigate(`/catalogue?${params.toString()}`);
                       }
                     }}
-                    className={`w-full text-left px-4 py-2 text-sm hover:bg-orange-50 hover:text-[#FF6B00] transition-colors ${city === c ? 'text-[#FF6B00] font-semibold bg-orange-50' : ''}`}
+                    className={`w-full text-left px-4 py-2 text-sm hover:bg-orange-50 hover:text-[#FF6B00] transition-colors ${country === c.code ? 'text-[#FF6B00] font-semibold bg-orange-50' : ''}`}
                   >
-                    {c}
+                    {c.label}
                   </button>
                 ))}
               </div>
@@ -301,21 +302,22 @@ export default function Header() {
           <div className="flex items-center gap-2 mb-3">
             <MapPin size={16} className="text-[#FF6B00]" />
             <select
-              value={city}
+              value={country}
               onChange={(e) => {
-                const next = e.target.value;
-                setCity(next);
+                const next = e.target.value as typeof country;
+                setCountry(next);
                 if (location.pathname.startsWith('/catalogue')) {
                   const params = new URLSearchParams(location.search);
-                  params.set('city', next);
+                  params.set('country', next);
+                  params.delete('city');
                   navigate(`/catalogue?${params.toString()}`);
                 }
               }}
               className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
             >
-              {cities.map((c) => (
-                <option key={c} value={c}>
-                  {c}
+              {countries.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.label}
                 </option>
               ))}
             </select>

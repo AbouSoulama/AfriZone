@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Camera } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { updateMyProfile, uploadAvatar } from '../../services/account';
-import { CATALOG_CITIES } from '../../types/catalog';
+import { CITIES_BY_COUNTRY } from '../../types/catalog';
+
+const ALL_CITIES = Object.values(CITIES_BY_COUNTRY).flat();
 
 export default function AccountProfilePage() {
   const { user, refreshProfile } = useAuth();
@@ -130,7 +132,7 @@ export default function AccountProfilePage() {
             onChange={(e) => setCity(e.target.value)}
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-white"
           >
-            {CATALOG_CITIES.map((c) => (
+            {ALL_CITIES.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>

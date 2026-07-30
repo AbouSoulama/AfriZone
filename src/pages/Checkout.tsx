@@ -17,16 +17,25 @@ import {
   type MobileMoneyProvider,
   type PaymentChannel,
 } from '../services/payments';
-import { CATALOG_CITIES } from '../types/catalog';
+import {
+  CATALOG_COUNTRIES,
+  CITIES_BY_COUNTRY,
+  capitalForCountry,
+  countryCodeFromLabelOrCity,
+  type CatalogCountryCode,
+} from '../types/catalog';
+import { useCountry } from '../context/CountryContext';
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { summary, refreshCart } = useCart();
+  const { country: siteCountry } = useCountry();
   const [addresses, setAddresses] = useState<AddressView[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>('');
   const [address, setAddress] = useState('');
-  const [city, setCity] = useState(user?.city || 'Dakar');
+  const [shipCountry, setShipCountry] = useState<CatalogCountryCode>(siteCountry || 'SN');
+  const [city, setCity] = useState(() => capitalForCountry(siteCountry || 'SN'));
   const [phone, setPhone] = useState(user?.phone || '');
   const [notes, setNotes] = useState('');
   const [paymentPhone, setPaymentPhone] = useState(user?.phone || '');
@@ -48,7 +57,12 @@ export default function CheckoutPage() {
         if (def) {
           setSelectedAddressId(def.id);
           setAddress(def.address);
-          setCity(def.city);
+          const code =
+            countryCodeFromLabelOrCity(def.country) ||
+            countryCodeFromLabelOrCity(def.city) ||
+            siteCountry;
+          setShipCountry(code);
+          setCity(def.city || capitalForCountry(code));
           setPhone(def.phone);
         }
       } catch {
@@ -62,7 +76,12 @@ export default function CheckoutPage() {
     const a = addresses.find((x) => x.id === id);
     if (!a) return;
     setAddress(a.address);
-    setCity(a.city);
+    const code =
+      countryCodeFromLabelOrCity(a.country) ||
+      countryCodeFromLabelOrCity(a.city) ||
+      shipCountry;
+    setShipCountry(code);
+    setCity(a.city || capitalForCountry(code));
     setPhone(a.phone);
   };
 
@@ -191,29 +210,47 @@ export default function CheckoutPage() {
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
+                <label className="block text-sm font-bold mb-2">Pays *</label>
+                <select
+                  value={shipCountry}
+                  onChange={(e) => {
+                    const code = e.target.value as CatalogCountryCode;
+                    setShipCountry(code);
+                    setCity(capitalForCountry(code));
+                  }}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-white"
+                >
+                  {CATALOG_COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="block text-sm font-bold mb-2">Ville *</label>
                 <select
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-white"
                 >
-                  {CATALOG_CITIES.map((c) => (
+                  {CITIES_BY_COUNTRY[shipCountry].map((c) => (
                     <option key={c} value={c}>
                       {c}
                     </option>
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-bold mb-2">Téléphone livraison *</label>
-                <input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                  placeholder="+221 ..."
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none"
-                />
-              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-bold mb-2">Téléphone livraison *</label>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                placeholder="+221 ..."
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none"
+              />
             </div>
             <div>
               <label className="block text-sm font-bold mb-2">Instructions (optionnel)</label>

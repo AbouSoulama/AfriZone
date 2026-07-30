@@ -8,9 +8,9 @@ import {
   MapPin,
 } from 'lucide-react';
 import { fetchFeaturedVendors } from '../services/catalog';
-import { useCity } from '../context/CityContext';
+import { useCountry } from '../context/CountryContext';
 import VendorBadges from './vendors/VendorBadges';
-import type { CatalogVendor } from '../types/catalog';
+import { countryLabel, type CatalogVendor } from '../types/catalog';
 
 function SellerCard({ seller }: { seller: CatalogVendor }) {
   return (
@@ -60,7 +60,7 @@ function SellerCard({ seller }: { seller: CatalogVendor }) {
         <div className="flex items-center gap-3 text-[11px] text-gray-500 mb-4">
           <span className="flex items-center gap-1 font-mono">{seller.vendorCode}</span>
           <span className="flex items-center gap-1">
-            <MapPin size={12} /> {seller.city}
+            <MapPin size={12} /> {countryLabel(seller.country) || seller.city}
           </span>
         </div>
 
@@ -76,7 +76,7 @@ function SellerCard({ seller }: { seller: CatalogVendor }) {
 }
 
 export default function Sellers() {
-  const { city } = useCity();
+  const { country, countryName } = useCountry();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -86,7 +86,7 @@ export default function Sellers() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchFeaturedVendors(8, city).then((list) => {
+    fetchFeaturedVendors(8, country).then((list) => {
       if (!cancelled) {
         setSellers(list);
         setLoading(false);
@@ -95,7 +95,7 @@ export default function Sellers() {
     return () => {
       cancelled = true;
     };
-  }, [city]);
+  }, [country]);
 
   const checkScroll = () => {
     if (!scrollRef.current) return;
@@ -121,7 +121,7 @@ export default function Sellers() {
               Vendeurs <span className="text-[#00A651]">vedettes</span>
             </h2>
             <p className="text-sm text-gray-500 mt-1">
-              Les meilleurs vendeurs vérifiés à {city}
+              Les meilleurs vendeurs vérifiés — {countryName}
             </p>
           </div>
           <div className="flex items-center gap-2">

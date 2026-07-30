@@ -5,6 +5,7 @@ import type {
   CatalogResult,
   CatalogVendor,
 } from '../types/catalog';
+import { countryCodeFromLabelOrCity } from '../types/catalog';
 
 type ProductRow = Record<string, unknown> & {
   vendors?: Record<string, unknown> | Record<string, unknown>[] | null;
@@ -118,8 +119,12 @@ export async function fetchProducts(filters: CatalogFilters = {}): Promise<Catal
     query = query.lte('price', filters.maxPrice);
   }
 
-  if (filters.city) {
-    query = query.eq('vendors.city', filters.city);
+  if (filters.country) {
+    query = query.eq('vendors.country', filters.country);
+  } else if (filters.city) {
+    const code = countryCodeFromLabelOrCity(filters.city);
+    if (code) query = query.eq('vendors.country', code);
+    else query = query.eq('vendors.city', filters.city);
   }
 
   switch (filters.sort) {
@@ -150,9 +155,12 @@ export async function fetchProducts(filters: CatalogFilters = {}): Promise<Catal
 
   let products = (data ?? []).map((row) => mapProduct(row as ProductRow));
 
-  // Filtre ville / verified côté client si jointure partielle
-  if (filters.city) {
-    products = products.filter((p) => p.vendor?.city === filters.city);
+  if (filters.country) {
+    products = products.filter((p) => p.vendor?.country === filters.country);
+  } else if (filters.city) {
+    const code = countryCodeFromLabelOrCity(filters.city);
+    if (code) products = products.filter((p) => p.vendor?.country === code);
+    else products = products.filter((p) => p.vendor?.city === filters.city);
   }
   if (filters.verifiedOnly) {
     products = products.filter((p) => p.vendor?.status === 'approved');
@@ -184,7 +192,7 @@ export async function fetchProductBySlug(slug: string): Promise<CatalogProduct |
 
 export async function fetchFeaturedProducts(
   limit = 8,
-  city?: string
+  country?: string
 ): Promise<CatalogProduct[]> {
   let query = supabase
     .from('products')
@@ -192,8 +200,9 @@ export async function fetchFeaturedProducts(
     .eq('is_active', true)
     .eq('vendors.status', 'approved');
 
-  if (city) {
-    query = query.eq('vendors.city', city);
+  if (country) {
+    const code = countryCodeFromLabelOrCity(country) || country;
+    query = query.eq('vendors.country', code);
   }
 
   const { data, error } = await query
@@ -210,12 +219,13 @@ export async function fetchFeaturedProducts(
 
 export async function fetchFeaturedVendors(
   limit = 8,
-  city?: string
+  country?: string
 ): Promise<CatalogVendor[]> {
   let query = supabase.from('vendors').select('*').eq('status', 'approved');
 
-  if (city) {
-    query = query.eq('city', city);
+  if (country) {
+    const code = countryCodeFromLabelOrCity(country) || country;
+    query = query.eq('country', code);
   }
 
   const { data, error } = await query

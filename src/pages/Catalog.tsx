@@ -5,10 +5,11 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ProductCard from '../components/catalog/ProductCard';
 import { fetchProducts } from '../services/catalog';
-import { useCity } from '../context/CityContext';
+import { useCountry } from '../context/CountryContext';
 import {
   CATALOG_CATEGORIES,
-  CATALOG_CITIES,
+  CATALOG_COUNTRIES,
+  countryCodeFromLabelOrCity,
   type CatalogFilters,
   type CatalogProduct,
   type CatalogSort,
@@ -17,27 +18,35 @@ import {
 
 export default function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { city: selectedCity, setCity: setSelectedCity } = useCity();
+  const { country: selectedCountry, setCountry: setSelectedCountry } = useCountry();
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mobileFilters, setMobileFilters] = useState(false);
 
-  // Si l'URL n'a pas de ville, appliquer la ville mémorisée
   useEffect(() => {
-    if (!searchParams.get('city') && selectedCity) {
+    const urlCountry =
+      searchParams.get('country') ||
+      countryCodeFromLabelOrCity(searchParams.get('city'));
+    if (!urlCountry && selectedCountry) {
       const next = new URLSearchParams(searchParams);
-      next.set('city', selectedCity);
+      next.set('country', selectedCountry);
+      next.delete('city');
       setSearchParams(next, { replace: true });
     }
-  }, [selectedCity, searchParams, setSearchParams]);
+  }, [selectedCountry, searchParams, setSearchParams]);
 
-  const filters: CatalogFilters = useMemo(
-    () => ({
+  const filters: CatalogFilters = useMemo(() => {
+    const country =
+      searchParams.get('country') ||
+      countryCodeFromLabelOrCity(searchParams.get('city')) ||
+      selectedCountry ||
+      undefined;
+    return {
       q: searchParams.get('q') || undefined,
       category: searchParams.get('category') || undefined,
-      city: searchParams.get('city') || selectedCity || undefined,
+      country: country || undefined,
       minPrice: searchParams.get('min') ? Number(searchParams.get('min')) : undefined,
       maxPrice: searchParams.get('max') ? Number(searchParams.get('max')) : undefined,
       condition: (searchParams.get('condition') as ProductCondition) || undefined,
@@ -45,9 +54,8 @@ export default function CatalogPage() {
       sort: (searchParams.get('sort') as CatalogSort) || 'relevance',
       page: Number(searchParams.get('page') || 1),
       pageSize: 12,
-    }),
-    [searchParams, selectedCity]
-  );
+    };
+  }, [searchParams, selectedCountry]);
 
   const [draftMin, setDraftMin] = useState(searchParams.get('min') || '');
   const [draftMax, setDraftMax] = useState(searchParams.get('max') || '');
@@ -90,7 +98,8 @@ export default function CatalogPage() {
     if (!value) next.delete(key);
     else next.set(key, value);
     if (key !== 'page') next.delete('page');
-    if (key === 'city' && value) setSelectedCity(value);
+    if (key === 'country' && value) setSelectedCountry(value as typeof selectedCountry);
+    if (key === 'country') next.delete('city');
     setSearchParams(next);
   };
 
@@ -144,16 +153,16 @@ export default function CatalogPage() {
       </div>
 
       <div>
-        <h3 className="text-sm font-extrabold text-[#1F2937] mb-3">Ville</h3>
+        <h3 className="text-sm font-extrabold text-[#1F2937] mb-3">Pays</h3>
         <select
-          value={filters.city || ''}
-          onChange={(e) => updateParam('city', e.target.value || undefined)}
+          value={filters.country || ''}
+          onChange={(e) => updateParam('country', e.target.value || undefined)}
           className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#FF6B00] focus:outline-none"
         >
-          <option value="">Toutes les villes</option>
-          {CATALOG_CITIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
+          <option value="">Tous les pays</option>
+          {CATALOG_COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.label}
             </option>
           ))}
         </select>

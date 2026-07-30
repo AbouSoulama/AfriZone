@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Upload, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { CATALOG_CATEGORIES, CATALOG_CITIES } from '../../types/catalog';
+import { CATALOG_CATEGORIES, CATALOG_COUNTRIES } from '../../types/catalog';
 import type { DeliveryMode, ProductCondition } from '../../types/catalog';
 import {
   createProduct,
@@ -322,20 +322,20 @@ export default function VendorProductFormPage() {
         {deliveryMode === 'vendor' && (
           <div className="space-y-4 p-4 bg-orange-50 border border-orange-100 rounded-xl">
             <div>
-              <label className="block text-sm font-bold mb-2">Zones de livraison *</label>
+              <label className="block text-sm font-bold mb-2">Pays de livraison *</label>
               <div className="flex flex-wrap gap-2">
-                {CATALOG_CITIES.map((city) => (
+                {CATALOG_COUNTRIES.map((c) => (
                   <button
-                    key={city}
+                    key={c.code}
                     type="button"
-                    onClick={() => toggleZone(city)}
+                    onClick={() => toggleZone(c.code)}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold border-2 ${
-                      deliveryZones.includes(city)
+                      deliveryZones.includes(c.code)
                         ? 'border-[#FF6B00] bg-white text-[#FF6B00]'
                         : 'border-gray-200 bg-white text-gray-500'
                     }`}
                   >
-                    {city}
+                    {c.label}
                   </button>
                 ))}
               </div>
