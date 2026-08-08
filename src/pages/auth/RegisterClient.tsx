@@ -29,6 +29,9 @@ const registerSchema = z
     confirmPassword: z.string(),
     city: z.enum(['Dakar', 'Ouagadougou', 'Bamako']),
     acceptTerms: z.boolean().refine((val) => val === true, 'Vous devez accepter les CGV'),
+    acceptReceiptCommitment: z
+      .boolean()
+      .refine((val) => val === true, 'Vous devez accepter cet engagement pour créer votre compte'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Les mots de passe ne correspondent pas',
@@ -54,6 +57,7 @@ export default function RegisterClient() {
     defaultValues: {
       city: 'Dakar',
       acceptTerms: false,
+      acceptReceiptCommitment: false,
     },
   });
 
@@ -260,14 +264,38 @@ export default function RegisterClient() {
               <input {...register('acceptTerms')} type="checkbox" className="mt-1 rounded accent-[#FF6B00]" />
               <span className="text-sm text-gray-600">
                 J&apos;accepte les{' '}
-                <a href="#" className="text-[#FF6B00] underline">
+                <Link to="/cgu" className="text-[#FF6B00] underline">
                   Conditions Générales de Vente
-                </a>
+                </Link>
               </span>
             </label>
             {errors.acceptTerms && (
               <p className="text-red-500 text-xs">{errors.acceptTerms.message}</p>
             )}
+
+            <div className="rounded-xl border-2 border-[#00A651]/35 bg-green-50/70 p-4 space-y-3">
+              <p className="text-xs font-extrabold uppercase tracking-wide text-[#00A651]">
+                Engagement acheteur AfriZone
+              </p>
+              <p className="text-sm text-gray-700 leading-relaxed">
+                Après réception de mon article, je m&apos;engage à photographier le produit reçu et
+                à envoyer cette photo au vendeur afin de confirmer que l&apos;article m&apos;a été
+                livré en bon état.
+              </p>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  {...register('acceptReceiptCommitment')}
+                  type="checkbox"
+                  className="mt-1 rounded accent-[#00A651]"
+                />
+                <span className="text-sm font-semibold text-gray-800">
+                  J&apos;ai lu et j&apos;accepte cet engagement
+                </span>
+              </label>
+              {errors.acceptReceiptCommitment && (
+                <p className="text-red-500 text-xs">{errors.acceptReceiptCommitment.message}</p>
+              )}
+            </div>
 
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">

@@ -42,15 +42,21 @@ const step1Schema = z
     path: ['acceptTerms'],
   });
 
-const step2Schema = z.object({
-  shopName: z.string().min(3, 'Le nom de la boutique doit contenir au moins 3 caractères'),
-  country: z.enum(['SN', 'BF', 'ML']),
-  city: z.string().min(2, 'Ville requise'),
-  address: z.string().min(5, 'Adresse physique requise'),
-  shopCategory: z.string().min(2, 'Catégorie requise'),
-  shopDescription: z.string().min(10, 'Description trop courte'),
-  commerceRegister: z.string().optional(),
-});
+const step2Schema = z
+  .object({
+    shopName: z.string().min(3, 'Le nom de la boutique doit contenir au moins 3 caractères'),
+    country: z.enum(['SN', 'BF', 'ML']),
+    city: z.string().min(2, 'Ville requise'),
+    address: z.string().min(5, 'Adresse physique requise'),
+    shopCategory: z.string().min(2, 'Catégorie requise'),
+    shopDescription: z.string().min(10, 'Description trop courte'),
+    commerceRegister: z.string().optional(),
+    acceptPhotoCommitment: z.boolean(),
+  })
+  .refine((data) => data.acceptPhotoCommitment === true, {
+    message: 'Vous devez accepter cet engagement pour créer votre boutique',
+    path: ['acceptPhotoCommitment'],
+  });
 
 type Step1FormData = z.infer<typeof step1Schema>;
 type Step2FormData = z.infer<typeof step2Schema>;
@@ -117,7 +123,7 @@ export default function RegisterVendor() {
     watch: watch2,
   } = useForm<Step2FormData>({
     resolver: zodResolver(step2Schema),
-    defaultValues: { country: 'SN', city: 'Dakar' },
+    defaultValues: { country: 'SN', city: 'Dakar', acceptPhotoCommitment: false },
   });
 
   const handleIdFileChange = (file: File | null) => {
@@ -726,6 +732,36 @@ export default function RegisterVendor() {
                   placeholder="Ex: SN-DKR-2024-B-12345"
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#00A651] focus:outline-none"
                 />
+              </div>
+
+              <div className="rounded-xl border-2 border-[#FF6B00]/40 bg-orange-50/80 p-4 space-y-3">
+                <p className="text-xs font-extrabold uppercase tracking-wide text-[#FF6B00]">
+                  Engagement vendeur AfriZone
+                </p>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  Pour toute vente réalisée sur AfriZone, je m&apos;engage à ajouter les photos du
+                  produit (ou du colis) avant sa livraison au client.
+                </p>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="mt-1 rounded accent-[#FF6B00]"
+                    checked={watch2('acceptPhotoCommitment')}
+                    onChange={(e) =>
+                      setValue2('acceptPhotoCommitment', e.target.checked, {
+                        shouldValidate: true,
+                      })
+                    }
+                  />
+                  <span className="text-sm font-semibold text-gray-800">
+                    J&apos;ai lu et j&apos;accepte cet engagement
+                  </span>
+                </label>
+                {errors2.acceptPhotoCommitment && (
+                  <p className="text-red-500 text-xs">
+                    {String(errors2.acceptPhotoCommitment.message)}
+                  </p>
+                )}
               </div>
 
               {error && (
