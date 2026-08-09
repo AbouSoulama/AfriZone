@@ -229,7 +229,7 @@ export default function VendorProductFormPage() {
 
         <div className="grid sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-bold mb-2">Prix (FCFA) *</label>
+            <label className="block text-sm font-bold mb-2">Prix (Promotionnel) *</label>
             <input
               type="number"
               min={0}
@@ -240,7 +240,7 @@ export default function VendorProductFormPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-bold mb-2">Prix barré</label>
+            <label className="block text-sm font-bold mb-2">Prix (FCFA)</label>
             <input
               type="number"
               min={0}
