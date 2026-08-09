@@ -148,6 +148,7 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 | `014_order_emails.sql` | 9+ emails | [ ] |
 | `015_fix_admin_deletes.sql` | fix admin | [ ] |
 | `016_vendor_self_delivery.sql` | vendeur livreur | [ ] |
+| `017_seed_rich_catalog.sql` | seed démo | [ ] |
 
 ---
 
