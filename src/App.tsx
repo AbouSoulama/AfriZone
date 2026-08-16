@@ -4,6 +4,7 @@ import { CartProvider } from './context/CartContext';
 import { CountryProvider } from './context/CountryContext';
 import { NotificationsProvider } from './context/NotificationsContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import AssistantWidget from './components/AssistantWidget';
 import Header from './components/Header';
 import HeroCarousel from './components/HeroCarousel';
 import Categories from './components/Categories';
@@ -67,7 +68,7 @@ function BackToTop() {
   return (
     <button
       onClick={handleScroll}
-      className="fixed bottom-6 right-6 z-50 w-12 h-12 bg-[#FF6B00] text-white rounded-full shadow-xl hover:bg-[#E05E00] flex items-center justify-center transition-all hover:-translate-y-1"
+      className="fixed bottom-6 right-[13.5rem] z-50 w-12 h-12 bg-white text-[#FF6B00] border border-gray-200 rounded-full shadow-xl hover:bg-gray-50 flex items-center justify-center transition-all hover:-translate-y-1 max-[480px]:hidden"
     >
       <svg
         width="20"
@@ -109,6 +110,7 @@ export default function App() {
         <NotificationsProvider>
           <CartProvider>
             <Router>
+              <AssistantWidget />
               <Routes>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/catalogue" element={<CatalogPage />} />

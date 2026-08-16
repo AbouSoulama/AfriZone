@@ -126,6 +126,14 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 - [x] Attribution auto + bascule manuelle admin
 - [x] Inclus dans migration `012_geolocation_badges.sql`
 
+### ✅ Module 14 — Assistant IA « Zoni »
+- [x] Base de connaissances complète de la plateforme (`src/lib/assistant-knowledge.ts`)
+- [x] Moteur de réponse local — fonctionne sans clé API ni migration
+- [x] Widget de chat flottant sur toutes les pages, adapté au rôle et à la page courante
+- [x] Raccourcis de navigation cliquables dans les réponses + historique conservé
+- [x] Edge Function `ai-assistant` (optionnelle) vers un fournisseur compatible OpenAI
+- [x] Repli automatique sur le mode local si la fonction ou la clé IA est absente
+
 ---
 
 ## Migrations SQL à cocher
@@ -149,6 +157,7 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 | `015_fix_admin_deletes.sql` | fix admin | [ ] |
 | `016_vendor_self_delivery.sql` | vendeur livreur | [ ] |
 | `017_seed_rich_catalog.sql` | seed démo | [ ] |
+| `018_seed_drivers.sql` | seed livreurs | [ ] |
 
 ---
 
@@ -156,7 +165,9 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 
 1. Exécuter `015_fix_admin_deletes.sql` (suppressions admin users / boutiques / produits)  
 2. Exécuter `014_order_emails.sql` + config Resend si pas encore fait  
-3. Tester suppressions depuis `/admin`
+3. Tester suppressions depuis `/admin`  
+4. *(optionnel)* Déployer `ai-assistant` + `AI_API_KEY` pour passer l’assistant en mode IA  
+5. Intégration des paiements réels (PayDunya / Orange / Wave) en mode test
 
 ---
 

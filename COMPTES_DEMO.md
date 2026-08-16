@@ -38,11 +38,17 @@
 
 ---
 
-## Livreur
+## Livreurs (approuvés)
 
-| Nom | Email | Mot de passe |
-|-----|--------|--------------|
-| Ibrahima Sarr | `demo.livreur1@afrizone.app` | `DemoAfriZone2026!` |
+| Nom | Pays / Ville | Véhicule | Email | Mot de passe |
+|-----|--------------|----------|--------|--------------|
+| Ibrahima Sarr | SN · Dakar | Moto | `demo.livreur1@afrizone.app` | `DemoAfriZone2026!` |
+| Aissatou Diallo | SN · Dakar | Voiture | `demo.livreur2@afrizone.app` | `DemoAfriZone2026!` |
+| Boubacar Ouédraogo | BF · Ouagadougou | Moto | `demo.livreur3@afrizone.app` | `DemoAfriZone2026!` |
+| Mariam Coulibaly | ML · Bamako | Moto | `demo.livreur4@afrizone.app` | `DemoAfriZone2026!` |
+| Ousmane Camara | ML · Bamako | Camionnette | `demo.livreur5@afrizone.app` | `DemoAfriZone2026!` |
+
+> Migration livreurs : `018_seed_drivers.sql` (à exécuter si pas déjà fait avec 017).
 
 ---
 
@@ -50,12 +56,13 @@
 
 - **8 boutiques** dans les 3 pays (SN / BF / ML)
 - **~24 produits** répartis sur : Électronique, Beauté, Mode, Maison, Alimentation, Sport, Auto, Livres
+- **5 livreurs** approuvés (SN / BF / ML) via `018_seed_drivers.sql`
 - Textes et images Unsplash alignés sur chaque article
 
 ---
 
 ## Notes
 
-1. Si la connexion échoue : vérifier que `017_seed_rich_catalog.sql` a bien été exécuté.
+1. Si la connexion échoue : vérifier que `017_seed_rich_catalog.sql` et `018_seed_drivers.sql` ont bien été exécutés.
 2. Dans Supabase Auth, « Confirm email » peut être désactivé en dev pour tester plus vite.
 3. Les anciens mots de passe `DemoVendor2026!` (seed 003) sont **remplacés** par `DemoAfriZone2026!` lors de l’exécution de 017.
