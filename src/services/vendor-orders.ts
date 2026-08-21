@@ -61,6 +61,7 @@ export async function fetchVendorOrders(vendorId: string): Promise<VendorOrderVi
     .from('orders')
     .select(ORDER_SELECT)
     .eq('vendor_id', vendorId)
+    .eq('payment_status', 'paid')
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
@@ -112,13 +113,16 @@ export async function updateVendorOrderStatus(
 ): Promise<void> {
   const { data: order, error } = await supabase
     .from('orders')
-    .select('id, status, tracking_number')
+    .select('id, status, tracking_number, payment_status')
     .eq('id', orderId)
     .eq('vendor_id', vendorId)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
   if (!order) throw new Error('Commande introuvable.');
+  if (order.payment_status !== 'paid') {
+    throw new Error('Cette commande n’est pas encore payée.');
+  }
 
   const expected = nextVendorStatus(order.status as OrderStatus);
   if (expected !== nextStatus) {

@@ -9,7 +9,8 @@ import { formatPrice } from '../services/catalog';
 import { placeOrders } from '../services/orders';
 import { fetchDefaultAddress, fetchMyAddresses, type AddressView } from '../services/account';
 import {
-  chargeMobileMoney,
+  isLivePayment,
+  startCheckout,
   MOBILE_MONEY_OPERATORS,
   PAYMENT_CHANNELS,
   providerLabel,
@@ -143,12 +144,7 @@ export default function CheckoutPage() {
     setLoading(true);
     setError(null);
     try {
-      const charge = await chargeMobileMoney({
-        amount: summary?.total ?? 0,
-        phone: paymentPhone,
-        provider,
-      });
-
+      const live = isLivePayment();
       const ids = await placeOrders(user.id, {
         shippingAddress: address,
         shippingCity: city,
@@ -156,8 +152,27 @@ export default function CheckoutPage() {
         notes,
         paymentMethod: provider,
         paymentPhone,
-        paymentTransactionId: charge.transactionId,
+        markPaid: !live,
       });
+
+      if (live) {
+        const checkout = await startCheckout({
+          amount: summary?.total ?? 0,
+          phone: paymentPhone,
+          provider,
+          kind: 'order',
+          orderIds: ids,
+          customerName: user.fullName,
+          customerEmail: user.email,
+          country: shipCountry,
+        });
+        if (checkout.paymentUrl) {
+          window.location.assign(checkout.paymentUrl);
+          return;
+        }
+        throw new Error('Lien de paiement CinetPay manquant.');
+      }
+
       await refreshCart();
       setDoneIds(ids);
     } catch (err) {
@@ -317,7 +332,9 @@ export default function CheckoutPage() {
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none"
                 />
                 <p className="text-[11px] text-gray-400 mt-1">
-                  Vous recevrez une demande de confirmation sur ce numéro (simulation MVP ou API live).
+                  {isLivePayment()
+                    ? 'Vous serez redirigé vers CinetPay pour confirmer le paiement (Orange Money, Wave, Moov, MTN).'
+                    : 'Mode simulation : la commande sera confirmée sans prélèvement réel.'}
                 </p>
               </div>
             </div>
@@ -363,7 +380,9 @@ export default function CheckoutPage() {
               className="w-full py-3.5 bg-[#00A651] hover:bg-[#008A43] disabled:bg-gray-300 text-white rounded-xl font-bold"
             >
               {loading
-                ? 'Paiement en cours...'
+                ? isLivePayment()
+                  ? 'Ouverture de CinetPay...'
+                  : 'Paiement en cours...'
                 : `Payer ${formatPrice(summary?.total ?? 0)}`}
             </button>
           </aside>

@@ -45,6 +45,7 @@ import AdminParcelsPage from './pages/admin/AdminParcels';
 import AdminUsersPage from './pages/admin/AdminUsers';
 import AdminCatalogPage from './pages/admin/AdminCatalog';
 import DeliveryTrackPage from './pages/DeliveryTrack';
+import PaymentReturnPage from './pages/PaymentReturn';
 import TermsPage from './pages/legal/Terms';
 import PrivacyPage from './pages/legal/Privacy';
 import FaqPage from './pages/legal/Faq';
@@ -118,6 +119,7 @@ export default function App() {
                 <Route path="/boutique/:slug" element={<VendorShopPage />} />
                 <Route path="/panier" element={<CartPage />} />
                 <Route path="/checkout" element={<CheckoutPage />} />
+                <Route path="/paiement/retour" element={<PaymentReturnPage />} />
                 <Route path="/commandes" element={<OrdersPage />} />
                 <Route path="/commandes/:id" element={<OrderDetailPage />} />
                 <Route path="/colis" element={<ParcelSendPage />} />

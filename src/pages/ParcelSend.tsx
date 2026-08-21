@@ -14,7 +14,8 @@ import {
   type ParcelType,
 } from '../services/parcels';
 import {
-  chargeMobileMoney,
+  isLivePayment,
+  startCheckout,
   MOBILE_MONEY_OPERATORS,
   PAYMENT_CHANNELS,
   providerLabel,
@@ -108,11 +109,7 @@ export default function ParcelSendPage() {
     setLoading(true);
     setError(null);
     try {
-      const charge = await chargeMobileMoney({
-        amount: price,
-        phone: paymentPhone,
-        provider,
-      });
+      const live = isLivePayment();
       const parcel = await createParcel(user.id, {
         senderName,
         senderPhone,
@@ -128,8 +125,26 @@ export default function ParcelSendPage() {
         specialInstructions,
         paymentPhone,
         paymentMethod: provider,
-        paymentTransactionId: charge.transactionId,
+        markPaid: !live,
       });
+
+      if (live) {
+        const checkout = await startCheckout({
+          amount: price,
+          phone: paymentPhone,
+          provider,
+          kind: 'parcel',
+          parcelId: parcel.id,
+          customerName: senderName || user.fullName,
+          customerEmail: user.email,
+        });
+        if (checkout.paymentUrl) {
+          window.location.assign(checkout.paymentUrl);
+          return;
+        }
+        throw new Error('Lien de paiement CinetPay manquant.');
+      }
+
       setDoneId(parcel.id);
       setTracking(parcel.trackingNumber);
     } catch (err) {
@@ -400,7 +415,7 @@ export default function ParcelSendPage() {
               disabled={loading}
               className="w-full py-3.5 bg-[#00A651] hover:bg-[#008A43] disabled:bg-gray-300 text-white rounded-xl font-bold"
             >
-              {loading ? 'Paiement...' : `Payer ${formatPrice(price)}`}
+              {loading ? (isLivePayment() ? 'Ouverture de CinetPay...' : 'Paiement...') : `Payer ${formatPrice(price)}`}
             </button>
           </aside>
         </form>

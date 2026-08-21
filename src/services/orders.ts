@@ -31,6 +31,8 @@ export interface CheckoutInput {
   paymentPhone: string;
   /** Référence transaction retournée par la couche paiement */
   paymentTransactionId?: string;
+  /** false = commande créée en attente du webhook CinetPay */
+  markPaid?: boolean;
 }
 
 export interface OrderItemView {
@@ -117,8 +119,9 @@ export async function placeOrders(
 
   const groups = groupByVendor(cart.items);
   const createdOrderIds: string[] = [];
+  const paid = input.markPaid !== false;
   const methodLabel = PAYMENT_METHOD_LABELS[input.paymentMethod] || 'Mobile Money';
-  const paymentNote = `Payé via ${methodLabel} (${input.paymentPhone.trim()})${
+  const paymentNote = `${paid ? 'Payé' : 'Paiement en cours'} via ${methodLabel} (${input.paymentPhone.trim()})${
     input.paymentTransactionId ? ` · réf. ${input.paymentTransactionId}` : ''
   }`;
   const notesParts = [input.notes?.trim(), paymentNote].filter(Boolean);
@@ -135,12 +138,12 @@ export async function placeOrders(
         order_number: orderNumber,
         user_id: userId,
         vendor_id: vendorId,
-        status: 'confirmed',
+        status: paid ? 'confirmed' : 'pending',
         subtotal,
         shipping_cost: shippingCost,
         total,
         payment_method: input.paymentMethod,
-        payment_status: 'paid',
+        payment_status: paid ? 'paid' : 'pending',
         shipping_address: input.shippingAddress.trim(),
         shipping_city: input.shippingCity.trim(),
         shipping_phone: input.shippingPhone.trim(),

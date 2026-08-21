@@ -158,6 +158,7 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 | `016_vendor_self_delivery.sql` | vendeur livreur | [ ] |
 | `017_seed_rich_catalog.sql` | seed démo | [ ] |
 | `018_seed_drivers.sql` | seed livreurs | [ ] |
+| `019_cinetpay.sql` | paiements CinetPay | [ ] |
 
 ---
 
@@ -167,7 +168,7 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 2. Exécuter `014_order_emails.sql` + config Resend si pas encore fait  
 3. Tester suppressions depuis `/admin`  
 4. *(optionnel)* Déployer `ai-assistant` + `AI_API_KEY` pour passer l’assistant en mode IA  
-5. Intégration des paiements réels (PayDunya / Orange / Wave) en mode test
+5. Paiements réels : compte CinetPay (pas PayDunya) + migration `019_cinetpay.sql` + `VITE_PAYMENT_MODE=live`
 
 ---
 

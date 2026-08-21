@@ -28,6 +28,7 @@ export interface ParcelInput {
   paymentPhone: string;
   paymentMethod?: string;
   paymentTransactionId?: string;
+  markPaid?: boolean;
 }
 
 export interface ParcelView {
@@ -187,7 +188,8 @@ export async function createParcel(userId: string, input: ParcelInput): Promise<
           : input.paymentMethod === 'mtn_money'
             ? 'MTN Money'
             : 'Mobile Money';
-  const note = `Payé via ${methodLabel} (${input.paymentPhone.trim()})${
+  const paid = input.markPaid !== false;
+  const note = `${paid ? 'Payé' : 'Paiement en cours'} via ${methodLabel} (${input.paymentPhone.trim()})${
     input.paymentTransactionId ? ` · réf. ${input.paymentTransactionId}` : ''
   }`;
   const instructions = [input.specialInstructions?.trim(), note].filter(Boolean).join(' — ');
@@ -211,7 +213,7 @@ export async function createParcel(userId: string, input: ParcelInput): Promise<
       special_instructions: instructions || null,
       price,
       status: 'received',
-      payment_status: 'paid',
+      payment_status: paid ? 'paid' : 'pending',
     })
     .select('*')
     .single();
