@@ -47,7 +47,18 @@ VITE_PAYMENT_MODE=live
 
 Puis `npm run dev`. Au checkout, redirection vers CinetPay Sandbox (sans vrai argent).
 
-## Ancienne API (Site ID)
+# Blocage fréquent : Liste Blanche IP
+
+Si CinetPay renvoie `NOT_ALLOWED` / `This Ip is not withlisted` :
+
+1. Panel → **Ressources → API & sécurité → Liste Blanche IP**
+2. **Supprimez toutes les IP** (liste vide = souvent toutes autorisées),  
+   **ou** désactivez la restriction IP si un interrupteur existe.
+3. Ne mettez **pas** une seule IP locale : les Edge Functions Supabase
+   changent d’IP et seraient bloquées.
+
+Les fonctions serverless (Supabase) ne peuvent pas utiliser une liste blanche IP stricte.
+
 
 L’ancienne doc (`site_id` + `api-checkout.cinetpay.com`) ne correspond **pas** au panel Sandbox actuel. AfriZone utilise désormais :
 

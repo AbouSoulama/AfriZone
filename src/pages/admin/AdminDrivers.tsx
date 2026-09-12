@@ -13,8 +13,9 @@ import {
 import { VEHICLE_LABELS, type VehicleType } from '../../services/drivers';
 import type { VendorStatus } from '../../types/auth';
 
-const FILTERS: { key: VendorStatus | 'all'; label: string }[] = [
+const FILTERS: { key: VendorStatus | 'all' | 'online'; label: string }[] = [
   { key: 'all', label: 'Tous' },
+  { key: 'online', label: 'En ligne' },
   { key: 'pending', label: 'En attente' },
   { key: 'approved', label: 'Approuvés' },
   { key: 'rejected', label: 'Refusés' },
@@ -28,9 +29,18 @@ const STATUS_LABEL: Record<string, string> = {
   suspended: 'Suspendu',
 };
 
+/** Présence considérée active si mise à jour il y a moins de 45 min */
+const ONLINE_STALE_MS = 45 * 60 * 1000;
+
+function isDriverLiveOnline(d: AdminDriverRow): boolean {
+  if (!d.isOnline) return false;
+  if (!d.onlineUpdatedAt) return true;
+  return Date.now() - new Date(d.onlineUpdatedAt).getTime() < ONLINE_STALE_MS;
+}
+
 export default function AdminDriversPage() {
   const { user } = useAuth();
-  const [filter, setFilter] = useState<VendorStatus | 'all'>('all');
+  const [filter, setFilter] = useState<VendorStatus | 'all' | 'online'>('all');
   const [rows, setRows] = useState<AdminDriverRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +52,10 @@ export default function AdminDriversPage() {
   const load = async () => {
     setLoading(true);
     try {
-      setRows(await fetchDriversForAdmin(filter));
+      const statusFilter = filter === 'online' ? 'approved' : filter;
+      let list = await fetchDriversForAdmin(statusFilter === 'all' ? 'all' : statusFilter);
+      if (filter === 'online') list = list.filter(isDriverLiveOnline);
+      setRows(list);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
@@ -52,7 +65,10 @@ export default function AdminDriversPage() {
   };
 
   useEffect(() => {
-    load();
+    void load();
+    const t = window.setInterval(() => void load(), 30000);
+    return () => window.clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
   const onStatus = async (id: string, status: VendorStatus) => {
@@ -108,7 +124,7 @@ export default function AdminDriversPage() {
     <div>
       <h1 className="text-2xl font-extrabold mb-2">Livreurs</h1>
       <p className="text-sm text-gray-500 mb-6">
-        Consultez la pièce d’identité et validez les candidatures.
+        Présence en temps réel (rafraîchi toutes les 30 s), candidatures et pièces d’identité.
       </p>
 
       <div className="flex gap-2 overflow-x-auto mb-5">
@@ -140,78 +156,103 @@ export default function AdminDriversPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {rows.map((d) => (
-            <div
-              key={d.id}
-              className={`bg-white rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border ${
-                d.status === 'pending'
-                  ? 'border-amber-300 ring-1 ring-amber-100 bg-amber-50/30'
-                  : 'border-gray-100'
-              }`}
-            >
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-mono font-bold text-[#FF6B00]">{d.driverCode}</p>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 uppercase">
-                    {STATUS_LABEL[d.status] || d.status}
-                  </span>
+          {rows.map((d) => {
+            const live = isDriverLiveOnline(d);
+            return (
+              <div
+                key={d.id}
+                className={`bg-white rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border ${
+                  d.status === 'pending'
+                    ? 'border-amber-300 ring-1 ring-amber-100 bg-amber-50/30'
+                    : 'border-gray-100'
+                }`}
+              >
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-mono font-bold text-[#FF6B00]">{d.driverCode}</p>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 uppercase">
+                      {STATUS_LABEL[d.status] || d.status}
+                    </span>
+                    {d.status === 'approved' && (
+                      <span
+                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          live ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            live ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                          }`}
+                        />
+                        {live ? 'En ligne' : 'Hors ligne'}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm font-semibold mt-0.5">{d.ownerName}</p>
+                  <p className="text-xs text-gray-500">
+                    {d.ownerPhone} · {d.city} ·{' '}
+                    {VEHICLE_LABELS[d.vehicleType as VehicleType] || d.vehicleType}
+                    {d.vehiclePlate ? ` (${d.vehiclePlate})` : ''}
+                  </p>
+                  {d.onlineUpdatedAt && (
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Présence : {new Date(d.onlineUpdatedAt).toLocaleString('fr-FR')}
+                      {d.lastLocationAt
+                        ? ` · GPS ${new Date(d.lastLocationAt).toLocaleTimeString('fr-FR')}`
+                        : ''}
+                    </p>
+                  )}
                 </div>
-                <p className="text-sm font-semibold mt-0.5">{d.ownerName}</p>
-                <p className="text-xs text-gray-500">
-                  {d.ownerPhone} · {d.city} ·{' '}
-                  {VEHICLE_LABELS[d.vehicleType as VehicleType] || d.vehicleType}
-                  {d.vehiclePlate ? ` (${d.vehiclePlate})` : ''}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => openDetail(d)}
-                  className="inline-flex items-center gap-1 px-3 py-2 border rounded-xl text-xs font-bold"
-                >
-                  <Eye size={14} /> Voir pièce
-                </button>
-                {d.status === 'pending' && (
-                  <>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openDetail(d)}
+                    className="inline-flex items-center gap-1 px-3 py-2 border rounded-xl text-xs font-bold"
+                  >
+                    <Eye size={14} /> Voir pièce
+                  </button>
+                  {d.status === 'pending' && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={busyId === d.id}
+                        onClick={() => onStatus(d.id, 'approved')}
+                        className="px-3 py-2 bg-[#00A651] text-white rounded-xl text-xs font-bold disabled:opacity-50"
+                      >
+                        Approuver
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === d.id}
+                        onClick={() => onStatus(d.id, 'rejected')}
+                        className="px-3 py-2 border border-red-200 text-red-600 rounded-xl text-xs font-bold"
+                      >
+                        Refuser
+                      </button>
+                    </>
+                  )}
+                  {d.status === 'approved' && (
                     <button
                       type="button"
                       disabled={busyId === d.id}
-                      onClick={() => onStatus(d.id, 'approved')}
-                      className="px-3 py-2 bg-[#00A651] text-white rounded-xl text-xs font-bold disabled:opacity-50"
+                      onClick={() => onStatus(d.id, 'suspended')}
+                      className="px-3 py-2 border rounded-xl text-xs font-bold"
                     >
-                      Approuver
+                      Suspendre
                     </button>
-                    <button
-                      type="button"
-                      disabled={busyId === d.id}
-                      onClick={() => onStatus(d.id, 'rejected')}
-                      className="px-3 py-2 border border-red-200 text-red-600 rounded-xl text-xs font-bold"
-                    >
-                      Refuser
-                    </button>
-                  </>
-                )}
-                {d.status === 'approved' && (
+                  )}
                   <button
                     type="button"
                     disabled={busyId === d.id}
-                    onClick={() => onStatus(d.id, 'suspended')}
-                    className="px-3 py-2 border rounded-xl text-xs font-bold"
+                    onClick={() => onDelete(d)}
+                    className="inline-flex items-center gap-1 px-3 py-2 border border-red-200 text-red-600 rounded-xl text-xs font-bold"
                   >
-                    Suspendre
+                    <Trash2 size={14} /> Supprimer
                   </button>
-                )}
-                <button
-                  type="button"
-                  disabled={busyId === d.id}
-                  onClick={() => onDelete(d)}
-                  className="inline-flex items-center gap-1 px-3 py-2 border border-red-200 text-red-600 rounded-xl text-xs font-bold"
-                >
-                  <Trash2 size={14} /> Supprimer
-                </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -224,6 +265,32 @@ export default function AdminDriversPage() {
               <Row label="Email" value={selected.ownerEmail} />
               <Row label="Code" value={selected.driverCode} />
               <Row label="Statut" value={STATUS_LABEL[selected.status] || selected.status} />
+              <Row
+                label="Présence"
+                value={
+                  isDriverLiveOnline(selected)
+                    ? 'En ligne'
+                    : selected.isOnline
+                      ? 'Hors ligne (inactif > 45 min)'
+                      : 'Hors ligne'
+                }
+              />
+              <Row
+                label="Dernière présence"
+                value={
+                  selected.onlineUpdatedAt
+                    ? new Date(selected.onlineUpdatedAt).toLocaleString('fr-FR')
+                    : '—'
+                }
+              />
+              <Row
+                label="Dernière position GPS"
+                value={
+                  selected.lastLat != null && selected.lastLng != null
+                    ? `${selected.lastLat.toFixed(5)}, ${selected.lastLng.toFixed(5)}`
+                    : '—'
+                }
+              />
               <Row label="Ville" value={`${selected.city} (${selected.country})`} />
               <Row
                 label="Véhicule"
@@ -233,10 +300,7 @@ export default function AdminDriversPage() {
               />
               <Row label="Zones" value={selected.zones.join(', ') || '—'} />
               <Row label="Permis" value={selected.licenseNumber || '—'} />
-              <Row
-                label="Type de pièce"
-                value={selected.idDocumentType?.toUpperCase() || '—'}
-              />
+              <Row label="Type de pièce" value={selected.idDocumentType?.toUpperCase() || '—'} />
               <Row label="Courses" value={String(selected.totalDeliveries)} />
               <Row
                 label="Inscrit le"

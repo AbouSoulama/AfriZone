@@ -12,6 +12,11 @@ export interface AdminDriverRow extends DriverProfile {
   ownerPhone?: string | null;
   ownerEmail?: string | null;
   createdAt: string;
+  isOnline: boolean;
+  onlineUpdatedAt: string | null;
+  lastLat: number | null;
+  lastLng: number | null;
+  lastLocationAt: string | null;
 }
 
 function mapDeliveryAdmin(row: Record<string, unknown>): DeliveryView & {
@@ -82,9 +87,16 @@ export async function fetchDriversForAdmin(
         ownerName: profile?.full_name ?? null,
         ownerPhone: profile?.phone ?? null,
         ownerEmail: profile?.email ?? null,
+        isOnline: Boolean(row.is_online),
+        onlineUpdatedAt: (row.online_updated_at as string) ?? null,
+        lastLat: row.last_lat != null ? Number(row.last_lat) : null,
+        lastLng: row.last_lng != null ? Number(row.last_lng) : null,
+        lastLocationAt: (row.last_location_at as string) ?? null,
       };
     })
     .sort((a, b) => {
+      if (a.isOnline && !b.isOnline) return -1;
+      if (b.isOnline && !a.isOnline) return 1;
       if (a.status === 'pending' && b.status !== 'pending') return -1;
       if (b.status === 'pending' && a.status !== 'pending') return 1;
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -198,6 +210,8 @@ export async function assignOrderToDriver(
     pickup_city: order.shipping_city,
     delivery_address: order.shipping_address,
     delivery_city: order.shipping_city,
+    delivery_lat: order.shipping_lat != null ? Number(order.shipping_lat) : null,
+    delivery_lng: order.shipping_lng != null ? Number(order.shipping_lng) : null,
     recipient_name: null,
     recipient_phone: order.shipping_phone,
     assigned_by: adminId,

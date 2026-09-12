@@ -50,11 +50,16 @@ export default function DriverDeliveryDetailPage() {
       setDelivery(d);
       setError(null);
       if (d) {
+        const preserve =
+          d.deliveryLat != null && d.deliveryLng != null
+            ? { lat: d.deliveryLat, lng: d.deliveryLng }
+            : null;
         const prepared = await prepareDeliveryRoute(
           d.id,
           d.pickupCity,
           d.deliveryCity,
-          user?.driver?.vehicleType
+          user?.driver?.vehicleType,
+          preserve
         );
         if (prepared) setRouteInfo({ km: prepared.distanceKm, eta: prepared.etaMinutes });
       }

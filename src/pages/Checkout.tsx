@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, MapPin, Navigation } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
@@ -39,6 +39,10 @@ export default function CheckoutPage() {
   const [city, setCity] = useState(() => capitalForCountry(siteCountry || 'SN'));
   const [phone, setPhone] = useState(user?.phone || '');
   const [notes, setNotes] = useState('');
+  const [shippingLat, setShippingLat] = useState<number | null>(null);
+  const [shippingLng, setShippingLng] = useState<number | null>(null);
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoHint, setGeoHint] = useState<string | null>(null);
   const [paymentPhone, setPaymentPhone] = useState(user?.phone || '');
   const [channel, setChannel] = useState<PaymentChannel>('mobile_money');
   const [operator, setOperator] = useState<MobileMoneyOperator>('orange_money');
@@ -65,6 +69,11 @@ export default function CheckoutPage() {
           setShipCountry(code);
           setCity(def.city || capitalForCountry(code));
           setPhone(def.phone);
+          if (def.lat != null && def.lng != null) {
+            setShippingLat(def.lat);
+            setShippingLng(def.lng);
+            setGeoHint('Position reprise depuis votre adresse enregistrée.');
+          }
         }
       } catch {
         /* ignore */
@@ -84,6 +93,49 @@ export default function CheckoutPage() {
     setShipCountry(code);
     setCity(a.city || capitalForCountry(code));
     setPhone(a.phone);
+    if (a.lat != null && a.lng != null) {
+      setShippingLat(a.lat);
+      setShippingLng(a.lng);
+      setGeoHint('Position reprise depuis votre adresse enregistrée.');
+    } else {
+      setShippingLat(null);
+      setShippingLng(null);
+      setGeoHint(null);
+    }
+  };
+
+  const captureLocation = () => {
+    setGeoHint(null);
+    if (!navigator.geolocation) {
+      setGeoHint('La géolocalisation n’est pas disponible sur cet appareil.');
+      return;
+    }
+    setGeoLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setShippingLat(pos.coords.latitude);
+        setShippingLng(pos.coords.longitude);
+        setGeoHint(
+          `Position capturée (±${Math.round(pos.coords.accuracy || 0)} m). Le livreur pourra s’y rendre.`
+        );
+        setGeoLoading(false);
+      },
+      (err) => {
+        setGeoHint(
+          err.code === err.PERMISSION_DENIED
+            ? 'Permission refusée. Autorisez la localisation dans le navigateur.'
+            : 'Impossible d’obtenir la position. Réessayez à l’extérieur.'
+        );
+        setGeoLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 }
+    );
+  };
+
+  const clearLocation = () => {
+    setShippingLat(null);
+    setShippingLng(null);
+    setGeoHint(null);
   };
 
   if (!authLoading && !isAuthenticated) {
@@ -149,6 +201,8 @@ export default function CheckoutPage() {
         shippingAddress: address,
         shippingCity: city,
         shippingPhone: phone,
+        shippingLat,
+        shippingLng,
         notes,
         paymentMethod: provider,
         paymentPhone,
@@ -267,6 +321,52 @@ export default function CheckoutPage() {
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none"
               />
             </div>
+
+            <div className="rounded-2xl border-2 border-dashed border-[#00A651]/40 bg-[#00A651]/5 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-xl bg-[#00A651] text-white p-2">
+                  <Navigation size={18} />
+                </div>
+                <div className="flex-1">
+                  <p className="font-extrabold text-sm">Localisation GPS pour le livreur</p>
+                  <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                    En plus de l’adresse textuelle, partagez votre position pour que le livreur
+                    puisse vous retrouver précisément (Maps / suivi).
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={captureLocation}
+                  disabled={geoLoading}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#00A651] text-white rounded-xl text-sm font-bold disabled:opacity-60"
+                >
+                  <MapPin size={16} />
+                  {geoLoading ? 'Localisation…' : 'Utiliser ma position'}
+                </button>
+                {shippingLat != null && shippingLng != null && (
+                  <button
+                    type="button"
+                    onClick={clearLocation}
+                    className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-600"
+                  >
+                    Effacer
+                  </button>
+                )}
+              </div>
+              {shippingLat != null && shippingLng != null ? (
+                <p className="text-xs font-semibold text-[#00A651]">
+                  ✓ GPS enregistré : {shippingLat.toFixed(5)}, {shippingLng.toFixed(5)}
+                </p>
+              ) : (
+                <p className="text-xs text-amber-700 font-medium">
+                  Recommandé : sans GPS, le livreur utilisera seulement la ville / l’adresse.
+                </p>
+              )}
+              {geoHint && <p className="text-xs text-gray-600">{geoHint}</p>}
+            </div>
+
             <div>
               <label className="block text-sm font-bold mb-2">Instructions (optionnel)</label>
               <textarea
@@ -374,6 +474,17 @@ export default function CheckoutPage() {
                 <span className="text-[#FF6B00]">{formatPrice(summary?.total ?? 0)}</span>
               </div>
             </div>
+            <p
+              className={`text-[11px] font-semibold mb-3 ${
+                shippingLat != null && shippingLng != null
+                  ? 'text-[#00A651]'
+                  : 'text-amber-600'
+              }`}
+            >
+              {shippingLat != null && shippingLng != null
+                ? '✓ Localisation GPS jointe pour le livreur'
+                : '⚠ Pas de GPS — adresse texte seule'}
+            </p>
             <button
               type="submit"
               disabled={loading}

@@ -25,6 +25,9 @@ export interface CheckoutInput {
   shippingAddress: string;
   shippingCity: string;
   shippingPhone: string;
+  /** GPS point de livraison client (optionnel mais recommandé) */
+  shippingLat?: number | null;
+  shippingLng?: number | null;
   notes?: string;
   paymentMethod: PaymentMethod;
   /** Numéro Mobile Money utilisé pour le paiement */
@@ -147,6 +150,14 @@ export async function placeOrders(
         shipping_address: input.shippingAddress.trim(),
         shipping_city: input.shippingCity.trim(),
         shipping_phone: input.shippingPhone.trim(),
+        shipping_lat:
+          input.shippingLat != null && Number.isFinite(input.shippingLat)
+            ? input.shippingLat
+            : null,
+        shipping_lng:
+          input.shippingLng != null && Number.isFinite(input.shippingLng)
+            ? input.shippingLng
+            : null,
         notes: notesParts.join(' — ') || null,
       })
       .select('id')

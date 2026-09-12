@@ -20,6 +20,8 @@ export interface AddressView {
   city: string;
   address: string;
   isDefault: boolean;
+  lat: number | null;
+  lng: number | null;
   createdAt: string;
 }
 
@@ -47,6 +49,8 @@ function mapAddress(row: Record<string, unknown>): AddressView {
     city: row.city as string,
     address: row.address as string,
     isDefault: Boolean(row.is_default),
+    lat: row.lat != null ? Number(row.lat) : null,
+    lng: row.lng != null ? Number(row.lng) : null,
     createdAt: row.created_at as string,
   };
 }

@@ -116,10 +116,12 @@ export async function prepareDeliveryRoute(
   deliveryId: string,
   pickupCity: string,
   deliveryCity: string,
-  vehicleType?: string | null
+  vehicleType?: string | null,
+  /** Si fourni (GPS client), prioritaire sur le centroïde ville */
+  preferredDropoff?: LatLng | null
 ): Promise<{ distanceKm: number; etaMinutes: number; pickup: LatLng; dropoff: LatLng } | null> {
   const pickup = coordsForCity(pickupCity);
-  const dropoff = coordsForCity(deliveryCity);
+  const dropoff = preferredDropoff ?? coordsForCity(deliveryCity);
   if (!pickup || !dropoff) return null;
 
   const distanceKm = Math.round(haversineKm(pickup, dropoff) * 10) / 10;

@@ -44,6 +44,7 @@ import AdminDeliveriesPage from './pages/admin/AdminDeliveries';
 import AdminParcelsPage from './pages/admin/AdminParcels';
 import AdminUsersPage from './pages/admin/AdminUsers';
 import AdminCatalogPage from './pages/admin/AdminCatalog';
+import AdminWithdrawalsPage from './pages/admin/AdminWithdrawals';
 import DeliveryTrackPage from './pages/DeliveryTrack';
 import PaymentReturnPage from './pages/PaymentReturn';
 import TermsPage from './pages/legal/Terms';
@@ -193,6 +194,7 @@ export default function App() {
                 <Route path="vendeurs" element={<AdminVendorsPage />} />
                 <Route path="livreurs" element={<AdminDriversPage />} />
                 <Route path="livraisons" element={<AdminDeliveriesPage />} />
+                <Route path="retraits" element={<AdminWithdrawalsPage />} />
                 <Route path="colis" element={<AdminParcelsPage />} />
               </Route>
             </Routes>

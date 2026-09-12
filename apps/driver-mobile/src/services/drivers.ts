@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { VendorStatus } from '../types/auth';
+import { coordsForCity, estimateEtaMinutes, haversineKm } from '../lib/geo';
 
 export type VehicleType = 'moto' | 'voiture' | 'velo' | 'camionnette';
 export type DeliveryJobStatus =
@@ -14,30 +14,16 @@ export type DeliveryJobStatus =
 export interface DriverProfile {
   id: string;
   userId: string;
-  status: VendorStatus;
+  status: string;
   driverCode: string;
-  vehicleType: VehicleType | string;
+  vehicleType: string;
   vehiclePlate: string | null;
   city: string;
   country: string;
   zones: string[];
-  idDocumentUrl: string | null;
-  idDocumentType: string | null;
-  licenseNumber: string | null;
   rating: number;
   totalDeliveries: number;
   rejectionReason: string | null;
-}
-
-export interface DriverRegisterInput {
-  vehicleType: VehicleType;
-  vehiclePlate?: string;
-  city: string;
-  country: 'SN' | 'BF' | 'ML';
-  zones: string[];
-  licenseNumber?: string;
-  idDocumentType: 'cni' | 'passport' | 'permis';
-  idDocumentPath: string;
 }
 
 export interface DeliveryView {
@@ -60,13 +46,15 @@ export interface DeliveryView {
   orderNumber?: string | null;
   parcelTracking?: string | null;
   kind: 'order' | 'parcel';
+  currentLat?: number | null;
+  currentLng?: number | null;
   pickupLat?: number | null;
   pickupLng?: number | null;
   deliveryLat?: number | null;
   deliveryLng?: number | null;
 }
 
-export const VEHICLE_LABELS: Record<VehicleType, string> = {
+export const VEHICLE_LABELS: Record<string, string> = {
   moto: 'Moto',
   voiture: 'Voiture',
   velo: 'Vélo',
@@ -83,40 +71,17 @@ export const DELIVERY_STATUS_LABELS: Record<DeliveryJobStatus, string> = {
   cancelled: 'Annulée',
 };
 
-export const DELIVERY_TIMELINE: DeliveryJobStatus[] = [
-  'assigned',
-  'accepted',
-  'picked_up',
-  'in_transit',
-  'delivered',
-];
-
-export function generateDriverCode(country: string, city: string): string {
-  const cityCode = city
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-    .replace(/[^A-Z]/g, '')
-    .slice(0, 3)
-    .padEnd(3, 'X');
-  const seq = Math.floor(1000 + Math.random() * 9000);
-  return `LV-${country}-${cityCode}-${seq}`;
-}
-
 export function mapDriver(row: Record<string, unknown>): DriverProfile {
   return {
     id: row.id as string,
     userId: row.user_id as string,
-    status: row.status as VendorStatus,
+    status: row.status as string,
     driverCode: row.driver_code as string,
     vehicleType: row.vehicle_type as string,
     vehiclePlate: (row.vehicle_plate as string) ?? null,
     city: row.city as string,
     country: row.country as string,
     zones: (row.zones as string[]) ?? [],
-    idDocumentUrl: (row.id_document_url as string) ?? null,
-    idDocumentType: (row.id_document_type as string) ?? null,
-    licenseNumber: (row.license_number as string) ?? null,
     rating: Number(row.rating ?? 0),
     totalDeliveries: Number(row.total_deliveries ?? 0),
     rejectionReason: (row.rejection_reason as string) ?? null,
@@ -151,6 +116,8 @@ function mapDelivery(row: Record<string, unknown>): DeliveryView {
     orderNumber: o ? ((o.order_number as string) ?? null) : null,
     parcelTracking: p ? ((p.tracking_number as string) ?? null) : null,
     kind: row.order_id ? 'order' : 'parcel',
+    currentLat: row.current_lat != null ? Number(row.current_lat) : null,
+    currentLng: row.current_lng != null ? Number(row.current_lng) : null,
     pickupLat: row.pickup_lat != null ? Number(row.pickup_lat) : null,
     pickupLng: row.pickup_lng != null ? Number(row.pickup_lng) : null,
     deliveryLat: row.delivery_lat != null ? Number(row.delivery_lat) : null,
@@ -175,44 +142,7 @@ export async function getDriverForUser(userId: string): Promise<DriverProfile | 
     .eq('user_id', userId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return data ? mapDriver(data) : null;
-}
-
-export async function createDriverApplication(
-  userId: string,
-  input: DriverRegisterInput
-): Promise<DriverProfile> {
-  if (!input.zones.length) throw new Error('Indiquez au moins une zone de livraison.');
-  if (!input.idDocumentPath) throw new Error('Pièce d’identité requise.');
-
-  const existing = await getDriverForUser(userId);
-  if (existing) throw new Error('Vous avez déjà une candidature livreur.');
-
-  const driverCode = generateDriverCode(input.country, input.city);
-
-  const { data, error } = await supabase
-    .from('drivers')
-    .insert({
-      user_id: userId,
-      status: 'pending',
-      driver_code: driverCode,
-      vehicle_type: input.vehicleType,
-      vehicle_plate: input.vehiclePlate?.trim() || null,
-      city: input.city,
-      country: input.country,
-      zones: input.zones,
-      id_document_url: input.idDocumentPath,
-      id_document_type: input.idDocumentType,
-      license_number: input.licenseNumber?.trim() || null,
-    })
-    .select('*')
-    .single();
-
-  if (error) throw new Error(error.message);
-
-  await supabase.from('profiles').update({ role: 'livreur' }).eq('id', userId);
-
-  return mapDriver(data);
+  return data ? mapDriver(data as Record<string, unknown>) : null;
 }
 
 export async function fetchDriverDeliveries(driverId: string): Promise<DeliveryView[]> {
@@ -296,7 +226,6 @@ export async function updateDeliveryStatusByDriver(
 
   if (updateError) throw new Error(updateError.message);
 
-  // Sync order / parcel statuses
   if (delivery.order_id) {
     let orderStatus: string | null = null;
     if (nextStatus === 'picked_up' || nextStatus === 'in_transit') orderStatus = 'shipped';
@@ -324,10 +253,14 @@ export async function updateDeliveryStatusByDriver(
 export async function fetchDriverStats(driverId: string) {
   const { data, error } = await supabase
     .from('deliveries')
-    .select('status')
+    .select('status, delivered_at, created_at')
     .eq('driver_id', driverId);
   if (error) throw new Error(error.message);
   const rows = data ?? [];
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const todayIso = startOfDay.toISOString();
+
   return {
     total: rows.length,
     active: rows.filter((r) =>
@@ -335,5 +268,54 @@ export async function fetchDriverStats(driverId: string) {
     ).length,
     delivered: rows.filter((r) => r.status === 'delivered').length,
     assigned: rows.filter((r) => r.status === 'assigned').length,
+    deliveredToday: rows.filter(
+      (r) =>
+        r.status === 'delivered' &&
+        r.delivered_at &&
+        String(r.delivered_at) >= todayIso
+    ).length,
   };
+}
+
+export async function prepareDeliveryRoute(
+  deliveryId: string,
+  pickupCity: string,
+  deliveryCity: string,
+  vehicleType?: string | null,
+  /** GPS client déjà sur la course — ne pas écraser par le centroïde ville */
+  preserveDropoff?: { lat: number; lng: number } | null
+): Promise<{ distanceKm: number; etaMinutes: number } | null> {
+  const pickup = coordsForCity(pickupCity);
+  const dropoff = preserveDropoff ?? coordsForCity(deliveryCity);
+  if (!pickup || !dropoff) return null;
+
+  const distanceKm = Math.round(haversineKm(pickup, dropoff) * 10) / 10;
+  const etaMinutes = estimateEtaMinutes(distanceKm, vehicleType);
+
+  await supabase
+    .from('deliveries')
+    .update({
+      pickup_lat: pickup.lat,
+      pickup_lng: pickup.lng,
+      delivery_lat: dropoff.lat,
+      delivery_lng: dropoff.lng,
+      route_distance_km: distanceKm,
+      route_eta_minutes: etaMinutes,
+    })
+    .eq('id', deliveryId);
+
+  return { distanceKm, etaMinutes };
+}
+
+export async function pushDeliveryLocation(
+  deliveryId: string,
+  lat: number,
+  lng: number
+): Promise<void> {
+  const { error } = await supabase.rpc('update_delivery_location', {
+    p_delivery_id: deliveryId,
+    p_lat: lat,
+    p_lng: lng,
+  });
+  if (error) throw new Error(error.message);
 }

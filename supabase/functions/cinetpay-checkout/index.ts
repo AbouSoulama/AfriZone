@@ -50,9 +50,14 @@ async function getAccessToken(base: string, apiKey: string, apiPassword: string)
   });
   const body = await res.json().catch(() => ({}));
   if (!body?.access_token) {
-    throw new Error(
-      body?.status || body?.message || 'Authentification CinetPay échouée (vérifiez API Key + mot de passe API).'
-    );
+    const detail =
+      body?.description || body?.status || body?.message || `HTTP ${res.status}`;
+    if (String(detail).toLowerCase().includes('whitelist') || String(detail).toLowerCase().includes('withlist')) {
+      throw new Error(
+        'CinetPay bloque votre IP (liste blanche). Dans panel.cinetpay.net → Ressources → API & sécurité → Liste Blanche IP : videz la liste ou désactivez-la (les Edge Functions Supabase n’ont pas d’IP fixe).'
+      );
+    }
+    throw new Error(`Authentification CinetPay échouée : ${detail}`);
   }
   return body.access_token as string;
 }
@@ -227,12 +232,12 @@ Deno.serve(async (req: Request) => {
     const paymentUrl = initBody?.payment_url as string | undefined;
     if (!paymentUrl) {
       const message =
+        initBody?.description ||
         initBody?.message ||
         initBody?.status ||
-        initBody?.description ||
         'Impossible d’ouvrir la page CinetPay.';
       console.error('[cinetpay-checkout]', initBody);
-      return json({ error: message, details: initBody }, 502);
+      return json({ error: String(message), details: initBody }, 502);
     }
 
     const { error: insertError } = await userClient.from('payment_intents').insert({
