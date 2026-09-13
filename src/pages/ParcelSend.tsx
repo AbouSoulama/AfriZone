@@ -14,14 +14,9 @@ import {
   type ParcelType,
 } from '../services/parcels';
 import {
+  isFedaPaySandbox,
   isLivePayment,
   startCheckout,
-  MOBILE_MONEY_OPERATORS,
-  PAYMENT_CHANNELS,
-  providerLabel,
-  type MobileMoneyOperator,
-  type MobileMoneyProvider,
-  type PaymentChannel,
 } from '../services/payments';
 
 export default function ParcelSendPage() {
@@ -39,21 +34,15 @@ export default function ParcelSendPage() {
   const [weightKg, setWeightKg] = useState(1);
   const [contentDescription, setContentDescription] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
-  const [paymentPhone, setPaymentPhone] = useState(user?.phone || '');
-  const [channel, setChannel] = useState<PaymentChannel>('mobile_money');
-  const [operator, setOperator] = useState<MobileMoneyOperator>('orange_money');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [doneId, setDoneId] = useState<string | null>(null);
   const [tracking, setTracking] = useState<string | null>(null);
 
-  const provider: MobileMoneyProvider = channel === 'wave' ? 'wave' : operator;
-
   useEffect(() => {
     if (!user) return;
     setSenderName(user.fullName || '');
     setSenderPhone(user.phone || '');
-    setPaymentPhone(user.phone || '');
     if (user.city) setPickupCity(user.city);
     fetchDefaultAddress(user.id)
       .then((def) => {
@@ -123,16 +112,16 @@ export default function ParcelSendPage() {
         weightKg,
         contentDescription,
         specialInstructions,
-        paymentPhone,
-        paymentMethod: provider,
+        paymentPhone: senderPhone,
+        paymentMethod: 'mobile_money',
         markPaid: !live,
       });
 
       if (live) {
         const checkout = await startCheckout({
           amount: price,
-          phone: paymentPhone,
-          provider,
+          phone: senderPhone,
+          provider: 'mobile_money',
           kind: 'parcel',
           parcelId: parcel.id,
           customerName: senderName || user.fullName,
@@ -142,7 +131,7 @@ export default function ParcelSendPage() {
           window.location.assign(checkout.paymentUrl);
           return;
         }
-        throw new Error('Lien de paiement CinetPay manquant.');
+        throw new Error('Lien de paiement FedaPay manquant.');
       }
 
       setDoneId(parcel.id);
@@ -165,7 +154,7 @@ export default function ParcelSendPage() {
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold">Envoyer un colis</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Dakar · Ouagadougou · Bamako — paiement Wave ou Mobile Money.
+              Dakar · Ouagadougou · Bamako — paiement sécurisé via FedaPay.
             </p>
           </div>
           <div className="flex gap-2">
@@ -332,53 +321,20 @@ export default function ParcelSendPage() {
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl resize-none focus:border-[#FF6B00] focus:outline-none"
                 />
               </div>
-              <div>
-                <h3 className="font-extrabold mb-2">Paiement</h3>
-                <div className="grid sm:grid-cols-2 gap-2 mb-3">
-                  {PAYMENT_CHANNELS.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setChannel(c.id)}
-                      className={`p-3 border-2 rounded-xl text-left transition-colors ${
-                        channel === c.id
-                          ? 'border-[#FF6B00] bg-orange-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <p className="font-semibold text-sm">{c.label}</p>
-                      <p className="text-xs text-gray-500">{c.hint}</p>
-                    </button>
-                  ))}
-                </div>
-                {channel === 'mobile_money' && (
-                  <div className="grid sm:grid-cols-3 gap-2 mb-3">
-                    {MOBILE_MONEY_OPERATORS.map((op) => (
-                      <button
-                        key={op.id}
-                        type="button"
-                        onClick={() => setOperator(op.id)}
-                        className={`p-2.5 border-2 rounded-xl text-left transition-colors ${
-                          operator === op.id
-                            ? 'border-[#FF6B00] bg-orange-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <p className="font-semibold text-xs">{op.label}</p>
-                      </button>
-                    ))}
-                  </div>
+              <div className="rounded-2xl border border-[#FF6B00]/30 bg-orange-50/60 p-4">
+                <h3 className="font-extrabold mb-1">Paiement sécurisé</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {isLivePayment()
+                    ? 'Après validation, vous serez redirigé vers FedaPay pour choisir le moyen de paiement et confirmer.'
+                    : 'Mode simulation : l’envoi sera confirmé sans prélèvement réel.'}
+                </p>
+                {isLivePayment() && isFedaPaySandbox() && (
+                  <p className="mt-2 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+                    Sandbox : <strong>Momo Test</strong>, drapeau <strong>Bénin (+229)</strong>, numéro{' '}
+                    <strong>64000001</strong> / <strong>66000001</strong> — ou carte Visa{' '}
+                    <strong>4111111111111111</strong>.
+                  </p>
                 )}
-                <label className="block text-sm font-bold mb-2">
-                  Numéro {providerLabel(provider)} *
-                </label>
-                <input
-                  value={paymentPhone}
-                  onChange={(e) => setPaymentPhone(e.target.value)}
-                  required
-                  placeholder="+221 77 ..."
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none"
-                />
               </div>
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">
@@ -415,7 +371,7 @@ export default function ParcelSendPage() {
               disabled={loading}
               className="w-full py-3.5 bg-[#00A651] hover:bg-[#008A43] disabled:bg-gray-300 text-white rounded-xl font-bold"
             >
-              {loading ? (isLivePayment() ? 'Ouverture de CinetPay...' : 'Paiement...') : `Payer ${formatPrice(price)}`}
+              {loading ? (isLivePayment() ? 'Ouverture de FedaPay...' : 'Paiement...') : `Payer ${formatPrice(price)}`}
             </button>
           </aside>
         </form>

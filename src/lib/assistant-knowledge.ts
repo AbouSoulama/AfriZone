@@ -52,10 +52,10 @@ SÉLECTEUR PAYS : en haut du site, l'utilisateur choisit son pays (Burkina Faso,
 Le catalogue et les boutiques affichés dépendent du pays sélectionné. Les villes servent
 uniquement aux adresses de livraison, pas au filtre principal.
 
-PAIEMENT : deux canaux distincts, encaissés via CinetPay (pas via PayDunya).
+PAIEMENT : deux canaux distincts, encaissés via FedaPay.
 - Mobile Money : opérateurs télécoms (Orange Money, Moov Money, MTN Money).
 - Wave : portefeuille indépendant, proposé séparément.
-Au checkout, le client est redirigé vers la page CinetPay pour confirmer.
+Au checkout, le client est redirigé vers la page FedaPay pour confirmer.
 Le paiement est confirmé AVANT que le vendeur ne prépare la commande.
 En mode simulation (développement), la commande est confirmée sans prélèvement réel.
 
@@ -149,7 +149,7 @@ export const KNOWLEDGE_TOPICS: KnowledgeTopic[] = [
     ],
     question: 'Quels moyens de paiement sont acceptés ?',
     answer:
-      "Deux canaux : **Mobile Money** (Orange Money, Moov Money, MTN Money selon votre pays) et **Wave**. Au checkout, choisissez le canal puis l'opérateur. Vous êtes ensuite redirigé vers CinetPay pour confirmer le paiement sur votre téléphone. Le paiement est validé avant que le vendeur ne prépare la commande.",
+      "Deux canaux : **Mobile Money** (Orange Money, Moov Money, MTN Money selon votre pays) et **Wave**. Au checkout, choisissez le canal puis l'opérateur. Vous êtes ensuite redirigé vers FedaPay pour confirmer le paiement sur votre téléphone. Le paiement est validé avant que le vendeur ne prépare la commande.",
     links: [{ label: 'Aller au checkout', to: '/checkout' }],
   },
   {

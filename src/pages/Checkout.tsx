@@ -8,16 +8,7 @@ import { useCart } from '../context/CartContext';
 import { formatPrice } from '../services/catalog';
 import { placeOrders } from '../services/orders';
 import { fetchDefaultAddress, fetchMyAddresses, type AddressView } from '../services/account';
-import {
-  isLivePayment,
-  startCheckout,
-  MOBILE_MONEY_OPERATORS,
-  PAYMENT_CHANNELS,
-  providerLabel,
-  type MobileMoneyOperator,
-  type MobileMoneyProvider,
-  type PaymentChannel,
-} from '../services/payments';
+import { isFedaPaySandbox, isLivePayment, startCheckout } from '../services/payments';
 import {
   CATALOG_COUNTRIES,
   CITIES_BY_COUNTRY,
@@ -43,14 +34,9 @@ export default function CheckoutPage() {
   const [shippingLng, setShippingLng] = useState<number | null>(null);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoHint, setGeoHint] = useState<string | null>(null);
-  const [paymentPhone, setPaymentPhone] = useState(user?.phone || '');
-  const [channel, setChannel] = useState<PaymentChannel>('mobile_money');
-  const [operator, setOperator] = useState<MobileMoneyOperator>('orange_money');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [doneIds, setDoneIds] = useState<string[] | null>(null);
-
-  const provider: MobileMoneyProvider = channel === 'wave' ? 'wave' : operator;
 
   useEffect(() => {
     if (!user) return;
@@ -169,8 +155,7 @@ export default function CheckoutPage() {
               {doneIds.length > 1
                 ? `${doneIds.length} commandes créées (un ticket par vendeur).`
                 : 'Votre commande a été payée et confirmée.'}{' '}
-              Via {providerLabel(provider)}
-              {paymentPhone ? ` (${paymentPhone})` : ''}.
+              Paiement via FedaPay.
             </p>
             <div className="flex flex-col gap-2">
               <button
@@ -204,16 +189,16 @@ export default function CheckoutPage() {
         shippingLat,
         shippingLng,
         notes,
-        paymentMethod: provider,
-        paymentPhone,
+        paymentMethod: 'mobile_money',
+        paymentPhone: phone,
         markPaid: !live,
       });
 
       if (live) {
         const checkout = await startCheckout({
           amount: summary?.total ?? 0,
-          phone: paymentPhone,
-          provider,
+          phone,
+          provider: 'mobile_money',
           kind: 'order',
           orderIds: ids,
           customerName: user.fullName,
@@ -224,7 +209,7 @@ export default function CheckoutPage() {
           window.location.assign(checkout.paymentUrl);
           return;
         }
-        throw new Error('Lien de paiement CinetPay manquant.');
+        throw new Error('Lien de paiement FedaPay manquant.');
       }
 
       await refreshCart();
@@ -377,66 +362,33 @@ export default function CheckoutPage() {
               />
             </div>
 
-            <div>
-              <h2 className="font-extrabold mb-3">Mode de paiement</h2>
-              <div className="grid sm:grid-cols-2 gap-2 mb-3">
-                {PAYMENT_CHANNELS.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setChannel(c.id)}
-                    className={`p-3 border-2 rounded-xl text-left transition-colors ${
-                      channel === c.id
-                        ? 'border-[#FF6B00] bg-orange-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <p className="font-semibold text-sm">{c.label}</p>
-                    <p className="text-[11px] text-gray-500 mt-0.5">{c.hint}</p>
-                  </button>
-                ))}
-              </div>
-              {channel === 'mobile_money' && (
-                <div className="mb-4">
-                  <p className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">
-                    Opérateur Mobile Money
-                  </p>
-                  <div className="grid sm:grid-cols-3 gap-2">
-                    {MOBILE_MONEY_OPERATORS.map((op) => (
-                      <button
-                        key={op.id}
-                        type="button"
-                        onClick={() => setOperator(op.id)}
-                        className={`p-3 border-2 rounded-xl text-left transition-colors ${
-                          operator === op.id
-                            ? 'border-[#FF6B00] bg-orange-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <p className="font-semibold text-sm">{op.label}</p>
-                        <p className="text-[11px] text-gray-500 mt-0.5">{op.hint}</p>
-                      </button>
-                    ))}
-                  </div>
+            <div className="rounded-2xl border border-[#FF6B00]/30 bg-orange-50/60 p-4">
+              <h2 className="font-extrabold mb-1">Paiement sécurisé</h2>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {isLivePayment()
+                  ? 'Après validation, vous serez redirigé vers FedaPay pour choisir Mobile Money, Wave ou un autre moyen disponible et confirmer le paiement.'
+                  : 'Mode simulation : la commande sera confirmée sans prélèvement réel.'}
+              </p>
+              {isLivePayment() && isFedaPaySandbox() && (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 leading-relaxed">
+                  <p className="font-bold mb-1">Mode test FedaPay (sandbox)</p>
+                  <ol className="list-decimal pl-4 space-y-1">
+                    <li>
+                      Choisissez <strong>Momo Test</strong> (pas Orange/Moov CI).
+                    </li>
+                    <li>
+                      Dans le champ téléphone, passez le drapeau en <strong>Bénin (+229)</strong> — pas Burkina (+226).
+                    </li>
+                    <li>
+                      Numéro succès : <strong>64000001</strong> ou <strong>66000001</strong>.
+                    </li>
+                    <li>
+                      Autre option : payer par <strong>carte</strong> Visa test{' '}
+                      <strong>4111 1111 1111 1111</strong> (date future + CVC quelconque).
+                    </li>
+                  </ol>
                 </div>
               )}
-              <div>
-                <label className="block text-sm font-bold mb-2">
-                  Numéro {providerLabel(provider)} *
-                </label>
-                <input
-                  value={paymentPhone}
-                  onChange={(e) => setPaymentPhone(e.target.value)}
-                  required
-                  placeholder="+221 77 ..."
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none"
-                />
-                <p className="text-[11px] text-gray-400 mt-1">
-                  {isLivePayment()
-                    ? 'Vous serez redirigé vers CinetPay pour confirmer le paiement (Orange Money, Wave, Moov, MTN).'
-                    : 'Mode simulation : la commande sera confirmée sans prélèvement réel.'}
-                </p>
-              </div>
             </div>
 
             {error && (
@@ -492,7 +444,7 @@ export default function CheckoutPage() {
             >
               {loading
                 ? isLivePayment()
-                  ? 'Ouverture de CinetPay...'
+                  ? 'Ouverture de FedaPay...'
                   : 'Paiement en cours...'
                 : `Payer ${formatPrice(summary?.total ?? 0)}`}
             </button>

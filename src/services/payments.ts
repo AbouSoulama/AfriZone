@@ -1,15 +1,16 @@
 /**
  * Paiements AfriZone
  * - Wave (portefeuille indépendant)
- * - Mobile Money = opérateurs télécoms (Orange, Moov, MTN) — pas un moyen séparé
+ * - Mobile Money = opérateurs télécoms (Orange, Moov, MTN)
+ * Encaissement live via FedaPay (Edge Functions).
  */
 
 import { supabase } from '../lib/supabase';
 
 export type PaymentChannel = 'mobile_money' | 'wave';
 export type MobileMoneyOperator = 'orange_money' | 'moov_money' | 'mtn_money';
-/** Valeur persistée en base sur orders.payment_method */
-export type MobileMoneyProvider = MobileMoneyOperator | 'wave';
+/** Valeur persistée / envoyée à FedaPay (le moyen exact se choisit sur FedaPay) */
+export type MobileMoneyProvider = MobileMoneyOperator | 'wave' | 'mobile_money';
 
 export interface PaymentProviderOption {
   id: MobileMoneyProvider;
@@ -94,6 +95,18 @@ export function isLivePayment(): boolean {
   return paymentMode() === 'live';
 }
 
+/** Sandbox FedaPay (clés sk_sandbox) — affichage des consignes de test côté UI. */
+export function isFedaPaySandbox(): boolean {
+  const env = (import.meta.env.VITE_FEDAPAY_ENV as string | undefined)?.toLowerCase();
+  if (env === 'live') return false;
+  if (env === 'sandbox') return true;
+  // Défaut : localhost / mode live sans VITE_FEDAPAY_ENV = sandbox
+  if (typeof window !== 'undefined' && /localhost|127\.0\.0\.1/.test(window.location.hostname)) {
+    return true;
+  }
+  return env !== 'live';
+}
+
 function paymentMode(): 'simulate' | 'live' {
   const mode = (import.meta.env.VITE_PAYMENT_MODE as string | undefined)?.toLowerCase();
   return mode === 'live' ? 'live' : 'simulate';
@@ -120,7 +133,8 @@ async function authHeaders(): Promise<Record<string, string>> {
 
 export async function startCheckout(input: StartCheckoutInput): Promise<StartCheckoutResult> {
   const phone = input.phone.trim();
-  if (!phone || phone.replace(/\D/g, '').length < 8) {
+  // Sur FedaPay le client choisit le moyen ; le téléphone sert surtout de contact client.
+  if (paymentMode() !== 'live' && (!phone || phone.replace(/\D/g, '').length < 8)) {
     throw new Error('Numéro de paiement invalide.');
   }
   if (!input.amount || input.amount <= 0) {
@@ -136,7 +150,7 @@ export async function startCheckout(input: StartCheckoutInput): Promise<StartChe
   const base = import.meta.env.VITE_SUPABASE_URL as string | undefined;
   if (!base) throw new Error('Configuration Supabase manquante.');
 
-  const res = await fetch(`${base}/functions/v1/cinetpay-checkout`, {
+  const res = await fetch(`${base}/functions/v1/fedapay-checkout`, {
     method: 'POST',
     headers: await authHeaders(),
     body: JSON.stringify({
@@ -165,7 +179,7 @@ export async function startCheckout(input: StartCheckoutInput): Promise<StartChe
 
   if (body.unavailable) {
     throw new Error(
-      'CinetPay n’est pas encore configuré. Ajoutez CINETPAY_API_KEY et CINETPAY_API_PASSWORD (Ressources → API & sécurité), ou remettez VITE_PAYMENT_MODE=simulate.'
+      'FedaPay n’est pas encore configuré. Ajoutez FEDAPAY_SECRET_KEY (sk_sandbox_…), déployez fedapay-checkout, ou remettez VITE_PAYMENT_MODE=simulate.'
     );
   }
   if (!res.ok || !body.paymentUrl || !body.transactionId) {
@@ -182,6 +196,8 @@ export async function startCheckout(input: StartCheckoutInput): Promise<StartChe
 
 export async function checkCheckout(transactionId: string): Promise<{
   status: string;
+  providerStatus?: string;
+  /** @deprecated alias providerStatus */
   cinetpayStatus?: string;
   kind?: string;
   orderIds?: string[];
@@ -190,14 +206,17 @@ export async function checkCheckout(transactionId: string): Promise<{
   const base = import.meta.env.VITE_SUPABASE_URL as string | undefined;
   if (!base) throw new Error('Configuration Supabase manquante.');
 
-  const res = await fetch(`${base}/functions/v1/cinetpay-checkout`, {
+  const res = await fetch(`${base}/functions/v1/fedapay-checkout`, {
     method: 'POST',
     headers: await authHeaders(),
     body: JSON.stringify({ action: 'check', transactionId }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || 'Vérification du paiement impossible.');
-  return body;
+  return {
+    ...body,
+    cinetpayStatus: body.providerStatus,
+  };
 }
 
 function makeTxId(provider: MobileMoneyProvider): string {
@@ -205,7 +224,7 @@ function makeTxId(provider: MobileMoneyProvider): string {
   return `MM-${provider.slice(0, 3).toUpperCase()}-${Date.now()}-${rand}`;
 }
 
-/** Simulation locale uniquement. Le parcours live passe par startCheckout → CinetPay. */
+/** Simulation locale uniquement. Le parcours live passe par startCheckout → FedaPay. */
 export async function chargeMobileMoney(
   input: ChargeMobileMoneyInput
 ): Promise<ChargeMobileMoneyResult> {

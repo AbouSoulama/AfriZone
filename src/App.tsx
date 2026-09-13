@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { CountryProvider } from './context/CountryContext';
@@ -65,6 +66,16 @@ import DriverDashboard from './pages/driver/DriverDashboard';
 import DriverDeliveriesPage from './pages/driver/DriverDeliveries';
 import DriverDeliveryDetailPage from './pages/driver/DriverDeliveryDetail';
 
+/** Remonte en haut à chaque navigation (évite d’atterrir sur le footer). */
+function ScrollToTop() {
+  const { pathname, search, hash } = useLocation();
+  useEffect(() => {
+    if (hash) return;
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [pathname, search, hash]);
+  return null;
+}
+
 function BackToTop() {
   const handleScroll = () => window.scrollTo({ top: 0, behavior: 'smooth' });
   return (
@@ -112,6 +123,7 @@ export default function App() {
         <NotificationsProvider>
           <CartProvider>
             <Router>
+              <ScrollToTop />
               <AssistantWidget />
               <Routes>
                 <Route path="/" element={<HomePage />} />

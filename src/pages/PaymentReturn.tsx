@@ -48,7 +48,9 @@ export default function PaymentReturnPage() {
         const paid =
           remote?.status === 'paid' ||
           intent?.status === 'paid' ||
-          String(remote?.cinetpayStatus || '').toUpperCase() === 'ACCEPTED';
+          ['approved', 'transferred', 'accepted', 'success'].includes(
+            String(remote?.providerStatus || remote?.cinetpayStatus || '').toLowerCase()
+          );
 
         if (cancelled) return;
 

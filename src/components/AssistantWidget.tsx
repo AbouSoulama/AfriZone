@@ -53,14 +53,6 @@ function saveHistory(messages: AssistantMessage[]) {
   }
 }
 
-function teaserWasDismissed(): boolean {
-  try {
-    return sessionStorage.getItem(TEASER_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
 function dismissTeaser() {
   try {
     sessionStorage.setItem(TEASER_KEY, '1');
@@ -126,12 +118,6 @@ export default function AssistantWidget() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open]);
-
-  useEffect(() => {
-    if (open || teaserWasDismissed()) return;
-    const timer = window.setTimeout(() => setShowTeaser(true), 3500);
-    return () => window.clearTimeout(timer);
   }, [open]);
 
   const closeTeaser = () => {
