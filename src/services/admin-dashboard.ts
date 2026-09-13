@@ -202,13 +202,16 @@ export async function fetchAdminDashboardStats(): Promise<AdminDashboardStats> {
   return data.stats;
 }
 
-export async function fetchAdminOrders(status?: OrderStatus | 'all'): Promise<OrderView[]> {
+export async function fetchAdminOrders(
+  status?: OrderStatus | 'all',
+  country?: string | 'ALL'
+): Promise<OrderView[]> {
   let query = supabase
     .from('orders')
     .select(
       `
       *,
-      vendors ( shop_name ),
+      vendors ( shop_name, country ),
       order_items (
         id, product_id, quantity, price, total,
         products ( name, main_image, images, slug )
@@ -216,7 +219,7 @@ export async function fetchAdminOrders(status?: OrderStatus | 'all'): Promise<Or
     `
     )
     .order('created_at', { ascending: false })
-    .limit(100);
+    .limit(200);
 
   if (status && status !== 'all') {
     query = query.eq('status', status);
@@ -224,7 +227,17 @@ export async function fetchAdminOrders(status?: OrderStatus | 'all'): Promise<Or
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => mapOrder(row as Record<string, unknown>));
+
+  const rows = (data ?? []).filter((row) => {
+    if (!country || country === 'ALL') return true;
+    const sc = String((row as { shipping_country?: string }).shipping_country || '').toUpperCase();
+    if (sc === country) return true;
+    const vendors = (row as { vendors?: { country?: string } | { country?: string }[] }).vendors;
+    const v = Array.isArray(vendors) ? vendors[0] : vendors;
+    return String(v?.country || '').toUpperCase() === country;
+  });
+
+  return rows.slice(0, 100).map((row) => mapOrder(row as Record<string, unknown>));
 }
 
 export async function adminUpdateOrderStatus(

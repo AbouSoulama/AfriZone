@@ -25,6 +25,8 @@ export interface CheckoutInput {
   shippingAddress: string;
   shippingCity: string;
   shippingPhone: string;
+  /** Code pays livraison SN | BF | ML */
+  shippingCountry?: string;
   /** GPS point de livraison client (optionnel mais recommandé) */
   shippingLat?: number | null;
   shippingLng?: number | null;
@@ -60,6 +62,7 @@ export interface OrderView {
   paymentStatus: string;
   shippingAddress: string;
   shippingCity: string;
+  shippingCountry: string | null;
   shippingPhone: string;
   trackingNumber: string | null;
   notes: string | null;
@@ -149,6 +152,7 @@ export async function placeOrders(
         payment_status: paid ? 'paid' : 'pending',
         shipping_address: input.shippingAddress.trim(),
         shipping_city: input.shippingCity.trim(),
+        shipping_country: (input.shippingCountry || '').trim().toUpperCase() || null,
         shipping_phone: input.shippingPhone.trim(),
         shipping_lat:
           input.shippingLat != null && Number.isFinite(input.shippingLat)
@@ -266,6 +270,7 @@ function mapOrder(row: Record<string, unknown>): OrderView {
     paymentStatus: (row.payment_status as string) || 'pending',
     shippingAddress: row.shipping_address as string,
     shippingCity: row.shipping_city as string,
+    shippingCountry: (row.shipping_country as string) ?? null,
     shippingPhone: row.shipping_phone as string,
     trackingNumber: (row.tracking_number as string) ?? null,
     notes: (row.notes as string) ?? null,

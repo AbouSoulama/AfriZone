@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, MapPin, User, Menu, X, ChevronDown, Truck, Shield, Headphones, CreditCard, LogOut } from 'lucide-react';
+import { Search, ShoppingCart, MapPin, User, Menu, X, ChevronDown, Truck, Shield, Headphones, CreditCard, LogOut, PackageSearch } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useCountry } from '../context/CountryContext';
@@ -13,6 +13,7 @@ const navItems = [
   { label: 'Maison', to: '/catalogue?category=Maison' },
   { label: 'Beauté', to: '/catalogue?category=Beaut%C3%A9' },
   { label: 'Alimentation', to: '/catalogue?category=Alimentation' },
+  { label: 'Suivre ma commande', to: '/commandes' },
   { label: 'Envoi de Colis', to: '/colis' },
 ];
 
@@ -54,6 +55,12 @@ export default function Header() {
             <span className="hidden sm:flex items-center gap-1"><Shield size={12} /> Paiement sécurisé</span>
           </div>
           <div className="flex items-center gap-4">
+            <Link
+              to="/commandes"
+              className="hidden sm:flex items-center gap-1 hover:text-[#FF6B00] transition-colors font-semibold"
+            >
+              <PackageSearch size={12} /> Suivre ma commande
+            </Link>
             <span className="hidden md:flex items-center gap-1"><Headphones size={12} /> Support 24/7</span>
             <span className="flex items-center gap-1"><CreditCard size={12} /> FCFA</span>
           </div>
@@ -194,9 +201,9 @@ export default function Header() {
                       <Link
                         to="/commandes"
                         onClick={() => setUserMenuOpen(false)}
-                        className="block px-4 py-2 text-sm hover:bg-orange-50"
+                        className="block px-4 py-2 text-sm hover:bg-orange-50 font-semibold text-[#FF6B00]"
                       >
-                        Mes commandes
+                        Suivre ma commande
                       </Link>
                       <Link
                         to="/colis/mes-envois"
@@ -344,23 +351,21 @@ export default function Header() {
             >
               Panier{itemCount > 0 ? ` (${itemCount})` : ''}
             </Link>
+            <Link
+              to="/commandes"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2 rounded-lg hover:bg-orange-50 text-[#FF6B00] font-bold text-sm"
+            >
+              Suivre ma commande
+            </Link>
             {isAuthenticated && (
-              <>
-                <Link
-                  to="/compte"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
-                >
-                  Mon compte
-                </Link>
-                <Link
-                  to="/commandes"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
-                >
-                  Mes commandes
-                </Link>
-              </>
+              <Link
+                to="/compte"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
+              >
+                Mon compte
+              </Link>
             )}
             <Link
               to="/colis"

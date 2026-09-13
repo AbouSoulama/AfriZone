@@ -4,6 +4,7 @@ import AdminModal from '../../components/admin/AdminModal';
 import { DocPreview } from '../../components/admin/DocPreview';
 import VendorBadges from '../../components/vendors/VendorBadges';
 import { useAuth } from '../../context/AuthContext';
+import { useAdminCountry } from '../../context/AdminCountryContext';
 import {
   deleteVendorAdmin,
   fetchVendorsForAdmin,
@@ -23,6 +24,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function AdminVendorsPage() {
   const { user } = useAuth();
+  const { adminCountry, adminCountryName } = useAdminCountry();
   const [filter, setFilter] = useState<VendorStatus | 'all'>('all');
   const [vendors, setVendors] = useState<AdminVendorRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +48,7 @@ export default function AdminVendorsPage() {
     setLoading(true);
     setError(null);
     try {
-      setVendors(await fetchVendorsForAdmin(filter));
+      setVendors(await fetchVendorsForAdmin(filter, adminCountry));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
     } finally {
@@ -56,7 +58,7 @@ export default function AdminVendorsPage() {
 
   useEffect(() => {
     load();
-  }, [filter]);
+  }, [filter, adminCountry]);
 
   const openDetail = async (v: AdminVendorRow) => {
     setSelected(v);
@@ -150,6 +152,7 @@ export default function AdminVendorsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-extrabold text-[#1F2937]">Gestion des vendeurs</h1>
+          <p className="text-sm text-gray-500">{adminCountryName}</p>
           <p className="text-sm text-gray-500">Consulter le dossier, la pièce d’identité, valider ou supprimer</p>
         </div>
         <select

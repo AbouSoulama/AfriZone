@@ -3,6 +3,7 @@ import { Eye, Trash2 } from 'lucide-react';
 import AdminModal from '../../components/admin/AdminModal';
 import { DocPreview } from '../../components/admin/DocPreview';
 import { useAuth } from '../../context/AuthContext';
+import { useAdminCountry } from '../../context/AdminCountryContext';
 import {
   deleteDriverAdmin,
   fetchDriversForAdmin,
@@ -40,6 +41,7 @@ function isDriverLiveOnline(d: AdminDriverRow): boolean {
 
 export default function AdminDriversPage() {
   const { user } = useAuth();
+  const { adminCountry, adminCountryName } = useAdminCountry();
   const [filter, setFilter] = useState<VendorStatus | 'all' | 'online'>('all');
   const [rows, setRows] = useState<AdminDriverRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +55,10 @@ export default function AdminDriversPage() {
     setLoading(true);
     try {
       const statusFilter = filter === 'online' ? 'approved' : filter;
-      let list = await fetchDriversForAdmin(statusFilter === 'all' ? 'all' : statusFilter);
+      let list = await fetchDriversForAdmin(
+        statusFilter === 'all' ? 'all' : statusFilter,
+        adminCountry
+      );
       if (filter === 'online') list = list.filter(isDriverLiveOnline);
       setRows(list);
       setError(null);
@@ -69,7 +74,7 @@ export default function AdminDriversPage() {
     const t = window.setInterval(() => void load(), 30000);
     return () => window.clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
+  }, [filter, adminCountry]);
 
   const onStatus = async (id: string, status: VendorStatus) => {
     if (!user) return;
@@ -123,6 +128,7 @@ export default function AdminDriversPage() {
   return (
     <div>
       <h1 className="text-2xl font-extrabold mb-2">Livreurs</h1>
+      <p className="text-sm text-gray-500 mb-4">{adminCountryName}</p>
       <p className="text-sm text-gray-500 mb-6">
         Présence en temps réel (rafraîchi toutes les 30 s), candidatures et pièces d’identité.
       </p>

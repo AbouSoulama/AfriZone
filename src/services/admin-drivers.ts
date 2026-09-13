@@ -58,10 +58,12 @@ function mapDeliveryAdmin(row: Record<string, unknown>): DeliveryView & {
 }
 
 export async function fetchDriversForAdmin(
-  status?: VendorStatus | 'all'
+  status?: VendorStatus | 'all',
+  country?: string | 'ALL'
 ): Promise<AdminDriverRow[]> {
   let query = supabase.from('drivers').select('*').order('created_at', { ascending: false });
   if (status && status !== 'all') query = query.eq('status', status);
+  if (country && country !== 'ALL') query = query.eq('country', country);
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
@@ -138,23 +140,23 @@ export async function deleteDriverAdmin(driverId: string): Promise<void> {
   }
 }
 
-export async function fetchApprovedDrivers(): Promise<DriverProfile[]> {
-  const { data, error } = await supabase
-    .from('drivers')
-    .select('*')
-    .eq('status', 'approved')
-    .order('city');
+export async function fetchApprovedDrivers(country?: string | 'ALL'): Promise<DriverProfile[]> {
+  let query = supabase.from('drivers').select('*').eq('status', 'approved').order('city');
+  if (country && country !== 'ALL') query = query.eq('country', country);
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => mapDriver(row));
 }
 
-export async function fetchAssignableOrders() {
+export async function fetchAssignableOrders(country?: string | 'ALL') {
   const { data: orders, error } = await supabase
     .from('orders')
-    .select('id, order_number, status, shipping_address, shipping_city, shipping_phone, total, created_at')
+    .select(
+      'id, order_number, status, shipping_address, shipping_city, shipping_country, shipping_phone, total, created_at, vendors(country)'
+    )
     .in('status', ['confirmed', 'processing', 'shipped'])
     .order('created_at', { ascending: false })
-    .limit(50);
+    .limit(80);
   if (error) throw new Error(error.message);
 
   const { data: active } = await supabase
@@ -164,7 +166,15 @@ export async function fetchAssignableOrders() {
     .not('status', 'in', '(refused,cancelled,delivered)');
 
   const taken = new Set((active ?? []).map((d) => d.order_id as string));
-  return (orders ?? []).filter((o) => !taken.has(o.id));
+  return (orders ?? []).filter((o) => {
+    if (taken.has(o.id)) return false;
+    if (!country || country === 'ALL') return true;
+    const sc = String((o as { shipping_country?: string }).shipping_country || '').toUpperCase();
+    if (sc === country) return true;
+    const vendors = (o as { vendors?: { country?: string } | { country?: string }[] }).vendors;
+    const v = Array.isArray(vendors) ? vendors[0] : vendors;
+    return String(v?.country || '').toUpperCase() === country;
+  });
 }
 
 export async function fetchAssignableParcels() {

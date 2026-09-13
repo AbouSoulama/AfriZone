@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
+import { PackageSearch } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
@@ -32,7 +33,12 @@ export default function OrdersPage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <h1 className="text-2xl md:text-3xl font-extrabold mb-6">Mes commandes</h1>
+        <div className="mb-6">
+          <h1 className="text-2xl md:text-3xl font-extrabold">Suivre mes commandes</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Consultez le statut et le suivi de livraison de vos achats AfriZone.
+          </p>
+        </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 mb-4 text-sm">
@@ -52,26 +58,32 @@ export default function OrdersPage() {
         ) : (
           <div className="space-y-3">
             {orders.map((o) => (
-              <Link
+              <div
                 key={o.id}
-                to={`/commandes/${o.id}`}
-                className="block bg-white border border-gray-100 rounded-2xl p-5 hover:border-[#FF6B00] transition-colors"
+                className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-[#FF6B00] transition-colors"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <Link to={`/commandes/${o.id}`} className="min-w-0 flex-1">
                     <p className="font-mono font-bold text-[#FF6B00]">{o.orderNumber}</p>
                     <p className="text-sm text-gray-500">
                       {new Date(o.createdAt).toLocaleString('fr-FR')} · {o.vendorName || 'Vendeur'}
+                      {o.shippingCity ? ` · ${o.shippingCity}` : ''}
                     </p>
-                  </div>
-                  <div className="text-right">
-                    <span className="inline-block text-xs font-bold px-2 py-1 rounded-full bg-orange-50 text-[#FF6B00]">
+                    <span className="inline-block mt-2 text-xs font-bold px-2 py-1 rounded-full bg-orange-50 text-[#FF6B00]">
                       {ORDER_STATUS_LABELS[o.status]}
                     </span>
-                    <p className="font-extrabold mt-1">{formatPrice(o.total)}</p>
+                  </Link>
+                  <div className="flex sm:flex-col items-center sm:items-end gap-2 shrink-0">
+                    <p className="font-extrabold">{formatPrice(o.total)}</p>
+                    <Link
+                      to={`/commandes/${o.id}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FF6B00] text-white text-xs font-bold hover:bg-[#E05E00] transition-colors"
+                    >
+                      <PackageSearch size={14} /> Suivre
+                    </Link>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}

@@ -15,11 +15,14 @@ import {
 } from '../types/catalog';
 
 const STORAGE_KEY = 'afrizone_selected_country';
+const CHOSEN_KEY = 'afrizone_country_chosen';
 const LEGACY_CITY_KEY = 'afrizone_selected_city';
 
 interface CountryContextType {
   country: CatalogCountryCode;
   countryName: string;
+  /** false = premier visite : CountryGate affiché */
+  hasChosenCountry: boolean;
   setCountry: (code: CatalogCountryCode) => void;
   countries: typeof CATALOG_COUNTRIES;
 }
@@ -30,12 +33,32 @@ function isCountryCode(value: string): value is CatalogCountryCode {
   return CATALOG_COUNTRIES.some((c) => c.code === value);
 }
 
+function readChosenFlag(): boolean {
+  try {
+    if (localStorage.getItem(CHOSEN_KEY) === '1') return true;
+    // Ancienne session avec pays déjà stocké = choix déjà fait
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored && isCountryCode(stored)) return true;
+    if (localStorage.getItem(LEGACY_CITY_KEY)) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+function writeChosenFlag() {
+  try {
+    localStorage.setItem(CHOSEN_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+}
+
 function readStoredCountry(): CatalogCountryCode | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored && isCountryCode(stored)) return stored;
 
-    // Migration depuis l’ancien sélecteur « ville »
     const legacyCity = localStorage.getItem(LEGACY_CITY_KEY);
     const fromLegacy = countryCodeFromLabelOrCity(legacyCity);
     if (fromLegacy) {
@@ -61,11 +84,14 @@ export function CountryProvider({ children }: { children: ReactNode }) {
   const [country, setCountryState] = useState<CatalogCountryCode>(
     () => readStoredCountry() || 'SN'
   );
+  const [hasChosenCountry, setHasChosenCountry] = useState(() => readChosenFlag());
 
   const setCountry = useCallback((next: CatalogCountryCode) => {
     if (!isCountryCode(next)) return;
     setCountryState(next);
     writeStoredCountry(next);
+    writeChosenFlag();
+    setHasChosenCountry(true);
   }, []);
 
   useEffect(() => {
@@ -74,10 +100,14 @@ export function CountryProvider({ children }: { children: ReactNode }) {
     const stored = readStoredCountry();
     if (stored) {
       setCountryState(stored);
+      if (!hasChosenCountry) {
+        writeChosenFlag();
+        setHasChosenCountry(true);
+      }
       return;
     }
 
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user && !hasChosenCountry) {
       const fromProfile =
         countryCodeFromLabelOrCity(user.vendor?.country) ||
         countryCodeFromLabelOrCity(user.driver?.country) ||
@@ -85,17 +115,17 @@ export function CountryProvider({ children }: { children: ReactNode }) {
         countryCodeFromLabelOrCity(user.vendor?.city) ||
         countryCodeFromLabelOrCity(user.driver?.city);
       if (fromProfile) {
-        setCountryState(fromProfile);
-        writeStoredCountry(fromProfile);
+        setCountry(fromProfile);
       }
     }
-  }, [isLoading, isAuthenticated, user]);
+  }, [isLoading, isAuthenticated, user, hasChosenCountry, setCountry]);
 
   return (
     <CountryContext.Provider
       value={{
         country,
         countryName: countryLabel(country),
+        hasChosenCountry,
         setCountry,
         countries: CATALOG_COUNTRIES,
       }}

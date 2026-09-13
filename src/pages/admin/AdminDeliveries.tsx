@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useAdminCountry } from '../../context/AdminCountryContext';
 import { formatPrice } from '../../services/catalog';
 import {
   assignOrderToDriver,
@@ -14,9 +15,11 @@ import {
   type DeliveryView,
   type DriverProfile,
 } from '../../services/drivers';
+import { countryCodeFromLabelOrCity } from '../../types/catalog';
 
 export default function AdminDeliveriesPage() {
   const { user } = useAuth();
+  const { adminCountry, adminCountryName } = useAdminCountry();
   const [drivers, setDrivers] = useState<DriverProfile[]>([]);
   const [orders, setOrders] = useState<Awaited<ReturnType<typeof fetchAssignableOrders>>>([]);
   const [parcels, setParcels] = useState<Awaited<ReturnType<typeof fetchAssignableParcels>>>([]);
@@ -32,16 +35,34 @@ export default function AdminDeliveriesPage() {
     setLoading(true);
     try {
       const [d, o, p, all] = await Promise.all([
-        fetchApprovedDrivers(),
-        fetchAssignableOrders(),
+        fetchApprovedDrivers(adminCountry),
+        fetchAssignableOrders(adminCountry),
         fetchAssignableParcels(),
         fetchAllDeliveriesAdmin(),
       ]);
+      const filteredParcels =
+        adminCountry === 'ALL'
+          ? p
+          : p.filter((parcel) => {
+              const from =
+                countryCodeFromLabelOrCity(parcel.pickup_city) ||
+                countryCodeFromLabelOrCity(parcel.delivery_city);
+              return from === adminCountry;
+            });
+      const filteredDeliveries =
+        adminCountry === 'ALL'
+          ? all
+          : all.filter((job) => {
+              const from =
+                countryCodeFromLabelOrCity(job.pickupCity) ||
+                countryCodeFromLabelOrCity(job.deliveryCity);
+              return from === adminCountry;
+            });
       setDrivers(d);
       setOrders(o);
-      setParcels(p);
-      setDeliveries(all);
-      if (!selectedDriver && d[0]) setSelectedDriver(d[0].id);
+      setParcels(filteredParcels);
+      setDeliveries(filteredDeliveries);
+      setSelectedDriver((prev) => (d.some((x) => x.id === prev) ? prev : d[0]?.id || ''));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
@@ -52,7 +73,7 @@ export default function AdminDeliveriesPage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [adminCountry]);
 
   const onAssignOrder = async (orderId: string) => {
     if (!user || !selectedDriver) return;
@@ -84,6 +105,7 @@ export default function AdminDeliveriesPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-extrabold mb-2">Assignation des courses</h1>
+        <p className="text-sm text-gray-500 mb-4">{adminCountryName}</p>
         <p className="text-sm text-gray-500">
           Assignez commandes marketplace ou colis à un livreur approuvé.
         </p>

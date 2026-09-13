@@ -185,6 +185,7 @@ export default function CheckoutPage() {
       const ids = await placeOrders(user.id, {
         shippingAddress: address,
         shippingCity: city,
+        shippingCountry: shipCountry,
         shippingPhone: phone,
         shippingLat,
         shippingLng,

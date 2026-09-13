@@ -4,6 +4,7 @@ import {
   Bike,
   LayoutDashboard,
   LogOut,
+  MapPin,
   Package,
   ShoppingBag,
   Store,
@@ -13,6 +14,10 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import {
+  AdminCountryProvider,
+  useAdminCountry,
+} from '../../context/AdminCountryContext';
 
 const NAV = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -26,9 +31,39 @@ const NAV = [
   { to: '/admin/colis', label: 'Colis', icon: Package },
 ];
 
-export default function AdminLayout() {
+function AdminCountryBar() {
+  const { adminCountry, setAdminCountry, countries } = useAdminCountry();
+  return (
+    <div className="mb-5 flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-orange-100 bg-orange-50/70 px-4 py-3">
+      <div className="flex items-center gap-2 text-sm font-bold text-[#1F2937]">
+        <MapPin size={16} className="text-[#FF6B00]" />
+        Pays de gestion
+      </div>
+      <select
+        value={adminCountry}
+        onChange={(e) =>
+          setAdminCountry(e.target.value as typeof adminCountry)
+        }
+        className="sm:ml-auto border-2 border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold bg-white focus:border-[#FF6B00] focus:outline-none"
+      >
+        {countries.map((c) => (
+          <option key={c.code} value={c.code}>
+            {c.label}
+          </option>
+        ))}
+        <option value="ALL">Tous les pays</option>
+      </select>
+      <p className="text-xs text-gray-600 sm:max-w-xs">
+        Commandes, vendeurs, livreurs et courses sont filtrés selon ce pays.
+      </p>
+    </div>
+  );
+}
+
+function AdminShell() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { adminCountryName } = useAdminCountry();
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -45,6 +80,7 @@ export default function AdminLayout() {
               <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[140px]">
                 {user?.fullName}
               </p>
+              <p className="text-[10px] text-[#FF6B00] font-bold mt-0.5">{adminCountryName}</p>
             </div>
           </div>
         </div>
@@ -92,7 +128,9 @@ export default function AdminLayout() {
           />
           <div>
             <p className="font-extrabold text-sm">Admin AfriZone</p>
-            <p className="text-xs text-gray-500">{user?.fullName}</p>
+            <p className="text-xs text-gray-500">
+              {user?.fullName} · {adminCountryName}
+            </p>
           </div>
         </div>
         <div className="md:hidden mb-4 flex gap-2 flex-wrap">
@@ -106,8 +144,17 @@ export default function AdminLayout() {
             </Link>
           ))}
         </div>
+        <AdminCountryBar />
         <Outlet />
       </main>
     </div>
+  );
+}
+
+export default function AdminLayout() {
+  return (
+    <AdminCountryProvider>
+      <AdminShell />
+    </AdminCountryProvider>
   );
 }

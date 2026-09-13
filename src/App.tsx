@@ -6,6 +6,7 @@ import { CountryProvider } from './context/CountryContext';
 import { NotificationsProvider } from './context/NotificationsContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AssistantWidget from './components/AssistantWidget';
+import CountryGate from './components/CountryGate';
 import Header from './components/Header';
 import HeroCarousel from './components/HeroCarousel';
 import Categories from './components/Categories';
@@ -124,6 +125,7 @@ export default function App() {
           <CartProvider>
             <Router>
               <ScrollToTop />
+              <CountryGate />
               <AssistantWidget />
               <Routes>
                 <Route path="/" element={<HomePage />} />

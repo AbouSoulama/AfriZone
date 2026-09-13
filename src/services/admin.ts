@@ -49,12 +49,16 @@ function mapVendor(row: Record<string, unknown>): AdminVendorRow {
 }
 
 export async function fetchVendorsForAdmin(
-  status?: VendorStatus | 'all'
+  status?: VendorStatus | 'all',
+  country?: string | 'ALL'
 ): Promise<AdminVendorRow[]> {
   let query = supabase.from('vendors').select('*').order('created_at', { ascending: false });
 
   if (status && status !== 'all') {
     query = query.eq('status', status);
+  }
+  if (country && country !== 'ALL') {
+    query = query.eq('country', country);
   }
 
   const { data, error } = await query;

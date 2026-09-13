@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { formatPrice } from '../../services/catalog';
+import { useAdminCountry } from '../../context/AdminCountryContext';
 import {
   adminUpdateOrderStatus,
   fetchAdminOrders,
@@ -25,6 +26,7 @@ const NEXT: Partial<Record<OrderStatus, OrderStatus>> = {
 };
 
 export default function AdminOrdersPage() {
+  const { adminCountry, adminCountryName } = useAdminCountry();
   const [status, setStatus] = useState<OrderStatus | 'all'>('all');
   const [orders, setOrders] = useState<OrderView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,7 @@ export default function AdminOrdersPage() {
     setLoading(true);
     setError(null);
     try {
-      setOrders(await fetchAdminOrders(status));
+      setOrders(await fetchAdminOrders(status, adminCountry));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
     } finally {
@@ -45,7 +47,7 @@ export default function AdminOrdersPage() {
 
   useEffect(() => {
     load();
-  }, [status]);
+  }, [status, adminCountry]);
 
   const advance = async (order: OrderView) => {
     const next = NEXT[order.status];
@@ -78,7 +80,9 @@ export default function AdminOrdersPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl md:text-3xl font-extrabold text-[#1F2937]">Commandes marketplace</h1>
-        <p className="text-sm text-gray-500 mt-1">Suivi et intervention admin sur les commandes</p>
+        <p className="text-sm text-gray-500 mt-1">
+          Suivi et intervention admin — {adminCountryName}
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5">
