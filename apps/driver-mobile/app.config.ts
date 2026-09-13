@@ -5,9 +5,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: 'AfriZone Livraison',
     slug: 'afrizone-driver',
-    version: '1.1.0',
+    version: '1.1.1',
     orientation: 'portrait',
-    icon: './assets/icon.jpg',
+    icon: './assets/icon.png',
     userInterfaceStyle: 'light',
     scheme: 'afrizone-driver',
     ios: {
@@ -29,7 +29,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       package: 'com.afrizone.driver',
       adaptiveIcon: {
         backgroundColor: '#1FAE4B',
-        foregroundImage: './assets/adaptive-icon.jpg',
+        foregroundImage: './assets/adaptive-icon.png',
       },
       permissions: [
         'ACCESS_COARSE_LOCATION',
@@ -74,7 +74,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   };
 
   (next as ExpoConfig & { splash?: Record<string, string> }).splash = {
-    image: './assets/splash-icon.jpg',
+    image: './assets/splash-icon.png',
     resizeMode: 'contain',
     backgroundColor: '#1FAE4B',
   };

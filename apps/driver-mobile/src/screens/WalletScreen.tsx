@@ -157,7 +157,10 @@ export default function WalletScreen() {
             style={{ marginTop: 10 }}
           />
           <Text style={styles.hint}>
-            Minimum configurable côté admin (défaut 2 000 F). Compte Mobile Money requis dans Profil.
+            1) Configurez votre Mobile Money dans Profil.{'\n'}
+            2) Demandez un retrait ven–dim (min. ~2 000 F).{'\n'}
+            3) Un admin AfriZone valide puis vous envoie l’argent réel sur votre numéro.{'\n'}
+            Statuts : En attente → Approuvé → Payé (ou Refusé).
           </Text>
         </Card>
 

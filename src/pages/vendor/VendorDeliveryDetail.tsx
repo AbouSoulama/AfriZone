@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, MapPin, Navigation } from 'lucide-react';
+import { ArrowLeft, Bike, Check, MapPin, Navigation, Truck } from 'lucide-react';
 import LiveTrackingMap from '../../components/geo/LiveTrackingMap';
 import { useAuth } from '../../context/AuthContext';
 import { coordsForCity, googleMapsDirectionsUrl, type LatLng } from '../../lib/geo';
@@ -10,9 +10,10 @@ import {
   DELIVERY_TIMELINE,
   fetchVendorDeliveryById,
   nextDeliveryStatus,
+  subscribeVendorDelivery,
   updateVendorDeliveryStatus,
   type DeliveryJobStatus,
-  type DeliveryView,
+  type VendorDeliveryView,
 } from '../../services/vendor-deliveries';
 import { prepareDeliveryRoute, pushDeliveryLocation } from '../../services/geolocation';
 
@@ -27,7 +28,7 @@ export default function VendorDeliveryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [vendorId, setVendorId] = useState<string | null>(null);
-  const [delivery, setDelivery] = useState<DeliveryView | null>(null);
+  const [delivery, setDelivery] = useState<VendorDeliveryView | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +43,10 @@ export default function VendorDeliveryDetailPage() {
       const d = await fetchVendorDeliveryById(vId, deliveryId);
       setDelivery(d);
       setError(null);
-      if (d) {
+      if (d?.currentLat != null && d.currentLng != null) {
+        setLastPos({ lat: d.currentLat, lng: d.currentLng });
+      }
+      if (d && d.courierKind === 'vendor') {
         const prepared = await prepareDeliveryRoute(d.id, d.pickupCity, d.deliveryCity, 'voiture');
         if (prepared) setRouteInfo({ km: prepared.distanceKm, eta: prepared.etaMinutes });
       }
@@ -71,6 +75,27 @@ export default function VendorDeliveryDetailPage() {
       }
     })();
   }, [user, id]);
+
+  // Temps réel statut + GPS (livreur AfriZone ou auto-livraison)
+  useEffect(() => {
+    if (!delivery?.id) return;
+    return subscribeVendorDelivery(delivery.id, (patch) => {
+      setDelivery((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: patch.status as DeliveryJobStatus,
+              currentLat: patch.current_lat,
+              currentLng: patch.current_lng,
+              locationUpdatedAt: patch.location_updated_at,
+            }
+          : prev
+      );
+      if (patch.current_lat != null && patch.current_lng != null) {
+        setLastPos({ lat: patch.current_lat, lng: patch.current_lng });
+      }
+    });
+  }, [delivery?.id]);
 
   useEffect(() => {
     return () => {
@@ -112,7 +137,7 @@ export default function VendorDeliveryDetailPage() {
   };
 
   const onAdvance = async () => {
-    if (!delivery || !vendorId) return;
+    if (!delivery || !vendorId || delivery.courierKind !== 'vendor') return;
     const next = nextDeliveryStatus(delivery.status);
     if (!next) return;
     setBusy(true);
@@ -128,11 +153,21 @@ export default function VendorDeliveryDetailPage() {
     }
   };
 
-  const next = delivery ? nextDeliveryStatus(delivery.status) : null;
+  const isSelf = delivery?.courierKind === 'vendor';
+  const next = delivery && isSelf ? nextDeliveryStatus(delivery.status) : null;
   const idx = delivery ? DELIVERY_TIMELINE.indexOf(delivery.status) : -1;
-  const dest = delivery ? coordsForCity(delivery.deliveryCity) : null;
+  const dropoff =
+    delivery?.deliveryLat != null && delivery.deliveryLng != null
+      ? { lat: delivery.deliveryLat, lng: delivery.deliveryLng }
+      : delivery
+        ? coordsForCity(delivery.deliveryCity)
+        : null;
   const mapsUrl =
-    lastPos && dest ? googleMapsDirectionsUrl(lastPos, dest) : dest ? `https://www.google.com/maps/search/?api=1&query=${dest.lat},${dest.lng}` : null;
+    lastPos && dropoff
+      ? googleMapsDirectionsUrl(lastPos, dropoff)
+      : dropoff
+        ? `https://www.google.com/maps/search/?api=1&query=${dropoff.lat},${dropoff.lng}`
+        : null;
 
   return (
     <div>
@@ -156,7 +191,18 @@ export default function VendorDeliveryDetailPage() {
             <div className="bg-white border rounded-2xl p-5">
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div>
-                  <p className="text-xs font-bold text-[#FF6B00] uppercase">Livraison vendeur</p>
+                  <p className="text-xs font-bold text-[#FF6B00] uppercase inline-flex items-center gap-1">
+                    {isSelf ? (
+                      <>
+                        <Truck size={12} /> Vous livrez
+                      </>
+                    ) : (
+                      <>
+                        <Bike size={12} /> Livreur AfriZone
+                        {delivery.driverCode ? ` · ${delivery.driverCode}` : ''}
+                      </>
+                    )}
+                  </p>
                   <h1 className="text-xl font-extrabold">{delivery.orderNumber}</h1>
                 </div>
                 <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-orange-50 text-[#FF6B00]">
@@ -179,7 +225,7 @@ export default function VendorDeliveryDetailPage() {
                 <div className="flex gap-2">
                   <MapPin size={16} className="text-[#00A651] shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold text-xs text-gray-400 uppercase">Retrait (boutique)</p>
+                    <p className="font-bold text-xs text-gray-400 uppercase">Retrait</p>
                     <p>
                       {delivery.pickupAddress}, {delivery.pickupCity}
                     </p>
@@ -213,40 +259,45 @@ export default function VendorDeliveryDetailPage() {
 
             <LiveTrackingMap
               driver={lastPos}
-              dropoff={dest}
+              dropoff={dropoff}
               distanceKm={routeInfo?.km}
               etaMinutes={routeInfo?.eta}
+              updatedAt={delivery.locationUpdatedAt}
             />
           </div>
 
           <aside className="space-y-4">
             <div className="bg-white border rounded-2xl p-5 space-y-3">
               <h2 className="font-extrabold">Suivi GPS</h2>
-              <p className="text-xs text-gray-500">
-                Partagez votre position pour que le client suive la livraison en direct.
-              </p>
-              {routeInfo && (
-                <p className="text-sm">
-                  ~{routeInfo.km} km · ETA ~{routeInfo.eta} min
-                </p>
-              )}
-              {!sharing ? (
-                <button
-                  type="button"
-                  onClick={startSharing}
-                  disabled={delivery.status === 'delivered'}
-                  className="w-full py-3 bg-[#FF6B00] text-white rounded-xl font-bold disabled:bg-gray-300"
-                >
-                  Partager ma position
-                </button>
+              {isSelf ? (
+                <>
+                  <p className="text-xs text-gray-500">
+                    Partagez votre position pour que le client suive la livraison en direct.
+                  </p>
+                  {!sharing ? (
+                    <button
+                      type="button"
+                      onClick={startSharing}
+                      disabled={delivery.status === 'delivered'}
+                      className="w-full py-3 bg-[#FF6B00] text-white rounded-xl font-bold disabled:bg-gray-300"
+                    >
+                      Partager ma position
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={stopSharing}
+                      className="w-full py-3 border-2 border-red-200 text-red-600 rounded-xl font-bold"
+                    >
+                      Arrêter le GPS
+                    </button>
+                  )}
+                </>
               ) : (
-                <button
-                  type="button"
-                  onClick={stopSharing}
-                  className="w-full py-3 border-2 border-red-200 text-red-600 rounded-xl font-bold"
-                >
-                  Arrêter le GPS
-                </button>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Le livreur AfriZone met à jour le statut et le GPS depuis l’application mobile.
+                  Cette page se rafraîchit automatiquement.
+                </p>
               )}
               {mapsUrl && (
                 <a
@@ -258,14 +309,12 @@ export default function VendorDeliveryDetailPage() {
                   Ouvrir dans Google Maps
                 </a>
               )}
-              {delivery.id && (
-                <Link
-                  to={`/suivi-livraison/${delivery.id}`}
-                  className="block w-full text-center py-2.5 text-sm font-semibold text-[#FF6B00]"
-                >
-                  Lien suivi client
-                </Link>
-              )}
+              <Link
+                to={`/suivi-livraison/${delivery.id}`}
+                className="block w-full text-center py-2.5 text-sm font-semibold text-[#FF6B00]"
+              >
+                Lien suivi client
+              </Link>
             </div>
 
             {next && (

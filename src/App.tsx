@@ -42,6 +42,7 @@ import AdminDashboardPage from './pages/admin/AdminDashboard';
 import AdminOrdersPage from './pages/admin/AdminOrders';
 import AdminVendorsPage from './pages/admin/AdminVendors';
 import AdminDriversPage from './pages/admin/AdminDrivers';
+import AdminDriversTrackPage from './pages/admin/AdminDriversTrack';
 import AdminDeliveriesPage from './pages/admin/AdminDeliveries';
 import AdminParcelsPage from './pages/admin/AdminParcels';
 import AdminUsersPage from './pages/admin/AdminUsers';
@@ -207,6 +208,7 @@ export default function App() {
                 <Route path="catalogue" element={<AdminCatalogPage />} />
                 <Route path="vendeurs" element={<AdminVendorsPage />} />
                 <Route path="livreurs" element={<AdminDriversPage />} />
+                <Route path="suivi-gps" element={<AdminDriversTrackPage />} />
                 <Route path="livraisons" element={<AdminDeliveriesPage />} />
                 <Route path="retraits" element={<AdminWithdrawalsPage />} />
                 <Route path="colis" element={<AdminParcelsPage />} />

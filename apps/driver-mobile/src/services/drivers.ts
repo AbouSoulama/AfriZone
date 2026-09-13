@@ -231,7 +231,11 @@ export async function updateDeliveryStatusByDriver(
     if (nextStatus === 'picked_up' || nextStatus === 'in_transit') orderStatus = 'shipped';
     if (nextStatus === 'delivered') orderStatus = 'delivered';
     if (orderStatus) {
-      await supabase.from('orders').update({ status: orderStatus }).eq('id', delivery.order_id);
+      const { error: orderErr } = await supabase
+        .from('orders')
+        .update({ status: orderStatus })
+        .eq('id', delivery.order_id);
+      if (orderErr) throw new Error(`Statut commande : ${orderErr.message}`);
     }
   }
 
@@ -242,10 +246,11 @@ export async function updateDeliveryStatusByDriver(
     if (nextStatus === 'in_transit') parcelStatus = 'in_transit';
     if (nextStatus === 'delivered') parcelStatus = 'delivered';
     if (parcelStatus) {
-      await supabase
+      const { error: parcelErr } = await supabase
         .from('parcel_shipments')
         .update({ status: parcelStatus })
         .eq('id', delivery.parcel_id);
+      if (parcelErr) throw new Error(`Statut colis : ${parcelErr.message}`);
     }
   }
 }

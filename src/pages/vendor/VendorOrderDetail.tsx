@@ -17,10 +17,11 @@ import {
 import type { OrderStatus } from '../../services/orders';
 import { PAYMENT_METHOD_LABELS } from '../../services/orders';
 import {
+  DELIVERY_STATUS_LABELS,
   fetchVendorDeliveryByOrder,
   orderHasVendorDeliveryMode,
   startVendorSelfDelivery,
-  type DeliveryView,
+  type VendorDeliveryView,
 } from '../../services/vendor-deliveries';
 
 const NEXT_ACTION_LABEL: Partial<Record<OrderStatus, string>> = {
@@ -42,7 +43,7 @@ export default function VendorOrderDetailPage() {
   const [order, setOrder] = useState<VendorOrderView | null>(null);
   const [tracking, setTracking] = useState('');
   const [selfDelivery, setSelfDelivery] = useState(false);
-  const [delivery, setDelivery] = useState<DeliveryView | null>(null);
+  const [delivery, setDelivery] = useState<VendorDeliveryView | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -205,19 +206,23 @@ export default function VendorOrderDetailPage() {
             )}
           </div>
 
-          {selfDelivery && delivery && (
+          {delivery && (
             <div className="bg-orange-50 border border-orange-100 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <p className="font-extrabold text-sm">Course de livraison active</p>
+                <p className="font-extrabold text-sm">
+                  Course de livraison · {DELIVERY_STATUS_LABELS[delivery.status]}
+                </p>
                 <p className="text-xs text-gray-600 mt-1">
-                  Partagez votre GPS et mettez à jour le statut jusqu’à la remise au client.
+                  {selfDelivery
+                    ? 'Partagez votre GPS et mettez à jour le statut jusqu’à la remise au client.'
+                    : 'Livreur AfriZone — le statut et le GPS se mettent à jour automatiquement.'}
                 </p>
               </div>
               <Link
                 to={`/vendeur/livraisons/${delivery.id}`}
                 className="px-4 py-2.5 bg-[#FF6B00] text-white rounded-xl text-sm font-bold text-center"
               >
-                Ouvrir le suivi GPS
+                Ouvrir le suivi
               </Link>
             </div>
           )}

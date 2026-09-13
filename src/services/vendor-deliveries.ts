@@ -6,10 +6,23 @@ import {
   type DeliveryJobStatus,
   type DeliveryView,
 } from './drivers';
+import { subscribeDeliveryLocation } from './geolocation';
 
-function mapDelivery(row: Record<string, unknown>): DeliveryView {
+export type CourierKind = 'driver' | 'vendor';
+
+export interface VendorDeliveryView extends DeliveryView {
+  courierKind: CourierKind;
+  currentLat?: number | null;
+  currentLng?: number | null;
+  locationUpdatedAt?: string | null;
+  driverCode?: string | null;
+}
+
+function mapDelivery(row: Record<string, unknown>): VendorDeliveryView {
   const order = Array.isArray(row.orders) ? row.orders[0] : row.orders;
   const o = order as Record<string, unknown> | null | undefined;
+  const driver = Array.isArray(row.drivers) ? row.drivers[0] : row.drivers;
+  const d = driver as Record<string, unknown> | null | undefined;
   return {
     id: row.id as string,
     driverId: (row.driver_id as string) || '',
@@ -30,12 +43,22 @@ function mapDelivery(row: Record<string, unknown>): DeliveryView {
     orderNumber: o ? ((o.order_number as string) ?? null) : null,
     parcelTracking: null,
     kind: 'order',
+    courierKind: ((row.courier_kind as string) === 'vendor' ? 'vendor' : 'driver') as CourierKind,
+    currentLat: row.current_lat != null ? Number(row.current_lat) : null,
+    currentLng: row.current_lng != null ? Number(row.current_lng) : null,
+    locationUpdatedAt: (row.location_updated_at as string) ?? null,
+    driverCode: d ? ((d.driver_code as string) ?? null) : null,
+    pickupLat: row.pickup_lat != null ? Number(row.pickup_lat) : null,
+    pickupLng: row.pickup_lng != null ? Number(row.pickup_lng) : null,
+    deliveryLat: row.delivery_lat != null ? Number(row.delivery_lat) : null,
+    deliveryLng: row.delivery_lng != null ? Number(row.delivery_lng) : null,
   };
 }
 
 const SELECT = `
   *,
-  orders ( order_number )
+  orders ( order_number, vendor_id ),
+  drivers ( driver_code )
 `;
 
 export async function orderHasVendorDeliveryMode(orderId: string): Promise<boolean> {
@@ -65,52 +88,88 @@ export async function startVendorSelfDelivery(orderId: string): Promise<string> 
   return data as string;
 }
 
-export async function fetchVendorDeliveries(vendorId: string): Promise<DeliveryView[]> {
+/** Toutes les courses liées au vendeur (auto-livraison + livreur AfriZone). */
+export async function fetchVendorDeliveries(vendorId: string): Promise<VendorDeliveryView[]> {
   const { data, error } = await supabase
     .from('deliveries')
     .select(SELECT)
-    .eq('vendor_id', vendorId)
-    .eq('courier_kind', 'vendor')
+    .or(`vendor_id.eq.${vendorId},orders.vendor_id.eq.${vendorId}`)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Fallback si le filtre imbriqué échoue : via vendor_id + commandes du vendeur
+    const { data: byVendor, error: e2 } = await supabase
+      .from('deliveries')
+      .select(SELECT)
+      .eq('vendor_id', vendorId)
+      .order('created_at', { ascending: false });
+    if (e2) throw new Error(error.message);
+    const { data: orderIds } = await supabase.from('orders').select('id').eq('vendor_id', vendorId);
+    const ids = (orderIds ?? []).map((o) => o.id as string);
+    if (!ids.length) return (byVendor ?? []).map((r) => mapDelivery(r as Record<string, unknown>));
+    const { data: byOrders, error: e3 } = await supabase
+      .from('deliveries')
+      .select(SELECT)
+      .in('order_id', ids)
+      .order('created_at', { ascending: false });
+    if (e3) throw new Error(e3.message);
+    const map = new Map<string, VendorDeliveryView>();
+    for (const r of [...(byVendor ?? []), ...(byOrders ?? [])]) {
+      const m = mapDelivery(r as Record<string, unknown>);
+      map.set(m.id, m);
+    }
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
   return (data ?? []).map((r) => mapDelivery(r as Record<string, unknown>));
 }
 
 export async function fetchVendorDeliveryById(
   vendorId: string,
   deliveryId: string
-): Promise<DeliveryView | null> {
+): Promise<VendorDeliveryView | null> {
   const { data, error } = await supabase
     .from('deliveries')
     .select(SELECT)
     .eq('id', deliveryId)
-    .eq('vendor_id', vendorId)
-    .eq('courier_kind', 'vendor')
     .maybeSingle();
 
   if (error) throw new Error(error.message);
   if (!data) return null;
-  return mapDelivery(data as Record<string, unknown>);
+  const mapped = mapDelivery(data as Record<string, unknown>);
+  const orderVendor = Array.isArray((data as { orders?: { vendor_id?: string } }).orders)
+    ? ((data as { orders: { vendor_id?: string }[] }).orders[0]?.vendor_id)
+    : ((data as { orders?: { vendor_id?: string } }).orders?.vendor_id);
+  const owns =
+    (data as { vendor_id?: string }).vendor_id === vendorId || orderVendor === vendorId;
+  if (!owns) return null;
+  return mapped;
 }
 
 export async function fetchVendorDeliveryByOrder(
   vendorId: string,
   orderId: string
-): Promise<DeliveryView | null> {
+): Promise<VendorDeliveryView | null> {
   const { data, error } = await supabase
     .from('deliveries')
     .select(SELECT)
-    .eq('vendor_id', vendorId)
     .eq('order_id', orderId)
-    .eq('courier_kind', 'vendor')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
   if (!data) return null;
-  return mapDelivery(data as Record<string, unknown>);
+  const mapped = mapDelivery(data as Record<string, unknown>);
+  const orderVendor = Array.isArray((data as { orders?: { vendor_id?: string } }).orders)
+    ? ((data as { orders: { vendor_id?: string }[] }).orders[0]?.vendor_id)
+    : ((data as { orders?: { vendor_id?: string } }).orders?.vendor_id);
+  const owns =
+    (data as { vendor_id?: string }).vendor_id === vendorId || orderVendor === vendorId;
+  if (!owns) return null;
+  return mapped;
 }
 
 export async function updateVendorDeliveryStatus(
@@ -122,6 +181,18 @@ export async function updateVendorDeliveryStatus(
     p_status: nextStatus,
   });
   if (error) throw new Error(error.message);
+}
+
+export function subscribeVendorDelivery(
+  deliveryId: string,
+  onChange: (patch: {
+    status: string;
+    current_lat: number | null;
+    current_lng: number | null;
+    location_updated_at: string | null;
+  }) => void
+) {
+  return subscribeDeliveryLocation(deliveryId, onChange);
 }
 
 export { DELIVERY_STATUS_LABELS, DELIVERY_TIMELINE, nextDeliveryStatus };

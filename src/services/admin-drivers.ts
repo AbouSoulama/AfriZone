@@ -215,6 +215,8 @@ export async function assignOrderToDriver(
     driver_id: driverId,
     order_id: orderId,
     parcel_id: null,
+    vendor_id: order.vendor_id ?? null,
+    courier_kind: 'driver',
     status: 'assigned',
     pickup_address: 'Entrepôt / vendeur AfriZone',
     pickup_city: order.shipping_city,

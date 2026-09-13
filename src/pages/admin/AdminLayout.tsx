@@ -26,6 +26,7 @@ const NAV = [
   { to: '/admin/catalogue', label: 'Boutiques', icon: Store },
   { to: '/admin/vendeurs', label: 'Vendeurs', icon: Users },
   { to: '/admin/livreurs', label: 'Livreurs', icon: Bike },
+  { to: '/admin/suivi-gps', label: 'Suivi GPS', icon: MapPin },
   { to: '/admin/livraisons', label: 'Courses', icon: Truck },
   { to: '/admin/retraits', label: 'Retraits', icon: Wallet },
   { to: '/admin/colis', label: 'Colis', icon: Package },
