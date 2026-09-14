@@ -11,6 +11,12 @@ import {
   updateProduct,
   uploadProductImage,
 } from '../../services/vendor';
+import {
+  formatCommissionHint,
+  PLATFORM_COMMISSION_RATE,
+  platformFeeFromPrice,
+  vendorNetFromPrice,
+} from '../../lib/commission';
 
 export default function VendorProductFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -229,7 +235,7 @@ export default function VendorProductFormPage() {
 
         <div className="grid sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-bold mb-2">Prix (Promotionnel) *</label>
+            <label className="block text-sm font-bold mb-2">Prix de vente (FCFA) *</label>
             <input
               type="number"
               min={0}
@@ -240,7 +246,7 @@ export default function VendorProductFormPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-bold mb-2">Prix (FCFA)</label>
+            <label className="block text-sm font-bold mb-2">Ancien prix (barré)</label>
             <input
               type="number"
               min={0}
@@ -260,6 +266,23 @@ export default function VendorProductFormPage() {
               required
             />
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-[#00A651]/25 bg-green-50/70 p-4 text-sm">
+          <p className="font-extrabold text-[#008A43] mb-1">
+            Commission AfriZone {(PLATFORM_COMMISSION_RATE * 100).toFixed(0)} %
+          </p>
+          <p className="text-gray-700 leading-relaxed">
+            {formatCommissionHint(Number(price) || 0)}
+          </p>
+          {Number(price) > 0 && (
+            <p className="mt-2 text-xs text-gray-600">
+              Exemple : prix affiché {Number(price).toLocaleString('fr-FR')} F → AfriZone{' '}
+              {platformFeeFromPrice(Number(price)).toLocaleString('fr-FR')} F · net vendeur{' '}
+              {vendorNetFromPrice(Number(price)).toLocaleString('fr-FR')} F.
+              Tenez-en compte avant de fixer votre prix.
+            </p>
+          )}
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">

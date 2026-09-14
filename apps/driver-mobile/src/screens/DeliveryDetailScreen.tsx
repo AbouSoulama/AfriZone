@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Image,
   Linking,
   ScrollView,
   StyleSheet,
@@ -10,11 +11,13 @@ import {
 import type { RouteProp } from '@react-navigation/native';
 import { useRoute } from '@react-navigation/native';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { Button, Card, Screen } from '../components/ui';
 import { colors, spacing } from '../lib/theme';
 import {
   coordsForCity,
+  formatXof,
   googleMapsDirectionsUrl,
   mapsQueryUrl,
   type LatLng,
@@ -26,6 +29,7 @@ import {
   prepareDeliveryRoute,
   pushDeliveryLocation,
   updateDeliveryStatusByDriver,
+  uploadDeliveryProof,
   type DeliveryJobStatus,
   type DeliveryView,
 } from '../services/drivers';
@@ -39,7 +43,7 @@ const ACTION_LABELS: Partial<Record<DeliveryJobStatus, string>> = {
 };
 
 export default function DeliveryDetailScreen() {
-  const { driver } = useAuth();
+  const { driver, user } = useAuth();
   const route = useRoute<RouteProp<RootStackParamList, 'DeliveryDetail'>>();
   const deliveryId = route.params.deliveryId;
 
@@ -48,6 +52,7 @@ export default function DeliveryDetailScreen() {
   const [busy, setBusy] = useState(false);
   const [gpsActive, setGpsActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [proofUri, setProofUri] = useState<string | null>(null);
   const watchRef = useRef<Location.LocationSubscription | null>(null);
 
   const load = useCallback(async () => {
@@ -56,6 +61,7 @@ export default function DeliveryDetailScreen() {
     try {
       const row = await fetchDriverDeliveryById(driver.id, deliveryId);
       setDelivery(row);
+      if (row?.proofPhotoUrl) setProofUri(row.proofPhotoUrl);
       if (row && ['accepted', 'picked_up', 'in_transit'].includes(row.status)) {
         const preserve =
           row.deliveryLat != null && row.deliveryLng != null
@@ -116,23 +122,56 @@ export default function DeliveryDetailScreen() {
   useEffect(() => {
     if (!delivery) return;
     const shouldTrack = ['accepted', 'picked_up', 'in_transit'].includes(delivery.status);
-    if (shouldTrack && !gpsActive) {
-      void startGps();
-    }
-    if (!shouldTrack && gpsActive) {
-      stopGps();
-    }
+    if (shouldTrack && !gpsActive) void startGps();
+    if (!shouldTrack && gpsActive) stopGps();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [delivery?.status]);
 
+  const takeProofPhoto = async () => {
+    const cam = await ImagePicker.requestCameraPermissionsAsync();
+    if (!cam.granted) {
+      setError('Permission caméra refusée.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      allowsEditing: true,
+      aspect: [4, 3],
+    });
+    if (!result.canceled && result.assets[0]?.uri) {
+      setProofUri(result.assets[0].uri);
+    }
+  };
+
   const advance = async () => {
-    if (!driver || !delivery) return;
+    if (!driver || !delivery || !user) return;
     const next = nextDeliveryStatus(delivery.status);
     if (!next) return;
+
+    if (next === 'delivered') {
+      if (!proofUri) {
+        Alert.alert(
+          'Photo obligatoire',
+          'Prenez une photo de vous avec le colis pour prouver la livraison.'
+        );
+        return;
+      }
+    }
+
     setBusy(true);
     setError(null);
     try {
-      await updateDeliveryStatusByDriver(driver.id, delivery.id, next);
+      let proofUrl: string | undefined;
+      if (next === 'delivered' && proofUri && !proofUri.startsWith('http')) {
+        proofUrl = await uploadDeliveryProof(user.id, delivery.id, proofUri);
+      } else if (next === 'delivered' && proofUri?.startsWith('http')) {
+        proofUrl = proofUri;
+      }
+
+      await updateDeliveryStatusByDriver(driver.id, delivery.id, next, {
+        proofPhotoUrl: proofUrl,
+      });
       if (next === 'accepted') {
         const preserve =
           delivery.deliveryLat != null && delivery.deliveryLng != null
@@ -150,7 +189,7 @@ export default function DeliveryDetailScreen() {
       if (next === 'delivered') stopGps();
       await load();
       if (next === 'delivered') {
-        Alert.alert('Livraison validée', 'Le gain a été crédité sur votre portefeuille.');
+        Alert.alert('Livraison validée', 'Le gain sera crédité selon le tarif du lot.');
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
@@ -161,7 +200,7 @@ export default function DeliveryDetailScreen() {
 
   const refuse = () => {
     if (!driver || !delivery) return;
-    Alert.alert('Refuser la course ?', 'Cette action est définitive.', [
+    Alert.alert('Refuser la course ?', 'Cette action est définitive pour ce lot.', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Refuser',
@@ -255,7 +294,19 @@ export default function DeliveryDetailScreen() {
         </Text>
         <Text style={styles.kind}>
           {delivery.kind === 'order' ? 'Commande marketplace' : 'Colis'}
+          {delivery.batchId ? ' · Lot groupé' : ''}
         </Text>
+
+        {delivery.offeredFee != null && delivery.offeredFee > 0 ? (
+          <Card style={{ marginTop: spacing.md, backgroundColor: '#ECFDF5' }}>
+            <Text style={styles.section}>Rémunération proposée</Text>
+            <Text style={styles.fee}>{formatXof(delivery.offeredFee)}</Text>
+            <Text style={styles.meta}>
+              Fixée par AfriZone — acceptez ou refusez. Délai 2 h pour accepter, puis 2 h pour
+              démarrer.
+            </Text>
+          </Card>
+        ) : null}
 
         <Card style={{ marginTop: spacing.md }}>
           <Text style={styles.section}>Collecte</Text>
@@ -279,7 +330,6 @@ export default function DeliveryDetailScreen() {
           {delivery.recipientPhone ? (
             <Text style={styles.meta}>Tél. : {delivery.recipientPhone}</Text>
           ) : null}
-          {delivery.notes ? <Text style={styles.meta}>Note : {delivery.notes}</Text> : null}
           <Button
             title="Ouvrir Maps (livraison)"
             variant="ghost"
@@ -287,6 +337,24 @@ export default function DeliveryDetailScreen() {
             style={{ marginTop: 10 }}
           />
         </Card>
+
+        {delivery.status === 'in_transit' || next === 'delivered' ? (
+          <Card style={{ marginTop: spacing.md }}>
+            <Text style={styles.section}>Preuve de livraison</Text>
+            <Text style={styles.meta}>
+              Photo de vous avec le colis remis (état visible). Obligatoire pour valider.
+            </Text>
+            {proofUri ? (
+              <Image source={{ uri: proofUri }} style={styles.proof} />
+            ) : null}
+            <Button
+              title={proofUri ? 'Reprendre la photo' : 'Prendre la photo'}
+              variant="secondary"
+              onPress={() => void takeProofPhoto()}
+              style={{ marginTop: 10 }}
+            />
+          </Card>
+        ) : null}
 
         <Card style={{ marginTop: spacing.md }}>
           <Text style={styles.section}>GPS course</Text>
@@ -307,7 +375,7 @@ export default function DeliveryDetailScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          {actionLabel && next ? (
+        {actionLabel && next ? (
           <Button
             title={actionLabel}
             variant="accent"
@@ -347,8 +415,10 @@ const styles = StyleSheet.create({
   ref: { fontSize: 24, fontWeight: '900', color: colors.ink, marginTop: 12 },
   kind: { color: colors.muted, marginTop: 4 },
   section: { fontWeight: '800', color: colors.ink, marginBottom: 6 },
+  fee: { fontSize: 28, fontWeight: '900', color: colors.success },
   addr: { fontSize: 15, fontWeight: '600', color: colors.ink },
   city: { color: colors.muted, marginTop: 2 },
-  meta: { color: colors.muted, marginTop: 6, fontSize: 13 },
+  meta: { color: colors.muted, marginTop: 6, fontSize: 13, lineHeight: 18 },
+  proof: { width: '100%', height: 200, borderRadius: 12, marginTop: 10, backgroundColor: '#E5E7EB' },
   error: { color: colors.danger, marginTop: 12, fontWeight: '600' },
 });

@@ -169,13 +169,19 @@ export async function placeOrders(
 
     if (error) throw new Error(error.message);
 
-    const orderItems = items.map((i) => ({
-      order_id: order.id,
-      product_id: i.productId,
-      quantity: i.quantity,
-      price: i.product.price,
-      total: i.product.price * i.quantity,
-    }));
+    const orderItems = items.map((i) => {
+      const lineTotal = i.product.price * i.quantity;
+      const platformFee = Math.round(lineTotal * 0.1);
+      return {
+        order_id: order.id,
+        product_id: i.productId,
+        quantity: i.quantity,
+        price: i.product.price,
+        total: lineTotal,
+        platform_fee: platformFee,
+        vendor_net: lineTotal - platformFee,
+      };
+    });
 
     const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
     if (itemsError) throw new Error(itemsError.message);

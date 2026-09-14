@@ -1,10 +1,19 @@
-import React, { Component, type ErrorInfo, type ReactNode } from 'react';
+import React, { Component, useEffect, type ErrorInfo, type ReactNode } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Image, StyleSheet, Text, View } from 'react-native';
+import * as ScreenCapture from 'expo-screen-capture';
 import { AuthProvider } from './src/context/AuthContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { colors } from './src/lib/theme';
+
+/** Autorise le partage d’écran (Meet, Zoom, WhatsApp…) — pas de black-out. */
+function AllowScreenShare({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    void ScreenCapture.allowScreenCaptureAsync().catch(() => undefined);
+  }, []);
+  return <>{children}</>;
+}
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -44,10 +53,12 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <AuthProvider>
-          <StatusBar style="dark" />
-          <RootNavigator />
-        </AuthProvider>
+        <AllowScreenShare>
+          <AuthProvider>
+            <StatusBar style="dark" />
+            <RootNavigator />
+          </AuthProvider>
+        </AllowScreenShare>
       </ErrorBoundary>
     </SafeAreaProvider>
   );
