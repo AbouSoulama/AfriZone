@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle, Package, QrCode, Truck } from 'lucide-react';
+import { CheckCircle, Package, QrCode, Truck, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { fetchDriverStats, getDriverForUser, VEHICLE_LABELS, type VehicleType } from '../../services/drivers';
+import {
+  fetchDriverStats,
+  getDriverForUser,
+  VEHICLE_LABELS,
+  type VehicleType,
+} from '../../services/drivers';
 
-function driverApkUrl(): string {
-  const fromEnv = (import.meta.env.VITE_DRIVER_APK_URL as string | undefined)?.trim();
-  if (fromEnv) return fromEnv;
-  // Fallback : page d’aide — remplacez par l’URL Expo / Drive de l’APK
-  return 'https://expo.dev/accounts/afrizone002/projects/afrizone-driver/builds';
-}
+const APK_URL =
+  (import.meta.env.VITE_DRIVER_APK_URL as string | undefined)?.trim() ||
+  'https://expo.dev/accounts/afrizone002/projects/afrizone-driver/builds';
 
 export default function DriverDashboard() {
   const { user } = useAuth();
@@ -17,13 +19,6 @@ export default function DriverDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showQr, setShowQr] = useState(false);
-
-  const apkUrl = useMemo(() => driverApkUrl(), []);
-  const qrSrc = useMemo(
-    () =>
-      `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(apkUrl)}`,
-    [apkUrl]
-  );
 
   useEffect(() => {
     if (!user) return;
@@ -50,6 +45,8 @@ export default function DriverDashboard() {
     { label: 'Total courses', value: stats.total, icon: Package, color: '#1F2937' },
   ];
 
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(APK_URL)}`;
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
@@ -65,8 +62,8 @@ export default function DriverDashboard() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setShowQr((v) => !v)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 border-2 border-[#00A651] text-[#008A43] rounded-xl text-sm font-bold"
+            onClick={() => setShowQr(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 border-2 border-[#00A651] text-[#00A651] rounded-xl text-sm font-bold"
           >
             <QrCode size={16} /> Installer l’app
           </button>
@@ -78,36 +75,6 @@ export default function DriverDashboard() {
           </Link>
         </div>
       </div>
-
-      {showQr && (
-        <div className="mb-8 bg-white border border-green-100 rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-5">
-          <img
-            src={qrSrc}
-            alt="QR code installation app livreur"
-            className="w-40 h-40 rounded-xl border"
-          />
-          <div className="text-sm space-y-2">
-            <p className="font-extrabold text-[#1F2937]">Application AfriZone Livraison</p>
-            <p className="text-gray-600 leading-relaxed">
-              Scannez ce QR avec votre téléphone pour télécharger / installer l’APK livreur. Tout
-              nouveau livreur doit installer l’app pour recevoir les courses groupées, le GPS et le
-              portefeuille.
-            </p>
-            <a
-              href={apkUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-block text-[#FF6B00] font-bold break-all"
-            >
-              Ouvrir le lien d’installation
-            </a>
-            <p className="text-xs text-gray-400">
-              Configurez <code className="bg-gray-100 px-1 rounded">VITE_DRIVER_APK_URL</code> avec
-              l’URL Expo / Drive de votre dernier APK.
-            </p>
-          </div>
-        </div>
-      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 mb-6 text-sm">
@@ -135,6 +102,42 @@ export default function DriverDashboard() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      <div className="mt-8 bg-green-50 border border-green-100 rounded-2xl p-5">
+        <h2 className="font-extrabold mb-1">Application mobile AfriZone Livraison</h2>
+        <p className="text-sm text-gray-600 leading-relaxed">
+          Tout nouveau livreur doit installer l’application pour accepter les lots, partager le GPS
+          et envoyer la photo de preuve à la livraison. Cliquez sur « Installer l’app » pour afficher
+          le QR code à scanner.
+        </p>
+      </div>
+
+      {showQr && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full relative shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setShowQr(false)}
+              className="absolute top-3 right-3 p-2 rounded-full hover:bg-gray-100"
+            >
+              <X size={18} />
+            </button>
+            <h3 className="font-extrabold text-lg mb-1">Scanner pour installer</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Ouvrez l’appareil photo du téléphone et scannez ce code.
+            </p>
+            <img src={qrSrc} alt="QR installation app livreur" className="w-full rounded-2xl border" />
+            <a
+              href={APK_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 block text-center text-sm font-bold text-[#00A651] break-all"
+            >
+              Ou ouvrir le lien
+            </a>
+          </div>
         </div>
       )}
     </div>

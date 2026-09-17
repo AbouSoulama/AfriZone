@@ -64,11 +64,6 @@ export interface DeliveryView {
   pickupLng?: number | null;
   deliveryLat?: number | null;
   deliveryLng?: number | null;
-  batchId?: string | null;
-  offeredFee?: number | null;
-  acceptDeadlineAt?: string | null;
-  startDeadlineAt?: string | null;
-  proofPhotoUrl?: string | null;
 }
 
 export const VEHICLE_LABELS: Record<VehicleType, string> = {
@@ -160,11 +155,6 @@ function mapDelivery(row: Record<string, unknown>): DeliveryView {
     pickupLng: row.pickup_lng != null ? Number(row.pickup_lng) : null,
     deliveryLat: row.delivery_lat != null ? Number(row.delivery_lat) : null,
     deliveryLng: row.delivery_lng != null ? Number(row.delivery_lng) : null,
-    batchId: (row.batch_id as string) ?? null,
-    offeredFee: row.offered_fee != null ? Number(row.offered_fee) : null,
-    acceptDeadlineAt: (row.accept_deadline_at as string) ?? null,
-    startDeadlineAt: (row.start_deadline_at as string) ?? null,
-    proofPhotoUrl: (row.proof_photo_url as string) ?? null,
   };
 }
 
@@ -267,8 +257,7 @@ export async function fetchDriverDeliveryById(
 export async function updateDeliveryStatusByDriver(
   driverId: string,
   deliveryId: string,
-  nextStatus: DeliveryJobStatus,
-  opts?: { proofPhotoUrl?: string }
+  nextStatus: DeliveryJobStatus
 ): Promise<void> {
   const { data: delivery, error } = await supabase
     .from('deliveries')
@@ -286,21 +275,6 @@ export async function updateDeliveryStatusByDriver(
     if (current !== 'assigned') {
       throw new Error('Seule une course assignée peut être refusée.');
     }
-    if (delivery.batch_id) {
-      const { error: batchErr } = await supabase.rpc('driver_respond_batch', {
-        p_batch_id: delivery.batch_id,
-        p_accept: false,
-      });
-      if (batchErr) throw new Error(batchErr.message);
-      return;
-    }
-  } else if (nextStatus === 'accepted' && current === 'assigned' && delivery.batch_id) {
-    const { error: batchErr } = await supabase.rpc('driver_respond_batch', {
-      p_batch_id: delivery.batch_id,
-      p_accept: true,
-    });
-    if (batchErr) throw new Error(batchErr.message);
-    return;
   } else {
     const expected = nextDeliveryStatus(current);
     if (expected !== nextStatus) {
@@ -310,22 +284,12 @@ export async function updateDeliveryStatusByDriver(
     }
   }
 
-  if (nextStatus === 'delivered' && !opts?.proofPhotoUrl && !delivery.proof_photo_url) {
-    throw new Error('Photo de preuve obligatoire pour valider la livraison.');
-  }
-
   const payload: Record<string, unknown> = { status: nextStatus };
   if (nextStatus === 'accepted') {
     payload.accepted_at = new Date().toISOString();
     payload.start_deadline_at = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
   }
-  if (nextStatus === 'delivered') {
-    payload.delivered_at = new Date().toISOString();
-    if (opts?.proofPhotoUrl) {
-      payload.proof_photo_url = opts.proofPhotoUrl;
-      payload.proof_photo_at = new Date().toISOString();
-    }
-  }
+  if (nextStatus === 'delivered') payload.delivered_at = new Date().toISOString();
 
   const { error: updateError } = await supabase
     .from('deliveries')
@@ -335,6 +299,7 @@ export async function updateDeliveryStatusByDriver(
 
   if (updateError) throw new Error(updateError.message);
 
+  // Sync order / parcel statuses
   if (delivery.order_id) {
     let orderStatus: string | null = null;
     if (nextStatus === 'picked_up' || nextStatus === 'in_transit') orderStatus = 'shipped';

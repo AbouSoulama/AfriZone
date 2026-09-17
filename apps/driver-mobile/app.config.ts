@@ -45,13 +45,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: [
       'expo-image',
+      'expo-screen-capture',
       [
         'expo-image-picker',
         {
           photosPermission:
             'AfriZone utilise vos photos pour la photo de profil livreur.',
           cameraPermission:
-            'AfriZone utilise la caméra pour la photo de profil livreur.',
+            'AfriZone utilise la caméra pour la photo de profil livreur et la preuve de livraison.',
         },
       ],
       [

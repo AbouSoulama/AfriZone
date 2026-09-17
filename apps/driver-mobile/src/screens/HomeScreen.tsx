@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
+  Alert,
   Image,
   RefreshControl,
   ScrollView,
@@ -14,7 +15,12 @@ import { useAuth } from '../context/AuthContext';
 import { BrandWordmark, Button, Card, Pill, Screen } from '../components/ui';
 import { colors, spacing } from '../lib/theme';
 import { formatXof } from '../lib/geo';
-import { fetchDriverStats, VEHICLE_LABELS } from '../services/drivers';
+import {
+  driverRespondBatch,
+  fetchDriverStats,
+  fetchOpenBatchesForDriver,
+  VEHICLE_LABELS,
+} from '../services/drivers';
 import { fetchDriverWalletBalance } from '../services/wallet';
 import type { MainTabParamList } from '../navigation/types';
 
@@ -28,23 +34,49 @@ export default function HomeScreen() {
     delivered: 0,
   });
   const [balance, setBalance] = useState(0);
+  const [batches, setBatches] = useState<
+    Awaited<ReturnType<typeof fetchOpenBatchesForDriver>>
+  >([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [batchBusy, setBatchBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!driver) return;
     setError(null);
     try {
-      const [s, b] = await Promise.all([
+      const [s, b, open] = await Promise.all([
         fetchDriverStats(driver.id),
         fetchDriverWalletBalance(driver.id),
+        fetchOpenBatchesForDriver(driver.id),
       ]);
       setStats(s);
       setBalance(b);
+      setBatches(open);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur de chargement');
     }
   }, [driver]);
+
+  const onBatch = (batchId: string, accept: boolean) => {
+    setBatchBusy(batchId);
+    void (async () => {
+      try {
+        await driverRespondBatch(batchId, accept);
+        Alert.alert(
+          accept ? 'Lot accepté' : 'Lot refusé',
+          accept
+            ? 'Les courses sont acceptées. Commencez sous 2 h.'
+            : 'AfriZone pourra réassigner ces commandes.'
+        );
+        await load();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Erreur lot');
+      } finally {
+        setBatchBusy(null);
+      }
+    })();
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -106,7 +138,7 @@ export default function HomeScreen() {
             source={
               avatarUrl
                 ? { uri: avatarUrl }
-                : require('../../assets/icon.jpg')
+                : require('../../assets/icon.png')
             }
             style={styles.avatar}
           />
@@ -165,6 +197,37 @@ export default function HomeScreen() {
           </Card>
         </View>
 
+        {batches.length > 0 ? (
+          <View style={{ marginTop: spacing.lg }}>
+            <Text style={styles.sectionTitle}>Lots proposés (accepter / refuser)</Text>
+            {batches.map((batch) => (
+              <Card key={batch.id} style={{ marginBottom: 10 }}>
+                <Text style={styles.batchFee}>{formatXof(batch.offeredFee)}</Text>
+                <Text style={styles.mutedSmall}>
+                  À accepter avant {new Date(batch.acceptDeadlineAt).toLocaleString('fr-FR')}
+                </Text>
+                {batch.notes ? <Text style={styles.mutedSmall}>{batch.notes}</Text> : null}
+                <View style={styles.batchActions}>
+                  <Button
+                    title="Accepter"
+                    variant="accent"
+                    loading={batchBusy === batch.id}
+                    onPress={() => onBatch(batch.id, true)}
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    title="Refuser"
+                    variant="danger"
+                    loading={batchBusy === batch.id}
+                    onPress={() => onBatch(batch.id, false)}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              </Card>
+            ))}
+          </View>
+        ) : null}
+
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <Button
@@ -209,5 +272,8 @@ const styles = StyleSheet.create({
   kpi: { flex: 1, alignItems: 'center', paddingVertical: 14 },
   kpiValue: { fontSize: 22, fontWeight: '900', color: colors.ink },
   kpiLabel: { color: colors.muted, fontSize: 11, fontWeight: '700', marginTop: 2 },
+  sectionTitle: { fontWeight: '900', fontSize: 16, color: colors.ink, marginBottom: 10 },
+  batchFee: { fontSize: 22, fontWeight: '900', color: colors.brand },
+  batchActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
   error: { color: colors.danger, marginTop: 12, fontWeight: '700' },
 });

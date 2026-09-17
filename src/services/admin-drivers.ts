@@ -53,11 +53,6 @@ function mapDeliveryAdmin(row: Record<string, unknown>): DeliveryView & {
     parcelTracking: p ? ((p.tracking_number as string) ?? null) : null,
     kind: row.order_id ? 'order' : 'parcel',
     driverCode: d ? ((d.driver_code as string) ?? null) : null,
-    batchId: (row.batch_id as string) ?? null,
-    offeredFee: row.offered_fee != null ? Number(row.offered_fee) : null,
-    acceptDeadlineAt: (row.accept_deadline_at as string) ?? null,
-    startDeadlineAt: (row.start_deadline_at as string) ?? null,
-    proofPhotoUrl: (row.proof_photo_url as string) ?? null,
     driverName: null,
   };
 }
@@ -206,8 +201,7 @@ export async function fetchAssignableParcels() {
 export async function assignOrderToDriver(
   adminId: string,
   orderId: string,
-  driverId: string,
-  offeredFee?: number
+  driverId: string
 ): Promise<void> {
   const { data: order, error } = await supabase
     .from('orders')
@@ -216,10 +210,6 @@ export async function assignOrderToDriver(
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!order) throw new Error('Commande introuvable.');
-
-  const fee =
-    offeredFee != null && Number.isFinite(offeredFee) ? Math.round(offeredFee) : null;
-  const deadline = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
 
   const { error: insertError } = await supabase.from('deliveries').insert({
     driver_id: driverId,
@@ -237,74 +227,13 @@ export async function assignOrderToDriver(
     recipient_name: null,
     recipient_phone: order.shipping_phone,
     assigned_by: adminId,
-    offered_fee: fee,
-    accept_deadline_at: deadline,
+    accept_deadline_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
   });
   if (insertError) throw new Error(insertError.message);
 
   if (order.status === 'confirmed' || order.status === 'processing') {
     await supabase.from('orders').update({ status: 'processing' }).eq('id', orderId);
   }
-}
-
-/** Assigne plusieurs commandes en un lot avec un prix fixe pour le livreur. */
-export async function createDeliveryBatch(
-  driverId: string,
-  orderIds: string[],
-  offeredFee: number,
-  notes?: string
-): Promise<string> {
-  const { data, error } = await supabase.rpc('admin_create_delivery_batch', {
-    p_driver_id: driverId,
-    p_order_ids: orderIds,
-    p_offered_fee: Math.round(offeredFee),
-    p_notes: notes || null,
-  });
-  if (error) throw new Error(error.message);
-  return data as string;
-}
-
-export async function reclaimDelivery(deliveryId: string): Promise<void> {
-  const { error } = await supabase.rpc('admin_reclaim_overdue_deliveries', {
-    p_batch_id: null,
-    p_delivery_id: deliveryId,
-  });
-  if (error) throw new Error(error.message);
-}
-
-export async function reclaimBatch(batchId: string): Promise<void> {
-  const { error } = await supabase.rpc('admin_reclaim_overdue_deliveries', {
-    p_batch_id: batchId,
-    p_delivery_id: null,
-  });
-  if (error) throw new Error(error.message);
-}
-
-export function isDeliveryOverdue(d: {
-  status: string;
-  assignedAt?: string;
-  acceptedAt?: string | null;
-  acceptDeadlineAt?: string | null;
-  startDeadlineAt?: string | null;
-}): boolean {
-  const now = Date.now();
-  if (d.status === 'assigned') {
-    const deadline = d.acceptDeadlineAt
-      ? new Date(d.acceptDeadlineAt).getTime()
-      : d.assignedAt
-        ? new Date(d.assignedAt).getTime() + 2 * 60 * 60 * 1000
-        : 0;
-    return deadline > 0 && now > deadline;
-  }
-  if (d.status === 'accepted') {
-    const deadline = d.startDeadlineAt
-      ? new Date(d.startDeadlineAt).getTime()
-      : d.acceptedAt
-        ? new Date(d.acceptedAt).getTime() + 2 * 60 * 60 * 1000
-        : 0;
-    return deadline > 0 && now > deadline;
-  }
-  return false;
 }
 
 export async function assignParcelToDriver(

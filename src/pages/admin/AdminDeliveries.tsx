@@ -4,14 +4,18 @@ import { useAdminCountry } from '../../context/AdminCountryContext';
 import { formatPrice } from '../../services/catalog';
 import {
   assignParcelToDriver,
-  createDeliveryBatch,
   fetchAllDeliveriesAdmin,
   fetchApprovedDrivers,
   fetchAssignableOrders,
   fetchAssignableParcels,
-  isDeliveryOverdue,
-  reclaimDelivery,
 } from '../../services/admin-drivers';
+import {
+  createDeliveryBatch,
+  fetchAdminBatches,
+  isOverdueDelivery,
+  reclaimOverdueDeliveries,
+  type DeliveryBatchView,
+} from '../../services/delivery-batches';
 import {
   DELIVERY_STATUS_LABELS,
   type DeliveryView,
@@ -28,10 +32,11 @@ export default function AdminDeliveriesPage() {
   const [deliveries, setDeliveries] = useState<(DeliveryView & { driverCode?: string | null })[]>(
     []
   );
+  const [batches, setBatches] = useState<DeliveryBatchView[]>([]);
   const [selectedDriver, setSelectedDriver] = useState('');
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [offeredFee, setOfferedFee] = useState('3000');
-  const [notes, setNotes] = useState('');
+  const [batchNotes, setBatchNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -39,11 +44,12 @@ export default function AdminDeliveriesPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const [d, o, p, all] = await Promise.all([
+      const [d, o, p, all, b] = await Promise.all([
         fetchApprovedDrivers(adminCountry),
         fetchAssignableOrders(adminCountry),
         fetchAssignableParcels(),
         fetchAllDeliveriesAdmin(),
+        fetchAdminBatches(),
       ]);
       const filteredParcels =
         adminCountry === 'ALL'
@@ -67,6 +73,7 @@ export default function AdminDeliveriesPage() {
       setOrders(o);
       setParcels(filteredParcels);
       setDeliveries(filteredDeliveries);
+      setBatches(b);
       setSelectedDriver((prev) => (d.some((x) => x.id === prev) ? prev : d[0]?.id || ''));
       setSelectedOrders((prev) => prev.filter((id) => o.some((x) => x.id === id)));
       setError(null);
@@ -88,10 +95,7 @@ export default function AdminDeliveriesPage() {
   };
 
   const onCreateBatch = async () => {
-    if (!selectedDriver || selectedOrders.length === 0) {
-      setError('Choisissez un livreur et au moins une commande.');
-      return;
-    }
+    if (!selectedDriver || selectedOrders.length === 0) return;
     const fee = Math.round(Number(offeredFee));
     if (!Number.isFinite(fee) || fee < 0) {
       setError('Prix de livraison invalide.');
@@ -99,9 +103,9 @@ export default function AdminDeliveriesPage() {
     }
     setBusy(true);
     try {
-      await createDeliveryBatch(selectedDriver, selectedOrders, fee, notes.trim() || undefined);
+      await createDeliveryBatch(selectedDriver, selectedOrders, fee, batchNotes);
       setSelectedOrders([]);
-      setNotes('');
+      setBatchNotes('');
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
@@ -123,11 +127,11 @@ export default function AdminDeliveriesPage() {
     }
   };
 
-  const onReclaim = async (deliveryId: string) => {
-    if (!confirm('Retirer cette course au livreur pour la réassigner ?')) return;
+  const onReclaim = async (deliveryId?: string, batchId?: string) => {
     setBusy(true);
     try {
-      await reclaimDelivery(deliveryId);
+      const n = await reclaimOverdueDeliveries({ deliveryId, batchId });
+      if (!n) setError('Aucune course retirée (délai non atteint ou déjà démarrée).');
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
@@ -139,12 +143,10 @@ export default function AdminDeliveriesPage() {
   const overdue = useMemo(
     () =>
       deliveries.filter((d) =>
-        isDeliveryOverdue({
+        isOverdueDelivery({
           status: d.status,
           assignedAt: d.assignedAt,
           acceptedAt: d.acceptedAt,
-          acceptDeadlineAt: d.acceptDeadlineAt,
-          startDeadlineAt: d.startDeadlineAt,
         })
       ),
     [deliveries]
@@ -153,11 +155,11 @@ export default function AdminDeliveriesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-extrabold mb-2">Assignation des courses</h1>
+        <h1 className="text-2xl font-extrabold mb-2">Courses groupées</h1>
         <p className="text-sm text-gray-500 mb-1">{adminCountryName}</p>
         <p className="text-sm text-gray-500">
-          Groupe plusieurs commandes, fixe le prix de livraison, le livreur accepte ou refuse (délai
-          2 h).
+          Sélectionnez plusieurs commandes, fixez le prix de livraison, proposez au livreur.
+          Il peut accepter ou refuser. Délai : 2 h pour accepter / démarrer.
         </p>
       </div>
 
@@ -167,13 +169,13 @@ export default function AdminDeliveriesPage() {
         </div>
       )}
 
-      <div className="bg-white border rounded-2xl p-4 space-y-4">
+      <div className="bg-white border rounded-2xl p-4 grid md:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-bold mb-2">Livreur cible</label>
+          <label className="block text-sm font-bold mb-2">Livreur</label>
           <select
             value={selectedDriver}
             onChange={(e) => setSelectedDriver(e.target.value)}
-            className="w-full max-w-md px-4 py-3 border-2 border-gray-200 rounded-xl bg-white"
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-white"
           >
             {drivers.length === 0 && <option value="">Aucun livreur approuvé</option>}
             {drivers.map((d) => (
@@ -183,35 +185,25 @@ export default function AdminDeliveriesPage() {
             ))}
           </select>
         </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-bold mb-2">Prix livraison lot (FCFA) *</label>
-            <input
-              type="number"
-              min={0}
-              value={offeredFee}
-              onChange={(e) => setOfferedFee(e.target.value)}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold mb-2">Note (optionnel)</label>
-            <input
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Ex. zone Ouaga centre"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl"
-            />
-          </div>
+        <div>
+          <label className="block text-sm font-bold mb-2">Prix lot (FCFA)</label>
+          <input
+            type="number"
+            min={0}
+            value={offeredFee}
+            onChange={(e) => setOfferedFee(e.target.value)}
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl"
+          />
         </div>
-        <button
-          type="button"
-          disabled={busy || !selectedDriver || selectedOrders.length === 0}
-          onClick={() => void onCreateBatch()}
-          className="px-4 py-3 bg-[#FF6B00] text-white rounded-xl text-sm font-bold disabled:opacity-50"
-        >
-          Assigner le lot ({selectedOrders.length} cmd) — {formatPrice(Number(offeredFee) || 0)}
-        </button>
+        <div>
+          <label className="block text-sm font-bold mb-2">Note (optionnel)</label>
+          <input
+            value={batchNotes}
+            onChange={(e) => setBatchNotes(e.target.value)}
+            placeholder="Ex. zone Ouaga centre"
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl"
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -219,9 +211,19 @@ export default function AdminDeliveriesPage() {
       ) : (
         <>
           <section>
-            <h2 className="font-extrabold mb-3">
-              Commandes à grouper ({orders.length}) — cochez puis assignez
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <h2 className="font-extrabold">
+                Commandes ({selectedOrders.length}/{orders.length} sélectionnées)
+              </h2>
+              <button
+                type="button"
+                disabled={busy || !selectedDriver || selectedOrders.length === 0}
+                onClick={() => void onCreateBatch()}
+                className="px-4 py-2.5 bg-[#FF6B00] text-white rounded-xl text-sm font-bold disabled:opacity-50"
+              >
+                Proposer le lot ({formatPrice(Number(offeredFee) || 0)})
+              </button>
+            </div>
             {orders.length === 0 ? (
               <p className="text-sm text-gray-500">Aucune commande disponible.</p>
             ) : (
@@ -239,10 +241,11 @@ export default function AdminDeliveriesPage() {
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggleOrder(o.id)}
-                        className="w-4 h-4"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="font-mono font-bold text-[#FF6B00] text-sm">{o.order_number}</p>
+                        <p className="font-mono font-bold text-[#FF6B00] text-sm">
+                          {o.order_number}
+                        </p>
                         <p className="text-xs text-gray-500">
                           {o.shipping_city} · {formatPrice(Number(o.total))} · {o.status}
                         </p>
@@ -255,7 +258,87 @@ export default function AdminDeliveriesPage() {
           </section>
 
           <section>
-            <h2 className="font-extrabold mb-3">Colis à assigner ({parcels.length})</h2>
+            <h2 className="font-extrabold mb-3">Lots récents</h2>
+            {batches.length === 0 ? (
+              <p className="text-sm text-gray-500">Aucun lot.</p>
+            ) : (
+              <div className="space-y-2">
+                {batches.slice(0, 15).map((b) => (
+                  <div
+                    key={b.id}
+                    className="bg-white border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div>
+                      <p className="font-bold">
+                        {formatPrice(b.offeredFee)} · {b.deliveryCount ?? 0} course(s) ·{' '}
+                        <span className="text-[#FF6B00]">{b.status}</span>
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {(b.orderNumbers || []).join(', ') || '—'} · deadline{' '}
+                        {new Date(b.acceptDeadlineAt).toLocaleString('fr-FR')}
+                      </p>
+                    </div>
+                    {['offered', 'accepted'].includes(b.status) && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void onReclaim(undefined, b.id)}
+                        className="px-3 py-2 border border-red-200 text-red-600 rounded-xl text-xs font-bold"
+                      >
+                        Retirer / réassigner
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {overdue.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-extrabold text-red-600">
+                  Retards SLA 2 h ({overdue.length})
+                </h2>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onReclaim()}
+                  className="px-3 py-2 bg-red-600 text-white rounded-xl text-xs font-bold"
+                >
+                  Retirer tous les retards
+                </button>
+              </div>
+              <div className="space-y-2">
+                {overdue.map((d) => (
+                  <div
+                    key={d.id}
+                    className="bg-red-50 border border-red-100 rounded-xl p-4 flex justify-between gap-3"
+                  >
+                    <div>
+                      <p className="font-mono font-bold text-sm">
+                        {d.orderNumber || d.parcelTracking}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        {DELIVERY_STATUS_LABELS[d.status]} · {d.driverCode || '—'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void onReclaim(d.id)}
+                      className="px-3 py-2 bg-white border border-red-200 text-red-600 rounded-xl text-xs font-bold"
+                    >
+                      Retirer
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section>
+            <h2 className="font-extrabold mb-3">Colis (assignation unitaire)</h2>
             {parcels.length === 0 ? (
               <p className="text-sm text-gray-500">Aucun colis disponible.</p>
             ) : (
@@ -285,82 +368,6 @@ export default function AdminDeliveriesPage() {
                 ))}
               </div>
             )}
-          </section>
-
-          {overdue.length > 0 && (
-            <section>
-              <h2 className="font-extrabold mb-3 text-red-700">
-                Retards SLA 2 h ({overdue.length})
-              </h2>
-              <div className="space-y-2">
-                {overdue.map((d) => (
-                  <div
-                    key={d.id}
-                    className="bg-red-50 border border-red-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm"
-                  >
-                    <div>
-                      <p className="font-mono font-bold text-[#FF6B00]">
-                        {d.kind === 'order' ? d.orderNumber : d.parcelTracking}
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        {DELIVERY_STATUS_LABELS[d.status]} · {d.driverCode || '—'} · dépassé 2 h
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void onReclaim(d.id)}
-                      className="px-3 py-2 bg-red-600 text-white rounded-xl text-xs font-bold disabled:opacity-50"
-                    >
-                      Retirer & libérer
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section>
-            <h2 className="font-extrabold mb-3">Courses récentes</h2>
-            <div className="space-y-2">
-              {deliveries.slice(0, 30).map((d) => {
-                const late = isDeliveryOverdue({
-                  status: d.status,
-                  assignedAt: d.assignedAt,
-                  acceptedAt: d.acceptedAt,
-                  acceptDeadlineAt: d.acceptDeadlineAt,
-                  startDeadlineAt: d.startDeadlineAt,
-                });
-                return (
-                  <div key={d.id} className="bg-white border rounded-xl p-4 text-sm">
-                    <div className="flex justify-between gap-2">
-                      <p className="font-mono font-bold text-[#FF6B00]">
-                        {d.kind === 'order' ? d.orderNumber : d.parcelTracking}
-                      </p>
-                      <span className="text-xs font-bold text-gray-600">
-                        {DELIVERY_STATUS_LABELS[d.status]}
-                        {late ? ' · RETARD' : ''}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Livreur {d.driverCode || '—'} · {d.pickupCity} → {d.deliveryCity}
-                      {d.offeredFee != null ? ` · ${formatPrice(d.offeredFee)}` : ''}
-                      {d.batchId ? ' · lot' : ''}
-                    </p>
-                    {(d.status === 'assigned' || d.status === 'accepted') && (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void onReclaim(d.id)}
-                        className="mt-2 text-xs font-bold text-red-600"
-                      >
-                        Retirer au livreur
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
           </section>
         </>
       )}

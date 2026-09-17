@@ -11,12 +11,6 @@ import {
   updateProduct,
   uploadProductImage,
 } from '../../services/vendor';
-import {
-  formatCommissionHint,
-  PLATFORM_COMMISSION_RATE,
-  platformFeeFromPrice,
-  vendorNetFromPrice,
-} from '../../lib/commission';
 
 export default function VendorProductFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -235,7 +229,7 @@ export default function VendorProductFormPage() {
 
         <div className="grid sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-bold mb-2">Prix de vente (FCFA) *</label>
+            <label className="block text-sm font-bold mb-2">Prix client (FCFA) *</label>
             <input
               type="number"
               min={0}
@@ -268,22 +262,28 @@ export default function VendorProductFormPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[#00A651]/25 bg-green-50/70 p-4 text-sm">
-          <p className="font-extrabold text-[#008A43] mb-1">
-            Commission AfriZone {(PLATFORM_COMMISSION_RATE * 100).toFixed(0)} %
-          </p>
-          <p className="text-gray-700 leading-relaxed">
-            {formatCommissionHint(Number(price) || 0)}
-          </p>
-          {Number(price) > 0 && (
-            <p className="mt-2 text-xs text-gray-600">
-              Exemple : prix affiché {Number(price).toLocaleString('fr-FR')} F → AfriZone{' '}
-              {platformFeeFromPrice(Number(price)).toLocaleString('fr-FR')} F · net vendeur{' '}
-              {vendorNetFromPrice(Number(price)).toLocaleString('fr-FR')} F.
-              Tenez-en compte avant de fixer votre prix.
+        {Number(price) > 0 && (
+          <div className="rounded-2xl border border-[#00A651]/30 bg-green-50/70 p-4 text-sm leading-relaxed">
+            <p className="font-extrabold text-[#008A43] mb-1">Commission AfriZone 10 %</p>
+            <p className="text-gray-700">
+              Prix affiché au client :{' '}
+              <strong>{Math.round(Number(price)).toLocaleString('fr-FR')} FCFA</strong>
             </p>
-          )}
-        </div>
+            <p className="text-gray-700">
+              Commission plateforme (10 %) :{' '}
+              <strong>{Math.round(Number(price) * 0.1).toLocaleString('fr-FR')} FCFA</strong>
+            </p>
+            <p className="text-gray-700">
+              Vous recevez (net) :{' '}
+              <strong className="text-[#00A651]">
+                {Math.round(Number(price) * 0.9).toLocaleString('fr-FR')} FCFA
+              </strong>
+            </p>
+            <p className="text-xs text-gray-500 mt-2">
+              Tenez compte de cette commission avant de fixer votre prix de vente.
+            </p>
+          </div>
+        )}
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div>

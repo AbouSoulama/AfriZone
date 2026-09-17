@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import type { RouteProp } from '@react-navigation/native';
 import { useRoute } from '@react-navigation/native';
-import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { useAuth } from '../context/AuthContext';
 import { Button, Card, Screen } from '../components/ui';
 import { colors, spacing } from '../lib/theme';
@@ -39,7 +39,7 @@ const ACTION_LABELS: Partial<Record<DeliveryJobStatus, string>> = {
   assigned: 'Accepter la course',
   accepted: 'Marquer collectée',
   picked_up: 'Partir en livraison',
-  in_transit: 'Marquer livrée',
+  in_transit: 'Marquer livrée (avec photo)',
 };
 
 export default function DeliveryDetailScreen() {
@@ -127,46 +127,49 @@ export default function DeliveryDetailScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [delivery?.status]);
 
-  const takeProofPhoto = async () => {
+  const takeProofPhoto = async (): Promise<string | null> => {
+    if (!user?.id) return null;
     const cam = await ImagePicker.requestCameraPermissionsAsync();
     if (!cam.granted) {
-      setError('Permission caméra refusée.');
-      return;
+      setError('Permission caméra refusée — requise pour la preuve de livraison.');
+      return null;
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       quality: 0.7,
-      allowsEditing: true,
-      aspect: [4, 3],
+      allowsEditing: false,
     });
-    if (!result.canceled && result.assets[0]?.uri) {
-      setProofUri(result.assets[0].uri);
-    }
+    if (result.canceled || !result.assets[0]) return null;
+    const asset = result.assets[0];
+    setProofUri(asset.uri);
+    const url = await uploadDeliveryProof(
+      user.id,
+      deliveryId,
+      asset.uri,
+      asset.mimeType || 'image/jpeg'
+    );
+    return url;
   };
 
   const advance = async () => {
-    if (!driver || !delivery || !user) return;
+    if (!driver || !delivery) return;
     const next = nextDeliveryStatus(delivery.status);
     if (!next) return;
-
-    if (next === 'delivered') {
-      if (!proofUri) {
-        Alert.alert(
-          'Photo obligatoire',
-          'Prenez une photo de vous avec le colis pour prouver la livraison.'
-        );
-        return;
-      }
-    }
-
     setBusy(true);
     setError(null);
     try {
       let proofUrl: string | undefined;
-      if (next === 'delivered' && proofUri && !proofUri.startsWith('http')) {
-        proofUrl = await uploadDeliveryProof(user.id, delivery.id, proofUri);
-      } else if (next === 'delivered' && proofUri?.startsWith('http')) {
-        proofUrl = proofUri;
+      if (next === 'delivered') {
+        Alert.alert(
+          'Preuve de livraison',
+          'Prenez une photo de vous avec le colis pour prouver la remise en bon état.'
+        );
+        const url = await takeProofPhoto();
+        if (!url) {
+          setBusy(false);
+          return;
+        }
+        proofUrl = url;
       }
 
       await updateDeliveryStatusByDriver(driver.id, delivery.id, next, {
@@ -189,7 +192,7 @@ export default function DeliveryDetailScreen() {
       if (next === 'delivered') stopGps();
       await load();
       if (next === 'delivered') {
-        Alert.alert('Livraison validée', 'Le gain sera crédité selon le tarif du lot.');
+        Alert.alert('Livraison validée', 'Preuve enregistrée. Gain crédité selon le tarif du lot.');
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
@@ -200,7 +203,7 @@ export default function DeliveryDetailScreen() {
 
   const refuse = () => {
     if (!driver || !delivery) return;
-    Alert.alert('Refuser la course ?', 'Cette action est définitive pour ce lot.', [
+    Alert.alert('Refuser la course ?', 'Cette action est définitive.', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Refuser',
@@ -294,19 +297,8 @@ export default function DeliveryDetailScreen() {
         </Text>
         <Text style={styles.kind}>
           {delivery.kind === 'order' ? 'Commande marketplace' : 'Colis'}
-          {delivery.batchId ? ' · Lot groupé' : ''}
+          {delivery.offeredFee != null ? ` · Gain lot ${formatXof(delivery.offeredFee)}` : ''}
         </Text>
-
-        {delivery.offeredFee != null && delivery.offeredFee > 0 ? (
-          <Card style={{ marginTop: spacing.md, backgroundColor: '#ECFDF5' }}>
-            <Text style={styles.section}>Rémunération proposée</Text>
-            <Text style={styles.fee}>{formatXof(delivery.offeredFee)}</Text>
-            <Text style={styles.meta}>
-              Fixée par AfriZone — acceptez ou refusez. Délai 2 h pour accepter, puis 2 h pour
-              démarrer.
-            </Text>
-          </Card>
-        ) : null}
 
         <Card style={{ marginTop: spacing.md }}>
           <Text style={styles.section}>Collecte</Text>
@@ -330,6 +322,7 @@ export default function DeliveryDetailScreen() {
           {delivery.recipientPhone ? (
             <Text style={styles.meta}>Tél. : {delivery.recipientPhone}</Text>
           ) : null}
+          {delivery.notes ? <Text style={styles.meta}>Note : {delivery.notes}</Text> : null}
           <Button
             title="Ouvrir Maps (livraison)"
             variant="ghost"
@@ -337,24 +330,6 @@ export default function DeliveryDetailScreen() {
             style={{ marginTop: 10 }}
           />
         </Card>
-
-        {delivery.status === 'in_transit' || next === 'delivered' ? (
-          <Card style={{ marginTop: spacing.md }}>
-            <Text style={styles.section}>Preuve de livraison</Text>
-            <Text style={styles.meta}>
-              Photo de vous avec le colis remis (état visible). Obligatoire pour valider.
-            </Text>
-            {proofUri ? (
-              <Image source={{ uri: proofUri }} style={styles.proof} />
-            ) : null}
-            <Button
-              title={proofUri ? 'Reprendre la photo' : 'Prendre la photo'}
-              variant="secondary"
-              onPress={() => void takeProofPhoto()}
-              style={{ marginTop: 10 }}
-            />
-          </Card>
-        ) : null}
 
         <Card style={{ marginTop: spacing.md }}>
           <Text style={styles.section}>GPS course</Text>
@@ -372,6 +347,16 @@ export default function DeliveryDetailScreen() {
             />
           ) : null}
         </Card>
+
+        {(proofUri || delivery.proofPhotoUrl) && (
+          <Card style={{ marginTop: spacing.md }}>
+            <Text style={styles.section}>Preuve photo</Text>
+            <Image
+              source={{ uri: proofUri || delivery.proofPhotoUrl || undefined }}
+              style={styles.proof}
+            />
+          </Card>
+        )}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -415,10 +400,9 @@ const styles = StyleSheet.create({
   ref: { fontSize: 24, fontWeight: '900', color: colors.ink, marginTop: 12 },
   kind: { color: colors.muted, marginTop: 4 },
   section: { fontWeight: '800', color: colors.ink, marginBottom: 6 },
-  fee: { fontSize: 28, fontWeight: '900', color: colors.success },
   addr: { fontSize: 15, fontWeight: '600', color: colors.ink },
   city: { color: colors.muted, marginTop: 2 },
-  meta: { color: colors.muted, marginTop: 6, fontSize: 13, lineHeight: 18 },
-  proof: { width: '100%', height: 200, borderRadius: 12, marginTop: 10, backgroundColor: '#E5E7EB' },
+  meta: { color: colors.muted, marginTop: 6, fontSize: 13 },
   error: { color: colors.danger, marginTop: 12, fontWeight: '600' },
+  proof: { width: '100%', height: 220, borderRadius: 12, marginTop: 8, backgroundColor: '#E5E7EB' },
 });

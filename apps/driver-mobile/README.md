@@ -26,11 +26,9 @@ npx expo start
 
 - Connexion email / mot de passe Supabase
 - Accueil : en ligne / hors ligne, KPI du jour, solde
-- Courses groupées : prix fixé par l’admin, accepter / refuser (délai 2 h)
-- Workflow : accepter → collecter → en route → **photo preuve** → livrée (+ GPS)
-- Portefeuille : solde, gains (tarif du lot), retrait **vendredi → dimanche**
+- Courses : accepter → collecter → en route → livrée (+ GPS + Maps)
+- Portefeuille : solde, gains, retrait **vendredi → dimanche** (fuseau Ouagadougou)
 - Profil : véhicule, zones, compte OM / Wave / Moov / MTN
-- Partage d’écran autorisé (Meet / Zoom / WhatsApp) — pas d’écran noir
 
 ## Build Android (APK sideload)
 

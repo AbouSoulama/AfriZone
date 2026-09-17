@@ -254,19 +254,19 @@ export default function Header() {
                         className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                       >
                         <LogOut size={14} /> Déconnexion
-                      </button>
+          </button>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="hidden sm:flex items-center gap-2">
-                  <Link to="/auth/login" className="px-4 py-2 text-sm font-semibold text-[#1F2937] hover:text-[#FF6B00] transition-colors">
-                    Connexion
-                  </Link>
+          <div className="hidden sm:flex items-center gap-2">
+            <Link to="/auth/login" className="px-4 py-2 text-sm font-semibold text-[#1F2937] hover:text-[#FF6B00] transition-colors">
+              Connexion
+            </Link>
                   <Link to="/auth/register" className="px-4 py-2 text-sm font-semibold bg-[#00A651] text-white rounded-lg hover:bg-[#008A43] transition-colors shadow-sm">
-                    Inscription
-                  </Link>
-                </div>
+              Inscription
+            </Link>
+          </div>
               )}
 
               <Link
@@ -280,7 +280,7 @@ export default function Header() {
                 }}
               >
                 {isAuthenticated ? <LogOut size={22} /> : <User size={22} />}
-              </Link>
+          </Link>
             </>
           )}
         </div>

@@ -216,21 +216,6 @@ export async function updateDeliveryStatusByDriver(
     if (current !== 'assigned') {
       throw new Error('Seule une course assignée peut être refusée.');
     }
-    if (delivery.batch_id) {
-      const { error: batchErr } = await supabase.rpc('driver_respond_batch', {
-        p_batch_id: delivery.batch_id,
-        p_accept: false,
-      });
-      if (batchErr) throw new Error(batchErr.message);
-      return;
-    }
-  } else if (nextStatus === 'accepted' && current === 'assigned' && delivery.batch_id) {
-    const { error: batchErr } = await supabase.rpc('driver_respond_batch', {
-      p_batch_id: delivery.batch_id,
-      p_accept: true,
-    });
-    if (batchErr) throw new Error(batchErr.message);
-    return;
   } else {
     const expected = nextDeliveryStatus(current);
     if (expected !== nextStatus) {
@@ -240,16 +225,15 @@ export async function updateDeliveryStatusByDriver(
     }
   }
 
-  if (nextStatus === 'delivered' && !opts?.proofPhotoUrl && !delivery.proof_photo_url) {
-    throw new Error('Photo de preuve obligatoire pour valider la livraison.');
-  }
-
   const payload: Record<string, unknown> = { status: nextStatus };
   if (nextStatus === 'accepted') {
     payload.accepted_at = new Date().toISOString();
     payload.start_deadline_at = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
   }
   if (nextStatus === 'delivered') {
+    if (!opts?.proofPhotoUrl && !delivery.proof_photo_url) {
+      throw new Error('Prenez une photo de preuve (vous + le colis) avant de valider la livraison.');
+    }
     payload.delivered_at = new Date().toISOString();
     if (opts?.proofPhotoUrl) {
       payload.proof_photo_url = opts.proofPhotoUrl;
@@ -292,26 +276,6 @@ export async function updateDeliveryStatusByDriver(
       if (parcelErr) throw new Error(`Statut colis : ${parcelErr.message}`);
     }
   }
-}
-
-export async function uploadDeliveryProof(
-  userId: string,
-  deliveryId: string,
-  localUri: string,
-  mimeType = 'image/jpeg'
-): Promise<string> {
-  const ext = mimeType.includes('png') ? 'png' : 'jpg';
-  const path = `${userId}/proofs/${deliveryId}-${Date.now()}.${ext}`;
-  const response = await fetch(localUri);
-  const blob = await response.blob();
-  const arrayBuffer = await new Response(blob).arrayBuffer();
-  const { error } = await supabase.storage.from('delivery-proofs').upload(path, arrayBuffer, {
-    upsert: true,
-    contentType: mimeType,
-  });
-  if (error) throw new Error(error.message);
-  const { data } = supabase.storage.from('delivery-proofs').getPublicUrl(path);
-  return data.publicUrl;
 }
 
 export async function fetchDriverStats(driverId: string) {
@@ -369,6 +333,54 @@ export async function prepareDeliveryRoute(
     .eq('id', deliveryId);
 
   return { distanceKm, etaMinutes };
+}
+
+/** Upload preuve photo (livreur + colis) vers `delivery-proofs`. */
+export async function uploadDeliveryProof(
+  userId: string,
+  deliveryId: string,
+  localUri: string,
+  mimeType = 'image/jpeg'
+): Promise<string> {
+  const ext = mimeType.includes('png') ? 'png' : 'jpg';
+  const path = `${userId}/${deliveryId}/${Date.now()}.${ext}`;
+  const response = await fetch(localUri);
+  const blob = await response.blob();
+  const arrayBuffer = await new Response(blob).arrayBuffer();
+
+  const { error } = await supabase.storage.from('delivery-proofs').upload(path, arrayBuffer, {
+    upsert: true,
+    contentType: mimeType,
+  });
+  if (error) throw new Error(error.message);
+
+  const { data } = supabase.storage.from('delivery-proofs').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+export async function driverRespondBatch(batchId: string, accept: boolean): Promise<void> {
+  const { error } = await supabase.rpc('driver_respond_batch', {
+    p_batch_id: batchId,
+    p_accept: accept,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function fetchOpenBatchesForDriver(driverId: string) {
+  const { data, error } = await supabase
+    .from('delivery_batches')
+    .select('*')
+    .eq('driver_id', driverId)
+    .eq('status', 'offered')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    offeredFee: Number(row.offered_fee ?? 0),
+    acceptDeadlineAt: row.accept_deadline_at as string,
+    notes: (row.notes as string) ?? null,
+    createdAt: row.created_at as string,
+  }));
 }
 
 export async function pushDeliveryLocation(
