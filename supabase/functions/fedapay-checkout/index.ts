@@ -124,9 +124,10 @@ Deno.serve(async (req: Request) => {
     amount?: number;
     phone?: string;
     provider?: string;
-    kind?: 'order' | 'parcel';
+    kind?: 'order' | 'parcel' | 'subscription';
     orderIds?: string[];
     parcelId?: string;
+    subscriptionId?: string;
     transactionId?: string;
     customerName?: string;
     customerEmail?: string;
@@ -197,11 +198,19 @@ Deno.serve(async (req: Request) => {
     const amount = roundXof(Number(payload.amount));
     const phoneRaw = String(payload.phone || '').trim();
     const provider = String(payload.provider || 'fedapay');
-    const kind = payload.kind === 'parcel' ? 'parcel' : 'order';
+    const kind =
+      payload.kind === 'parcel'
+        ? 'parcel'
+        : payload.kind === 'subscription'
+          ? 'subscription'
+          : 'order';
     const transactionId = merchantTxId();
     const payCountry = (payload.country || 'BF').toUpperCase();
 
     if (!amount || amount < 100) return json({ error: 'Montant invalide.' }, 400);
+    if (kind === 'subscription' && !payload.subscriptionId) {
+      return json({ error: 'subscriptionId manquant.' }, 400);
+    }
 
     const appUrl = (payload.returnUrl || Deno.env.get('APP_URL') || '').replace(/\/$/, '');
     // FedaPay accepte souvent HTTPS ; en local on garde localhost pour le retour navigateur.
@@ -240,7 +249,9 @@ Deno.serve(async (req: Request) => {
       description:
         kind === 'parcel'
           ? `Colis AfriZone ${transactionId}`
-          : `Commande AfriZone ${transactionId}`,
+          : kind === 'subscription'
+            ? `Abonnement AfriZone ${transactionId}`
+            : `Commande AfriZone ${transactionId}`,
       amount,
       currency: { iso: 'XOF' },
       custom_metadata: {
@@ -248,6 +259,7 @@ Deno.serve(async (req: Request) => {
         kind,
         provider,
         user_id: user.id,
+        subscription_id: payload.subscriptionId || null,
       },
       customer,
     };
@@ -309,6 +321,7 @@ Deno.serve(async (req: Request) => {
       status: 'pending',
       order_ids: payload.orderIds || [],
       parcel_id: payload.parcelId || null,
+      subscription_id: payload.subscriptionId || null,
       payment_url: paymentUrl,
       operator_name: `fp:${fpTxId}`,
     });

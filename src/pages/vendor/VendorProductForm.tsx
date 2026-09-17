@@ -11,6 +11,8 @@ import {
   updateProduct,
   uploadProductImage,
 } from '../../services/vendor';
+import { fetchActiveSubscription } from '../../services/subscriptions';
+import { PLATFORM_COMMISSION_RATE } from '../../lib/commission';
 
 export default function VendorProductFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +25,7 @@ export default function VendorProductFormPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [commissionRate, setCommissionRate] = useState(PLATFORM_COMMISSION_RATE);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -50,6 +53,15 @@ export default function VendorProductFormPage() {
           return;
         }
         setVendorId(vid);
+
+        try {
+          const sub = await fetchActiveSubscription();
+          if (sub?.audience === 'vendor' && sub.features.commissionPct != null) {
+            setCommissionRate(Number(sub.features.commissionPct));
+          }
+        } catch {
+          /* keep default */
+        }
 
         if (id) {
           const product = await fetchMyProduct(vid, id);
@@ -264,23 +276,29 @@ export default function VendorProductFormPage() {
 
         {Number(price) > 0 && (
           <div className="rounded-2xl border border-[#00A651]/30 bg-green-50/70 p-4 text-sm leading-relaxed">
-            <p className="font-extrabold text-[#008A43] mb-1">Commission AfriZone 10 %</p>
+            <p className="font-extrabold text-[#008A43] mb-1">
+              Commission AfriZone {(commissionRate * 100).toFixed(0)} %
+            </p>
             <p className="text-gray-700">
               Prix affiché au client :{' '}
               <strong>{Math.round(Number(price)).toLocaleString('fr-FR')} FCFA</strong>
             </p>
             <p className="text-gray-700">
-              Commission plateforme (10 %) :{' '}
-              <strong>{Math.round(Number(price) * 0.1).toLocaleString('fr-FR')} FCFA</strong>
+              Commission plateforme ({(commissionRate * 100).toFixed(0)} %) :{' '}
+              <strong>
+                {Math.round(Number(price) * commissionRate).toLocaleString('fr-FR')} FCFA
+              </strong>
             </p>
             <p className="text-gray-700">
               Vous recevez (net) :{' '}
               <strong className="text-[#00A651]">
-                {Math.round(Number(price) * 0.9).toLocaleString('fr-FR')} FCFA
+                {Math.round(Number(price) * (1 - commissionRate)).toLocaleString('fr-FR')} FCFA
               </strong>
             </p>
             <p className="text-xs text-gray-500 mt-2">
-              Tenez compte de cette commission avant de fixer votre prix de vente.
+              {commissionRate < PLATFORM_COMMISSION_RATE
+                ? 'Tarif Business actif (commission réduite).'
+                : 'Tenez compte de cette commission avant de fixer votre prix de vente.'}
             </p>
           </div>
         )}

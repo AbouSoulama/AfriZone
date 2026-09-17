@@ -1,13 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ShoppingBag, Zap, Gift, Truck, Shield, Headphones, RefreshCw } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ShoppingBag,
+  Zap,
+  Gift,
+  Truck,
+  Shield,
+  Headphones,
+  RefreshCw,
+  Megaphone,
+} from 'lucide-react';
+import { fetchActiveAds } from '../services/subscriptions';
 
-const slides = [
+type Slide = {
+  id: string | number;
+  title: string;
+  subtitle: string;
+  description: string;
+  cta: string;
+  to: string;
+  bg: string;
+  accent: string;
+  icon: typeof ShoppingBag;
+  badge: string;
+};
+
+const DEFAULT_SLIDES: Slide[] = [
   {
     id: 1,
     title: 'Bienvenue sur AfriZone',
     subtitle: 'Votre marketplace africaine',
-    description: 'Découvrez des milliers de produits authentiques et soutenez les vendeurs locaux africains.',
+    description:
+      'Découvrez des milliers de produits authentiques et soutenez les vendeurs locaux africains.',
     cta: 'Découvrir maintenant',
     to: '/catalogue',
     bg: 'from-[#FF6B00] via-[#FF8533] to-[#FF6B00]',
@@ -17,9 +43,10 @@ const slides = [
   },
   {
     id: 2,
-    title: '-30% sur l\'Électronique',
+    title: "-30% sur l'Électronique",
     subtitle: 'Offre limitée',
-    description: 'Smartphones, ordinateurs, accessoires — Les meilleures marques aux meilleurs prix.',
+    description:
+      'Smartphones, ordinateurs, accessoires — Les meilleures marques aux meilleurs prix.',
     cta: 'Voir les offres',
     to: '/catalogue?category=%C3%89lectronique',
     bg: 'from-[#00A651] via-[#33B874] to-[#00A651]',
@@ -31,7 +58,8 @@ const slides = [
     id: 3,
     title: 'Livraison Gratuite',
     subtitle: 'Dès 15 000 FCFA',
-    description: 'Profitez de la livraison gratuite sur toutes vos commandes dans Dakar et Ouagadougou.',
+    description:
+      'Profitez de la livraison gratuite sur toutes vos commandes dans Dakar et Ouagadougou.',
     cta: 'Commander',
     to: '/catalogue',
     bg: 'from-[#1F2937] via-[#374151] to-[#1F2937]',
@@ -43,7 +71,8 @@ const slides = [
     id: 4,
     title: 'Envoi de Colis',
     subtitle: 'Partout en Afrique',
-    description: 'Expédiez vos colis en toute sécurité avec notre service de livraison fiable.',
+    description:
+      'Expédiez vos colis en toute sécurité avec notre service de livraison fiable.',
     cta: 'Envoyer un colis',
     to: '/colis',
     bg: 'from-[#FF6B00] via-[#E05E00] to-[#FF6B00]',
@@ -51,6 +80,12 @@ const slides = [
     icon: Gift,
     badge: 'SERVICE',
   },
+];
+
+const AD_BGS = [
+  'from-[#1F2937] via-[#374151] to-[#111827]',
+  'from-[#7C2D12] via-[#C2410C] to-[#9A3412]',
+  'from-[#064E3B] via-[#047857] to-[#065F46]',
 ];
 
 const features = [
@@ -61,14 +96,49 @@ const features = [
 ];
 
 export default function HeroCarousel() {
+  const [adSlides, setAdSlides] = useState<Slide[]>([]);
   const [current, setCurrent] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+    fetchActiveAds('hero')
+      .then((ads) => {
+        if (cancelled) return;
+        setAdSlides(
+          ads.map((ad, i) => ({
+            id: ad.id,
+            title: ad.title,
+            subtitle: ad.subtitle || 'Sponsorisé',
+            description: ad.subtitle || 'Offre partenaire AfriZone Business.',
+            cta: 'Voir',
+            to: ad.linkUrl || '/catalogue',
+            bg: AD_BGS[i % AD_BGS.length],
+            accent: '#FF6B00',
+            icon: Megaphone,
+            badge: 'PUB',
+          }))
+        );
+      })
+      .catch(() => {
+        /* ignore */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const slides = useMemo(
+    () => (adSlides.length ? [...adSlides, ...DEFAULT_SLIDES] : DEFAULT_SLIDES),
+    [adSlides]
+  );
+
+  useEffect(() => {
+    setCurrent(0);
     const timer = setInterval(() => {
       setCurrent((c) => (c + 1) % slides.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [slides.length]);
 
   const next = () => setCurrent((c) => (c + 1) % slides.length);
   const prev = () => setCurrent((c) => (c - 1 + slides.length) % slides.length);
@@ -88,8 +158,6 @@ export default function HeroCarousel() {
               <div className="absolute inset-0 overflow-hidden">
                 <div className="absolute -top-20 -right-20 w-72 h-72 bg-white/10 rounded-full blur-3xl" />
                 <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-white/10 rounded-full blur-3xl" />
-                <div className="absolute top-10 right-20 w-32 h-32 border-4 border-white/20 rounded-full" />
-                <div className="absolute bottom-10 left-10 w-20 h-20 border-4 border-white/20 rounded-full" />
               </div>
 
               <div className="relative z-10 h-full flex items-center max-w-7xl mx-auto px-8 md:px-16">
@@ -100,9 +168,7 @@ export default function HeroCarousel() {
                   <h2 className="text-3xl md:text-5xl font-extrabold mb-2 leading-tight">
                     {slide.title}
                   </h2>
-                  <p className="text-lg md:text-xl font-semibold mb-3 opacity-90">
-                    {slide.subtitle}
-                  </p>
+                  <p className="text-lg md:text-xl font-semibold mb-3 opacity-90">{slide.subtitle}</p>
                   <p className="text-sm md:text-base opacity-80 mb-6 leading-relaxed">
                     {slide.description}
                   </p>
@@ -155,7 +221,10 @@ export default function HeroCarousel() {
         {features.map((item, i) => {
           const Icon = item.icon;
           return (
-            <div key={i} className="flex items-center gap-2 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition-shadow">
+            <div
+              key={i}
+              className="flex items-center gap-2 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition-shadow"
+            >
               <Icon size={20} style={{ color: item.color }} />
               <span className="text-xs font-semibold text-[#1F2937]">{item.text}</span>
             </div>

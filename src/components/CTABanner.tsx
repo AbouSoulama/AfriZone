@@ -1,5 +1,7 @@
 import { Package, Truck, MapPin, Clock, Shield, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { fetchActiveAds, type AdPlacement } from '../services/subscriptions';
 
 const features = [
   { icon: Truck, title: 'Livraison rapide', desc: '24-48h en ville' },
@@ -9,8 +11,27 @@ const features = [
 ];
 
 export default function CTABanner() {
+  const [sponsor, setSponsor] = useState<AdPlacement | null>(null);
+
+  useEffect(() => {
+    fetchActiveAds('home_banner')
+      .then((ads) => setSponsor(ads[0] || null))
+      .catch(() => setSponsor(null));
+  }, []);
+
   return (
-    <section className="max-w-7xl mx-auto px-4 py-10">
+    <section className="max-w-7xl mx-auto px-4 py-10 space-y-6">
+      {sponsor && (
+        <Link
+          to={sponsor.linkUrl || '/catalogue'}
+          className="block rounded-3xl border-2 border-[#FF6B00]/40 bg-gradient-to-r from-orange-50 to-white p-6 md:p-8 hover:shadow-md transition-shadow"
+        >
+          <p className="text-[10px] font-bold tracking-wider text-[#FF6B00] mb-2">SPONSORISÉ</p>
+          <h3 className="text-2xl font-extrabold text-[#1F2937]">{sponsor.title}</h3>
+          {sponsor.subtitle && <p className="text-sm text-gray-600 mt-1">{sponsor.subtitle}</p>}
+        </Link>
+      )}
+
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#00A651] via-[#00A651] to-[#008A43] p-8 md:p-12">
         <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full -translate-y-32 translate-x-32" />
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/10 rounded-full translate-y-20 -translate-x-20" />

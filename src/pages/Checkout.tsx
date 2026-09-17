@@ -9,6 +9,7 @@ import { formatPrice } from '../services/catalog';
 import { placeOrders } from '../services/orders';
 import { fetchDefaultAddress, fetchMyAddresses, type AddressView } from '../services/account';
 import { isFedaPaySandbox, isLivePayment, startCheckout } from '../services/payments';
+import { previewClubShippingDiscount } from '../services/subscriptions';
 import {
   CATALOG_COUNTRIES,
   CITIES_BY_COUNTRY,
@@ -32,11 +33,14 @@ export default function CheckoutPage() {
   const [notes, setNotes] = useState('');
   const [shippingLat, setShippingLat] = useState<number | null>(null);
   const [shippingLng, setShippingLng] = useState<number | null>(null);
+  const [manualLat, setManualLat] = useState('');
+  const [manualLng, setManualLng] = useState('');
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoHint, setGeoHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [doneIds, setDoneIds] = useState<string[] | null>(null);
+  const [clubDiscount, setClubDiscount] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -58,9 +62,13 @@ export default function CheckoutPage() {
           if (def.lat != null && def.lng != null) {
             setShippingLat(def.lat);
             setShippingLng(def.lng);
+            setManualLat(String(def.lat));
+            setManualLng(String(def.lng));
             setGeoHint('Position reprise depuis votre adresse enregistrée.');
           }
         }
+        const disc = await previewClubShippingDiscount();
+        setClubDiscount(disc);
       } catch {
         /* ignore */
       }
@@ -82,12 +90,45 @@ export default function CheckoutPage() {
     if (a.lat != null && a.lng != null) {
       setShippingLat(a.lat);
       setShippingLng(a.lng);
+      setManualLat(String(a.lat));
+      setManualLng(String(a.lng));
       setGeoHint('Position reprise depuis votre adresse enregistrée.');
     } else {
       setShippingLat(null);
       setShippingLng(null);
+      setManualLat('');
+      setManualLng('');
       setGeoHint(null);
     }
+  };
+
+  const syncManualFields = (lat: number | null, lng: number | null) => {
+    setManualLat(lat != null ? String(lat) : '');
+    setManualLng(lng != null ? String(lng) : '');
+  };
+
+  const applyManualCoords = (latStr: string, lngStr: string) => {
+    setManualLat(latStr);
+    setManualLng(lngStr);
+    const lat = Number(latStr.replace(',', '.'));
+    const lng = Number(lngStr.replace(',', '.'));
+    if (!latStr.trim() && !lngStr.trim()) {
+      setShippingLat(null);
+      setShippingLng(null);
+      setGeoHint(null);
+      return;
+    }
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      setGeoHint('Saisissez des nombres valides pour latitude et longitude.');
+      return;
+    }
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      setGeoHint('Latitude (−90…90) et longitude (−180…180) hors plage.');
+      return;
+    }
+    setShippingLat(lat);
+    setShippingLng(lng);
+    setGeoHint('Position saisie manuellement (livraison à un autre lieu).');
   };
 
   const captureLocation = () => {
@@ -101,6 +142,7 @@ export default function CheckoutPage() {
       (pos) => {
         setShippingLat(pos.coords.latitude);
         setShippingLng(pos.coords.longitude);
+        syncManualFields(pos.coords.latitude, pos.coords.longitude);
         setGeoHint(
           `Position capturée (±${Math.round(pos.coords.accuracy || 0)} m). Le livreur pourra s’y rendre.`
         );
@@ -121,6 +163,7 @@ export default function CheckoutPage() {
   const clearLocation = () => {
     setShippingLat(null);
     setShippingLng(null);
+    syncManualFields(null, null);
     setGeoHint(null);
   };
 
@@ -196,8 +239,10 @@ export default function CheckoutPage() {
       });
 
       if (live) {
+        const shipCut = Math.min(clubDiscount, summary?.shippingEstimate ?? 0);
+        const payAmount = Math.max(0, (summary?.total ?? 0) - shipCut);
         const checkout = await startCheckout({
-          amount: summary?.total ?? 0,
+          amount: payAmount,
           phone,
           provider: 'mobile_money',
           kind: 'order',
@@ -341,6 +386,39 @@ export default function CheckoutPage() {
                   </button>
                 )}
               </div>
+              <div className="pt-1">
+                <p className="text-xs font-bold text-gray-700 mb-2">
+                  Ou saisie manuelle (autre lieu de livraison)
+                </p>
+                <p className="text-[11px] text-gray-500 mb-2 leading-relaxed">
+                  Collez les coordonnées depuis Google Maps si la livraison doit se faire ailleurs
+                  que votre position actuelle.
+                </p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">Latitude</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={manualLat}
+                      onChange={(e) => applyManualCoords(e.target.value, manualLng)}
+                      placeholder="ex. 12.37140"
+                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-[#00A651] focus:outline-none bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">Longitude</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={manualLng}
+                      onChange={(e) => applyManualCoords(manualLat, e.target.value)}
+                      placeholder="ex. -1.51966"
+                      className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-[#00A651] focus:outline-none bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
               {shippingLat != null && shippingLng != null ? (
                 <p className="text-xs font-semibold text-[#00A651]">
                   ✓ GPS enregistré : {shippingLat.toFixed(5)}, {shippingLng.toFixed(5)}
@@ -422,9 +500,28 @@ export default function CheckoutPage() {
                 <span className="text-gray-500">Livraison</span>
                 <span>{formatPrice(summary?.shippingEstimate ?? 0)}</span>
               </div>
+              {clubDiscount > 0 && (
+                <div className="flex justify-between text-[#00A651] font-semibold">
+                  <span>Remise AfriZone Club</span>
+                  <span>
+                    −
+                    {formatPrice(
+                      Math.min(clubDiscount, summary?.shippingEstimate ?? clubDiscount)
+                    )}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between text-base font-extrabold">
                 <span>Total à payer</span>
-                <span className="text-[#FF6B00]">{formatPrice(summary?.total ?? 0)}</span>
+                <span className="text-[#FF6B00]">
+                  {formatPrice(
+                    Math.max(
+                      0,
+                      (summary?.total ?? 0) -
+                        Math.min(clubDiscount, summary?.shippingEstimate ?? 0)
+                    )
+                  )}
+                </span>
               </div>
             </div>
             <p

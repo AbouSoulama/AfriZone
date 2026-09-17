@@ -63,7 +63,11 @@ export default function PaymentReturnPage() {
 
         if (paid) {
           setPhase('paid');
-          setMessage('Paiement confirmé.');
+          setMessage(
+            nextKind === 'subscription'
+              ? 'Abonnement activé. Merci !'
+              : 'Paiement confirmé.'
+          );
           return;
         }
 
@@ -128,6 +132,13 @@ export default function PaymentReturnPage() {
                 className="rounded-xl bg-[#FF6B00] py-3 font-bold text-white"
               >
                 Voir mes envois
+              </Link>
+            ) : kind === 'subscription' ? (
+              <Link
+                to="/compte/abonnement"
+                className="rounded-xl bg-[#FF6B00] py-3 font-bold text-white"
+              >
+                Voir mon abonnement
               </Link>
             ) : (
               <Link

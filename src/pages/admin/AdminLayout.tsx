@@ -12,6 +12,7 @@ import {
   Users,
   UserSquare2,
   Wallet,
+  Crown,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -29,6 +30,7 @@ const NAV = [
   { to: '/admin/suivi-gps', label: 'Suivi GPS', icon: MapPin },
   { to: '/admin/livraisons', label: 'Courses', icon: Truck },
   { to: '/admin/retraits', label: 'Retraits', icon: Wallet },
+  { to: '/admin/abonnements', label: 'Abonnements', icon: Crown },
   { to: '/admin/colis', label: 'Colis', icon: Package },
 ];
 

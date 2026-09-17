@@ -11,6 +11,8 @@ import { fetchFeaturedVendors } from '../services/catalog';
 import { useCountry } from '../context/CountryContext';
 import VendorBadges from './vendors/VendorBadges';
 import { countryLabel, type CatalogVendor } from '../types/catalog';
+import { fetchActiveAds } from '../services/subscriptions';
+import { supabase } from '../lib/supabase';
 
 function SellerCard({ seller }: { seller: CatalogVendor }) {
   return (
@@ -86,12 +88,50 @@ export default function Sellers() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchFeaturedVendors(8, country).then((list) => {
+    (async () => {
+      const [list, ads] = await Promise.all([
+        fetchFeaturedVendors(8, country),
+        fetchActiveAds('featured_vendor').catch(() => []),
+      ]);
+      let ordered = list;
+      const sponsoredIds = ads.map((a) => a.vendorId).filter(Boolean) as string[];
+      if (sponsoredIds.length) {
+        const missing = sponsoredIds.filter((id) => !list.some((v) => v.id === id));
+        let extra: CatalogVendor[] = [];
+        if (missing.length) {
+          const { data } = await supabase
+            .from('vendors')
+            .select('*')
+            .in('id', missing)
+            .eq('status', 'approved');
+          extra = (data || []).map((row) => ({
+            id: row.id as string,
+            shopName: row.shop_name as string,
+            shopSlug: row.shop_slug as string,
+            shopDescription: (row.shop_description as string) ?? null,
+            shopCategory: (row.shop_category as string) ?? null,
+            shopLogoUrl: (row.shop_logo_url as string) ?? null,
+            vendorCode: row.vendor_code as string,
+            country: row.country as string,
+            city: row.city as string,
+            rating: Number(row.rating ?? 0),
+            reviewCount: Number(row.review_count ?? 0),
+            totalSales: Number(row.total_sales ?? 0),
+            status: row.status as string,
+            isGoldSeller: Boolean(row.is_gold_seller),
+            isTopRated: Boolean(row.is_top_rated),
+          }));
+        }
+        const byId = new Map([...list, ...extra].map((v) => [v.id, v]));
+        const boosted = sponsoredIds.map((id) => byId.get(id)).filter(Boolean) as CatalogVendor[];
+        const rest = list.filter((v) => !sponsoredIds.includes(v.id));
+        ordered = [...boosted, ...rest].slice(0, 8);
+      }
       if (!cancelled) {
-        setSellers(list);
+        setSellers(ordered);
         setLoading(false);
       }
-    });
+    })();
     return () => {
       cancelled = true;
     };

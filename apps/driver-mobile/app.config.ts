@@ -45,7 +45,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: [
       'expo-image',
-      'expo-screen-capture',
       [
         'expo-image-picker',
         {

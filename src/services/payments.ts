@@ -76,9 +76,10 @@ export interface StartCheckoutInput {
   amount: number;
   phone: string;
   provider: MobileMoneyProvider;
-  kind: 'order' | 'parcel';
+  kind: 'order' | 'parcel' | 'subscription';
   orderIds?: string[];
   parcelId?: string;
+  subscriptionId?: string;
   customerName?: string;
   customerEmail?: string | null;
   country?: string;
@@ -161,6 +162,7 @@ export async function startCheckout(input: StartCheckoutInput): Promise<StartChe
       kind: input.kind,
       orderIds: input.orderIds,
       parcelId: input.parcelId,
+      subscriptionId: input.subscriptionId,
       customerName: input.customerName,
       customerEmail: input.customerEmail,
       country: input.country,

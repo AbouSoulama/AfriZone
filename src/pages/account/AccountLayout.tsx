@@ -1,5 +1,5 @@
 import { Link, NavLink, Navigate, Outlet } from 'react-router-dom';
-import { MapPin, User } from 'lucide-react';
+import { Crown, MapPin, User } from 'lucide-react';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 import { useAuth } from '../../context/AuthContext';
@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 const nav = [
   { to: '/compte', end: true, label: 'Mon profil', icon: User },
   { to: '/compte/adresses', end: false, label: 'Mes adresses', icon: MapPin },
+  { to: '/compte/abonnement', end: false, label: 'Abonnement', icon: Crown },
 ];
 
 export default function AccountLayout() {

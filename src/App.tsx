@@ -29,6 +29,7 @@ import NotificationsPage from './pages/Notifications';
 import AccountLayout from './pages/account/AccountLayout';
 import AccountProfilePage from './pages/account/AccountProfile';
 import AccountAddressesPage from './pages/account/AccountAddresses';
+import AccountSubscriptionPage from './pages/account/AccountSubscription';
 import VendorLayout from './pages/vendor/VendorLayout';
 import VendorDashboard from './pages/vendor/VendorDashboard';
 import VendorProductsPage from './pages/vendor/VendorProducts';
@@ -37,6 +38,7 @@ import VendorOrdersPage from './pages/vendor/VendorOrders';
 import VendorOrderDetailPage from './pages/vendor/VendorOrderDetail';
 import VendorDeliveriesPage from './pages/vendor/VendorDeliveries';
 import VendorDeliveryDetailPage from './pages/vendor/VendorDeliveryDetail';
+import VendorSubscriptionPage from './pages/vendor/VendorSubscription';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboardPage from './pages/admin/AdminDashboard';
 import AdminOrdersPage from './pages/admin/AdminOrders';
@@ -48,6 +50,7 @@ import AdminParcelsPage from './pages/admin/AdminParcels';
 import AdminUsersPage from './pages/admin/AdminUsers';
 import AdminCatalogPage from './pages/admin/AdminCatalog';
 import AdminWithdrawalsPage from './pages/admin/AdminWithdrawals';
+import AdminSubscriptionsPage from './pages/admin/AdminSubscriptions';
 import DeliveryTrackPage from './pages/DeliveryTrack';
 import PaymentReturnPage from './pages/PaymentReturn';
 import TermsPage from './pages/legal/Terms';
@@ -148,6 +151,7 @@ export default function App() {
                 <Route path="/compte" element={<AccountLayout />}>
                   <Route index element={<AccountProfilePage />} />
                   <Route path="adresses" element={<AccountAddressesPage />} />
+                  <Route path="abonnement" element={<AccountSubscriptionPage />} />
                 </Route>
 
               <Route path="/cgu" element={<TermsPage />} />
@@ -179,6 +183,7 @@ export default function App() {
                 <Route path="produits" element={<VendorProductsPage />} />
                 <Route path="produits/nouveau" element={<VendorProductFormPage />} />
                 <Route path="produits/:id" element={<VendorProductFormPage />} />
+                <Route path="abonnement" element={<VendorSubscriptionPage />} />
               </Route>
 
               <Route
@@ -211,6 +216,7 @@ export default function App() {
                 <Route path="suivi-gps" element={<AdminDriversTrackPage />} />
                 <Route path="livraisons" element={<AdminDeliveriesPage />} />
                 <Route path="retraits" element={<AdminWithdrawalsPage />} />
+                <Route path="abonnements" element={<AdminSubscriptionsPage />} />
                 <Route path="colis" element={<AdminParcelsPage />} />
               </Route>
             </Routes>

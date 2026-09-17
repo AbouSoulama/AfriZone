@@ -229,6 +229,7 @@ export async function fetchFeaturedVendors(
   }
 
   const { data, error } = await query
+    .order('subscription_boost', { ascending: false })
     .order('rating', { ascending: false })
     .order('total_sales', { ascending: false })
     .limit(limit);

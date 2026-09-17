@@ -132,11 +132,44 @@ export async function placeOrders(
   }`;
   const notesParts = [input.notes?.trim(), paymentNote].filter(Boolean);
 
+  // Remise Club : 1 crédit max par checkout
+  let clubDiscountLeft = 0;
+  const { data: previewDisc } = await supabase.rpc('preview_club_shipping_discount', {
+    p_user_id: userId,
+  });
+  if (Number(previewDisc) > 0) {
+    const { data: consumed } = await supabase.rpc('consume_club_shipping_credit', {
+      p_user_id: userId,
+    });
+    clubDiscountLeft = Math.max(0, Number(consumed ?? 0));
+  }
+
+  // Commissions vendeur (Business = 7 %)
+  const vendorIds = [...groups.keys()];
+  const { data: vendorRows } = await supabase
+    .from('vendors')
+    .select('id, subscription_commission_pct')
+    .in('id', vendorIds);
+  const commissionByVendor = new Map<string, number>();
+  for (const v of vendorRows || []) {
+    const pct =
+      v.subscription_commission_pct != null
+        ? Number(v.subscription_commission_pct)
+        : 0.1;
+    commissionByVendor.set(v.id as string, Number.isFinite(pct) ? pct : 0.1);
+  }
+
   for (const [vendorId, items] of groups) {
     const subtotal = items.reduce((s, i) => s + i.product.price * i.quantity, 0);
-    const shippingCost = Math.max(...items.map((i) => estimateItemShipping(i.product)));
+    let shippingCost = Math.max(...items.map((i) => estimateItemShipping(i.product)));
+    if (clubDiscountLeft > 0 && shippingCost > 0) {
+      const cut = Math.min(clubDiscountLeft, shippingCost);
+      shippingCost -= cut;
+      clubDiscountLeft -= cut;
+    }
     const total = subtotal + shippingCost;
     const orderNumber = generateClientOrderNumber();
+    const rate = commissionByVendor.get(vendorId) ?? 0.1;
 
     const { data: order, error } = await supabase
       .from('orders')
@@ -171,7 +204,7 @@ export async function placeOrders(
 
     const orderItems = items.map((i) => {
       const lineTotal = i.product.price * i.quantity;
-      const platformFee = Math.round(lineTotal * 0.1);
+      const platformFee = Math.round(lineTotal * rate);
       return {
         order_id: order.id,
         product_id: i.productId,
