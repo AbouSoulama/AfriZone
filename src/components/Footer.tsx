@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, MapPin, Send, CreditCard, Truck, Shield, Headphones } from 'lucide-react';
+import { Mail, MapPin, Send, CreditCard, Truck, Shield, Headphones, CheckCircle } from 'lucide-react';
+import { useCountry } from '../context/CountryContext';
+import { subscribeNewsletter } from '../services/newsletter';
 
 const SocialIcon = ({ path }: { path: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
@@ -25,6 +28,7 @@ const socials = [
 const footerColumns: Record<string, Array<{ label: string; to: string }>> = {
   Acheter: [
     { label: 'Catalogue', to: '/catalogue' },
+    { label: 'Abonnements', to: '/abonnements' },
     { label: 'FAQ', to: '/faq' },
     { label: 'Suivre ma commande', to: '/commandes' },
     { label: 'Suivi colis', to: '/suivi' },
@@ -33,6 +37,7 @@ const footerColumns: Record<string, Array<{ label: string; to: string }>> = {
   Vendre: [
     { label: 'Devenir vendeur', to: '/auth/register/vendor' },
     { label: 'Espace vendeur', to: '/vendeur' },
+    { label: 'Abonnement vendeur', to: '/vendeur/abonnement' },
     { label: 'CGU', to: '/cgu' },
   ],
   Livrer: [
@@ -50,6 +55,28 @@ const footerColumns: Record<string, Array<{ label: string; to: string }>> = {
 };
 
 export default function Footer() {
+  const { country } = useCountry();
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const onNewsletter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setMsg(null);
+    setErr(null);
+    try {
+      await subscribeNewsletter(email, country);
+      setMsg('Merci ! Vous êtes inscrit(e) à la newsletter AfriZone.');
+      setEmail('');
+    } catch (ex) {
+      setErr(ex instanceof Error ? ex.message : 'Inscription impossible.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <footer className="bg-[#1F2937] text-white">
       <div className="border-b border-gray-700">
@@ -61,26 +88,37 @@ export default function Footer() {
                 Recevez nos meilleures offres et nouveautés directement dans votre boîte mail.
               </p>
             </div>
-            <form
-              className="flex gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-              }}
-            >
-              <div className="flex-1 relative">
-                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="email"
-                  placeholder="Votre adresse email"
-                  className="w-full pl-12 pr-4 py-3.5 bg-gray-800 border border-gray-700 rounded-xl text-sm focus:border-[#FF6B00] focus:outline-none text-white placeholder-gray-500"
-                />
+            <form className="space-y-2" onSubmit={onNewsletter}>
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Votre adresse email"
+                    className="w-full pl-12 pr-4 py-3.5 bg-gray-800 border border-gray-700 rounded-xl text-sm focus:border-[#FF6B00] focus:outline-none text-white placeholder-gray-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="px-6 py-3.5 bg-[#FF6B00] hover:bg-[#E05E00] disabled:opacity-60 rounded-xl font-bold text-sm flex items-center gap-2 transition-colors shrink-0"
+                >
+                  {busy ? '…' : (
+                    <>
+                      S&apos;abonner <Send size={14} />
+                    </>
+                  )}
+                </button>
               </div>
-              <button
-                type="submit"
-                className="px-6 py-3.5 bg-[#FF6B00] hover:bg-[#E05E00] rounded-xl font-bold text-sm flex items-center gap-2 transition-colors shrink-0"
-              >
-                S&apos;abonner <Send size={14} />
-              </button>
+              {msg && (
+                <p className="text-xs text-[#00A651] font-semibold flex items-center gap-1">
+                  <CheckCircle size={14} /> {msg}
+                </p>
+              )}
+              {err && <p className="text-xs text-red-400 font-semibold">{err}</p>}
             </form>
           </div>
         </div>
@@ -126,8 +164,13 @@ export default function Footer() {
               La marketplace ouest-africaine qui connecte acheteurs, vendeurs et livreurs.
             </p>
             <div className="space-y-2 text-sm text-gray-400">
-              <div className="flex items-center gap-2">
-                <MapPin size={14} className="text-[#FF6B00]" /> Route de Ngor, Dakar, Sénégal
+              <div className="flex items-start gap-2">
+                <MapPin size={14} className="text-[#FF6B00] mt-0.5 shrink-0" />
+                <span>
+                  Présents au <strong className="text-gray-300">Burkina Faso</strong>, au{' '}
+                  <strong className="text-gray-300">Mali</strong> et au{' '}
+                  <strong className="text-gray-300">Sénégal</strong>
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <Mail size={14} className="text-[#FF6B00]" /> contact@afrizone.com

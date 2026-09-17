@@ -51,6 +51,7 @@ export default function VendorSubscriptionPage() {
   const [adTitle, setAdTitle] = useState('');
   const [adSubtitle, setAdSubtitle] = useState('');
   const [adLink, setAdLink] = useState('/catalogue');
+  const [adImage, setAdImage] = useState('');
   const [adSlot, setAdSlot] = useState<AdSlot>('hero');
   const [adBusy, setAdBusy] = useState(false);
 
@@ -126,12 +127,14 @@ export default function VendorSubscriptionPage() {
         slot: adSlot,
         title: adTitle,
         subtitle: adSubtitle,
-        linkUrl: adLink || '/catalogue',
+        linkUrl: adLink || (user.vendor?.shopSlug ? `/boutique/${user.vendor.shopSlug}` : '/catalogue'),
+        imageUrl: adImage || undefined,
       });
       await setAdStatus(ad.id, 'active');
-      setOkMsg('Publicité créée et active (soumise).');
+      setOkMsg('Publicité créée — elle apparaît sur l’accueil (hero / bandeau).');
       setAdTitle('');
       setAdSubtitle('');
+      setAdImage('');
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur pub');
@@ -271,12 +274,21 @@ export default function VendorSubscriptionPage() {
                 placeholder="/boutique/mon-slug"
               />
             </div>
+            <div>
+              <label className="block text-sm font-bold mb-1">Image (URL)</label>
+              <input
+                value={adImage}
+                onChange={(e) => setAdImage(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl"
+                placeholder="https://… (logo boutique utilisé si vide)"
+              />
+            </div>
             <button
               type="submit"
               disabled={adBusy}
               className="px-5 py-3 bg-[#00A651] text-white rounded-xl font-bold disabled:opacity-60"
             >
-              {adBusy ? 'Publication…' : 'Publier'}
+              {adBusy ? 'Publication…' : 'Publier sur l’accueil'}
             </button>
           </form>
 

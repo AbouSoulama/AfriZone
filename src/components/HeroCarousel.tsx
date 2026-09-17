@@ -4,15 +4,15 @@ import {
   ChevronLeft,
   ChevronRight,
   ShoppingBag,
-  Zap,
   Gift,
-  Truck,
+  Zap,
   Shield,
   Headphones,
   RefreshCw,
   Megaphone,
 } from 'lucide-react';
 import { fetchActiveAds } from '../services/subscriptions';
+import { supabase } from '../lib/supabase';
 
 type Slide = {
   id: string | number;
@@ -25,67 +25,43 @@ type Slide = {
   accent: string;
   icon: typeof ShoppingBag;
   badge: string;
+  imageUrl?: string | null;
 };
 
-const DEFAULT_SLIDES: Slide[] = [
+/** Slides plateforme uniquement (pas de fausses promos) — les pubs Business viennent de la DB */
+const PLATFORM_SLIDES: Slide[] = [
   {
-    id: 1,
+    id: 'brand',
     title: 'Bienvenue sur AfriZone',
-    subtitle: 'Votre marketplace africaine',
+    subtitle: 'Marketplace ouest-africaine',
     description:
-      'Découvrez des milliers de produits authentiques et soutenez les vendeurs locaux africains.',
-    cta: 'Découvrir maintenant',
+      'Achetez, vendez et expédiez au Burkina Faso, au Mali et au Sénégal — vendeurs locaux, livraison suivie.',
+    cta: 'Découvrir le catalogue',
     to: '/catalogue',
     bg: 'from-[#FF6B00] via-[#FF8533] to-[#FF6B00]',
     accent: '#00A651',
     icon: ShoppingBag,
-    badge: 'NOUVEAU',
+    badge: 'AFRIZONE',
   },
   {
-    id: 2,
-    title: "-30% sur l'Électronique",
-    subtitle: 'Offre limitée',
-    description:
-      'Smartphones, ordinateurs, accessoires — Les meilleures marques aux meilleurs prix.',
-    cta: 'Voir les offres',
-    to: '/catalogue?category=%C3%89lectronique',
-    bg: 'from-[#00A651] via-[#33B874] to-[#00A651]',
-    accent: '#FF6B00',
-    icon: Zap,
-    badge: 'PROMO',
-  },
-  {
-    id: 3,
-    title: 'Livraison Gratuite',
-    subtitle: 'Dès 15 000 FCFA',
-    description:
-      'Profitez de la livraison gratuite sur toutes vos commandes dans Dakar et Ouagadougou.',
-    cta: 'Commander',
-    to: '/catalogue',
-    bg: 'from-[#1F2937] via-[#374151] to-[#1F2937]',
-    accent: '#FF6B00',
-    icon: Truck,
-    badge: 'LIVRAISON',
-  },
-  {
-    id: 4,
+    id: 'colis',
     title: 'Envoi de Colis',
-    subtitle: 'Partout en Afrique',
+    subtitle: 'Entre nos villes partenaires',
     description:
-      'Expédiez vos colis en toute sécurité avec notre service de livraison fiable.',
+      'Expédiez vos colis en toute sécurité avec suivi — Ouagadougou, Bamako, Dakar et plus.',
     cta: 'Envoyer un colis',
     to: '/colis',
-    bg: 'from-[#FF6B00] via-[#E05E00] to-[#FF6B00]',
-    accent: '#00A651',
+    bg: 'from-[#1F2937] via-[#374151] to-[#1F2937]',
+    accent: '#FF6B00',
     icon: Gift,
     badge: 'SERVICE',
   },
 ];
 
 const AD_BGS = [
-  'from-[#1F2937] via-[#374151] to-[#111827]',
-  'from-[#7C2D12] via-[#C2410C] to-[#9A3412]',
   'from-[#064E3B] via-[#047857] to-[#065F46]',
+  'from-[#7C2D12] via-[#C2410C] to-[#9A3412]',
+  'from-[#1E3A8A] via-[#2563EB] to-[#1D4ED8]',
 ];
 
 const features = [
@@ -101,42 +77,73 @@ export default function HeroCarousel() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchActiveAds('hero')
-      .then((ads) => {
-        if (cancelled) return;
+    (async () => {
+      try {
+        const ads = await fetchActiveAds('hero');
+        if (cancelled || !ads.length) {
+          if (!cancelled) setAdSlides([]);
+          return;
+        }
+        const vendorIds = [...new Set(ads.map((a) => a.vendorId).filter(Boolean))] as string[];
+        const vendorMap = new Map<string, { shopName: string; shopSlug: string; logo: string | null }>();
+        if (vendorIds.length) {
+          const { data } = await supabase
+            .from('vendors')
+            .select('id, shop_name, shop_slug, shop_logo_url')
+            .in('id', vendorIds);
+          for (const v of data || []) {
+            vendorMap.set(v.id as string, {
+              shopName: v.shop_name as string,
+              shopSlug: v.shop_slug as string,
+              logo: (v.shop_logo_url as string) ?? null,
+            });
+          }
+        }
         setAdSlides(
-          ads.map((ad, i) => ({
-            id: ad.id,
-            title: ad.title,
-            subtitle: ad.subtitle || 'Sponsorisé',
-            description: ad.subtitle || 'Offre partenaire AfriZone Business.',
-            cta: 'Voir',
-            to: ad.linkUrl || '/catalogue',
-            bg: AD_BGS[i % AD_BGS.length],
-            accent: '#FF6B00',
-            icon: Megaphone,
-            badge: 'PUB',
-          }))
+          ads.map((ad, i) => {
+            const vendor = ad.vendorId ? vendorMap.get(ad.vendorId) : undefined;
+            const link =
+              ad.linkUrl ||
+              (vendor?.shopSlug ? `/boutique/${vendor.shopSlug}` : '/catalogue');
+            return {
+              id: ad.id,
+              title: ad.title,
+              subtitle: ad.subtitle || vendor?.shopName || 'Offre partenaire',
+              description:
+                ad.subtitle ||
+                (vendor
+                  ? `Boutique ${vendor.shopName} — sponsorisée AfriZone Business.`
+                  : 'Publicité vendeur AfriZone Business.'),
+              cta: vendor ? 'Voir la boutique' : 'Découvrir',
+              to: link,
+              bg: AD_BGS[i % AD_BGS.length],
+              accent: '#FF6B00',
+              icon: Megaphone,
+              badge: 'SPONSORISÉ',
+              imageUrl: ad.imageUrl || vendor?.logo || null,
+            };
+          })
         );
-      })
-      .catch(() => {
-        /* ignore */
-      });
+      } catch {
+        if (!cancelled) setAdSlides([]);
+      }
+    })();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const slides = useMemo(
-    () => (adSlides.length ? [...adSlides, ...DEFAULT_SLIDES] : DEFAULT_SLIDES),
-    [adSlides]
-  );
+  const slides = useMemo(() => {
+    // Pubs Business en premier (réelles), puis slides plateforme
+    if (adSlides.length) return [...adSlides, ...PLATFORM_SLIDES];
+    return PLATFORM_SLIDES;
+  }, [adSlides]);
 
   useEffect(() => {
     setCurrent(0);
     const timer = setInterval(() => {
       setCurrent((c) => (c + 1) % slides.length);
-    }, 5000);
+    }, 5500);
     return () => clearInterval(timer);
   }, [slides.length]);
 
@@ -155,10 +162,22 @@ export default function HeroCarousel() {
                 i === current ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
               }`}
             >
-              <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute -top-20 -right-20 w-72 h-72 bg-white/10 rounded-full blur-3xl" />
-                <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-white/10 rounded-full blur-3xl" />
-              </div>
+              {slide.imageUrl && (
+                <>
+                  <img
+                    src={slide.imageUrl}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/55 to-black/30" />
+                </>
+              )}
+              {!slide.imageUrl && (
+                <div className="absolute inset-0 overflow-hidden">
+                  <div className="absolute -top-20 -right-20 w-72 h-72 bg-white/10 rounded-full blur-3xl" />
+                  <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-white/10 rounded-full blur-3xl" />
+                </div>
+              )}
 
               <div className="relative z-10 h-full flex items-center max-w-7xl mx-auto px-8 md:px-16">
                 <div className="flex-1 text-white max-w-xl">
@@ -182,9 +201,19 @@ export default function HeroCarousel() {
                   </Link>
                 </div>
                 <div className="hidden md:flex flex-shrink-0 ml-8">
-                  <div className="w-52 h-52 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                    <Icon size={100} className="text-white drop-shadow-lg" />
-                  </div>
+                  {slide.imageUrl ? (
+                    <div className="w-52 h-52 rounded-3xl overflow-hidden border-4 border-white/30 shadow-2xl bg-white/10">
+                      <img
+                        src={slide.imageUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-52 h-52 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                      <Icon size={100} className="text-white drop-shadow-lg" />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

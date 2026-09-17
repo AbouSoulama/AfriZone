@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Camera } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { updateMyProfile, uploadAvatar } from '../../services/account';
@@ -61,6 +62,22 @@ export default function AccountProfilePage() {
   };
 
   return (
+    <div className="space-y-6">
+      <div className="bg-gradient-to-r from-orange-50 to-white border border-[#FF6B00]/30 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <p className="font-extrabold text-[#1F2937]">AfriZone Club</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Remise livraison et avantages — même compte, sans réinscription.
+          </p>
+        </div>
+        <Link
+          to="/compte/abonnement"
+          className="inline-flex justify-center px-4 py-2.5 bg-[#FF6B00] text-white rounded-xl text-sm font-bold shrink-0"
+        >
+          Voir les abonnements
+        </Link>
+      </div>
+
     <div className="bg-white border border-gray-100 rounded-2xl p-6">
       <h2 className="font-extrabold text-lg mb-6">Mon profil</h2>
 
@@ -159,6 +176,7 @@ export default function AccountProfilePage() {
           {loading ? 'Enregistrement...' : 'Enregistrer'}
         </button>
       </form>
+    </div>
     </div>
   );
 }

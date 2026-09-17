@@ -61,6 +61,12 @@ export default function Header() {
             >
               <PackageSearch size={12} /> Suivre ma commande
             </Link>
+            <Link
+              to="/abonnements"
+              className="hidden sm:flex items-center gap-1 hover:text-[#FF6B00] transition-colors font-semibold"
+            >
+              Abonnements
+            </Link>
             <span className="hidden md:flex items-center gap-1"><Headphones size={12} /> Support 24/7</span>
             <span className="flex items-center gap-1"><CreditCard size={12} /> FCFA</span>
           </div>
@@ -190,6 +196,17 @@ export default function Header() {
                         className="block px-4 py-2 text-sm hover:bg-orange-50 font-semibold"
                       >
                         Mon compte
+                      </Link>
+                      <Link
+                        to={
+                          user.role === 'vendeur'
+                            ? '/vendeur/abonnement'
+                            : '/compte/abonnement'
+                        }
+                        onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2 text-sm hover:bg-orange-50 text-[#FF6B00] font-semibold"
+                      >
+                        Abonnement
                       </Link>
                       <Link
                         to="/notifications"

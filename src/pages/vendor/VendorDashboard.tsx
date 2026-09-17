@@ -88,6 +88,12 @@ export default function VendorDashboard() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
+            to="/vendeur/abonnement"
+            className="inline-flex items-center gap-2 px-4 py-2.5 border-2 border-[#00A651] text-[#00A651] rounded-xl text-sm font-bold hover:bg-green-50"
+          >
+            Abonnement & pubs
+          </Link>
+          <Link
             to="/vendeur/commandes"
             className="inline-flex items-center gap-2 px-4 py-2.5 border-2 border-[#FF6B00] text-[#FF6B00] rounded-xl text-sm font-bold hover:bg-orange-50"
           >
@@ -161,6 +167,12 @@ export default function VendorDashboard() {
           <div className="bg-white border border-gray-100 rounded-2xl p-6">
             <h2 className="font-extrabold text-[#1F2937] mb-2">Actions rapides</h2>
             <div className="flex flex-wrap gap-3">
+              <Link
+                to="/vendeur/abonnement"
+                className="px-4 py-2 border-2 border-[#00A651]/40 text-[#00A651] rounded-xl text-sm font-semibold hover:bg-green-50"
+              >
+                Boost / publicité hero
+              </Link>
               <Link
                 to="/vendeur/produits"
                 className="px-4 py-2 border-2 border-gray-200 rounded-xl text-sm font-semibold hover:border-[#FF6B00]"
