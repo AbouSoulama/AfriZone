@@ -125,9 +125,15 @@ export default function AccountSubscriptionPage() {
               </p>
             )}
             {active.planCode === 'client_club' && (
-              <p className="text-gray-600 mt-1">
-                Crédits livraison restants ce mois : <strong>{creditsLeft}</strong>
-              </p>
+              <>
+                <p className="text-gray-600 mt-1">
+                  Crédits livraison restants ce mois : <strong>{creditsLeft}</strong>
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Avantage réel : −1 000 FCFA sur les frais de livraison au checkout (max 4
+                  commandes / mois). Badge Club visible dans le menu.
+                </p>
+              </>
             )}
           </div>
         ) : (

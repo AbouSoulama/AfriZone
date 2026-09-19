@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, MapPin, User, Menu, X, ChevronDown, Truck, Shield, Headphones, CreditCard, LogOut, PackageSearch } from 'lucide-react';
+import { Search, ShoppingCart, MapPin, User, Menu, X, ChevronDown, Truck, Shield, Headphones, CreditCard, LogOut, PackageSearch, Crown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useCountry } from '../context/CountryContext';
 import NotificationBell from './NotificationBell';
+import { fetchActiveSubscription } from '../services/subscriptions';
 
 const navItems = [
   { label: 'Toutes les catégories', to: '/catalogue' },
@@ -28,12 +29,33 @@ export default function Header() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [scrolled, setScrolled] = useState(false);
+  const [isClub, setIsClub] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user || user.role === 'livreur') {
+      setIsClub(false);
+      return;
+    }
+    let cancelled = false;
+    fetchActiveSubscription()
+      .then((sub) => {
+        if (!cancelled) {
+          setIsClub(sub?.planCode === 'client_club' || sub?.planCode === 'vendor_pro' || sub?.planCode === 'vendor_business');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setIsClub(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, user?.id, user?.role]);
 
   const goSearch = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -175,6 +197,11 @@ export default function Header() {
                     <span className="text-sm font-semibold text-[#1F2937] max-w-[120px] truncate">
                       {user.fullName.split(' ')[0]}
                     </span>
+                    {isClub && (
+                      <span className="hidden lg:inline-flex items-center gap-0.5 text-[9px] font-extrabold uppercase tracking-wide text-[#FF6B00] bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full">
+                        <Crown size={10} /> Club
+                      </span>
+                    )}
                     <ChevronDown size={14} />
                   </button>
                   {userMenuOpen && (
@@ -186,6 +213,11 @@ export default function Header() {
                             : user.role}
                         </p>
                         <p className="text-sm font-semibold truncate">{user.fullName}</p>
+                        {isClub && (
+                          <p className="text-[10px] font-bold text-[#FF6B00] mt-0.5 uppercase">
+                            Abonnement actif
+                          </p>
+                        )}
                         {user.role === 'vendeur' && user.vendor?.shopName && (
                           <p className="text-xs text-[#00A651] truncate">{user.vendor.shopName}</p>
                         )}

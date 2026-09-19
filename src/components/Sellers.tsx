@@ -120,6 +120,8 @@ export default function Sellers() {
             status: row.status as string,
             isGoldSeller: Boolean(row.is_gold_seller),
             isTopRated: Boolean(row.is_top_rated),
+            subscriptionPlanCode: (row.subscription_plan_code as string) ?? null,
+            subscriptionBoost: Boolean(row.subscription_boost),
           }));
         }
         const byId = new Map([...list, ...extra].map((v) => [v.id, v]));

@@ -16,6 +16,7 @@ import VendorBadges from '../components/vendors/VendorBadges';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { fetchProductBySlug, formatPrice } from '../services/catalog';
+import { getAfrizoneShippingFee } from '../services/cart';
 import type { CatalogProduct } from '../types/catalog';
 
 export default function ProductDetailPage() {
@@ -168,9 +169,9 @@ export default function ProductDetailPage() {
                     </p>
                     <p className="text-gray-500 text-xs mt-0.5">
                       {product.deliveryMode === 'afrizone'
-                        ? 'Frais calculés automatiquement selon la zone'
+                        ? `Frais de livraison : ${formatPrice(getAfrizoneShippingFee())} (ajoutés à la commande)`
                         : product.vendorDeliveryFee != null
-                          ? `Frais vendeur : ${formatPrice(product.vendorDeliveryFee)}`
+                          ? `Frais vendeur : ${formatPrice(product.vendorDeliveryFee)} (ajoutés à la commande)`
                           : 'Frais selon zone du vendeur'}
                     </p>
                   </div>

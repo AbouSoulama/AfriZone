@@ -69,6 +69,12 @@ export default function OrdersPage() {
                       {new Date(o.createdAt).toLocaleString('fr-FR')} · {o.vendorName || 'Vendeur'}
                       {o.shippingCity ? ` · ${o.shippingCity}` : ''}
                     </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Produits {formatPrice(o.subtotal)}
+                      {o.shippingCost > 0
+                        ? ` + livraison ${formatPrice(o.shippingCost)}`
+                        : ' · livraison offerte / 0'}
+                    </p>
                     <span className="inline-block mt-2 text-xs font-bold px-2 py-1 rounded-full bg-orange-50 text-[#FF6B00]">
                       {ORDER_STATUS_LABELS[o.status]}
                     </span>

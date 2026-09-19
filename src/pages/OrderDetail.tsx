@@ -233,8 +233,8 @@ export default function OrderDetailPage() {
                   <span>{formatPrice(order.subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Livraison</span>
-                  <span>{formatPrice(order.shippingCost)}</span>
+                  <span className="text-gray-500">Frais de livraison</span>
+                  <span className="font-semibold">{formatPrice(order.shippingCost)}</span>
                 </div>
                 <div className="flex justify-between font-extrabold text-base">
                   <span>Total</span>

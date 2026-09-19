@@ -174,6 +174,17 @@ export default function VendorSubscriptionPage() {
                 })}
               </p>
             )}
+            <ul className="mt-2 text-xs text-gray-600 space-y-1 list-disc pl-4">
+              <li>Produits mis en avant automatiquement sur l’accueil / catalogue</li>
+              <li>Badge Pro ou Business sur votre boutique</li>
+              <li>Priorité dans « Vendeurs vedettes »</li>
+              {active.planCode === 'vendor_business' && (
+                <>
+                  <li>Commission réduite à 7 % sur les nouvelles commandes</li>
+                  <li>Publiez une pub hero / bandeau ci-dessous pour l’accueil</li>
+                </>
+              )}
+            </ul>
           </div>
         ) : (
           <p className="mt-4 text-sm text-amber-700 font-medium">Plan Gratuit — passez Pro ou Business.</p>

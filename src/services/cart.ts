@@ -19,6 +19,11 @@ export interface CartSummary {
 
 const AFRIZONE_SHIPPING_FEE = 2000;
 
+/** Frais de livraison AfriZone (produits mode afrizone). */
+export function getAfrizoneShippingFee(): number {
+  return AFRIZONE_SHIPPING_FEE;
+}
+
 function mapProduct(row: Record<string, unknown>): CatalogProduct {
   const vendorRaw = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
   const vendor = vendorRaw as Record<string, unknown> | null | undefined;
@@ -69,7 +74,7 @@ function mapProduct(row: Record<string, unknown>): CatalogProduct {
 
 export function estimateItemShipping(product: CatalogProduct): number {
   if (product.deliveryMode === 'vendor') {
-    return Number(product.vendorDeliveryFee ?? 0);
+    return Math.max(0, Number(product.vendorDeliveryFee ?? 0));
   }
   return AFRIZONE_SHIPPING_FEE;
 }

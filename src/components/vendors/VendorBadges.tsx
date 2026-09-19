@@ -1,4 +1,4 @@
-import { Award, CheckCircle, Crown } from 'lucide-react';
+import { Award, CheckCircle, Crown, Sparkles, Zap } from 'lucide-react';
 import type { CatalogVendor } from '../../types/catalog';
 import { resolveVendorBadges, type VendorBadge } from '../../lib/vendor-badges';
 
@@ -10,6 +10,16 @@ const META: Record<
     label: 'Vérifié',
     className: 'bg-green-50 text-[#00A651] border-green-200',
     Icon: CheckCircle,
+  },
+  pro: {
+    label: 'Pro',
+    className: 'bg-orange-50 text-[#FF6B00] border-orange-200',
+    Icon: Zap,
+  },
+  business: {
+    label: 'Business',
+    className: 'bg-violet-50 text-violet-700 border-violet-200',
+    Icon: Sparkles,
   },
   gold: {
     label: 'Gold Seller',
@@ -29,7 +39,13 @@ export default function VendorBadges({
 }: {
   vendor: Pick<
     CatalogVendor,
-    'status' | 'rating' | 'reviewCount' | 'totalSales' | 'isGoldSeller' | 'isTopRated'
+    | 'status'
+    | 'rating'
+    | 'reviewCount'
+    | 'totalSales'
+    | 'isGoldSeller'
+    | 'isTopRated'
+    | 'subscriptionPlanCode'
   >;
   size?: 'sm' | 'md';
 }) {

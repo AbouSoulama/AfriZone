@@ -29,6 +29,8 @@ function mapVendor(row: Record<string, unknown> | null | undefined): CatalogVend
     status: row.status as string,
     isGoldSeller: Boolean(row.is_gold_seller),
     isTopRated: Boolean(row.is_top_rated),
+    subscriptionPlanCode: (row.subscription_plan_code as string) ?? null,
+    subscriptionBoost: Boolean(row.subscription_boost),
   };
 }
 
@@ -69,7 +71,7 @@ const PRODUCT_SELECT = `
   vendors!inner (
     id, shop_name, shop_slug, shop_description, shop_category, shop_logo_url,
     vendor_code, country, city, rating, review_count, total_sales, status,
-    is_gold_seller, is_top_rated
+    is_gold_seller, is_top_rated, subscription_plan_code, subscription_boost
   )
 `;
 
@@ -78,7 +80,7 @@ const PRODUCT_SELECT_OPTIONAL = `
   vendors (
     id, shop_name, shop_slug, shop_description, shop_category, shop_logo_url,
     vendor_code, country, city, rating, review_count, total_sales, status,
-    is_gold_seller, is_top_rated
+    is_gold_seller, is_top_rated, subscription_plan_code, subscription_boost
   )
 `;
 

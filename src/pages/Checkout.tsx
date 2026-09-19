@@ -498,7 +498,7 @@ export default function CheckoutPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Livraison</span>
-                <span>{formatPrice(summary?.shippingEstimate ?? 0)}</span>
+                <span className="font-semibold">{formatPrice(summary?.shippingEstimate ?? 0)}</span>
               </div>
               {clubDiscount > 0 && (
                 <div className="flex justify-between text-[#00A651] font-semibold">

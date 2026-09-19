@@ -18,6 +18,9 @@ export interface CatalogVendor {
   /** Badges CDC */
   isGoldSeller?: boolean;
   isTopRated?: boolean;
+  /** Abonnement vendeur actif (pro / business) */
+  subscriptionPlanCode?: string | null;
+  subscriptionBoost?: boolean;
 }
 
 export interface CatalogProduct {
