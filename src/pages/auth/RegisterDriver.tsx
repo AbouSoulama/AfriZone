@@ -1,29 +1,25 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bike, CheckCircle, Upload } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { CATALOG_COUNTRIES, CITIES_BY_COUNTRY } from '../../types/catalog';
+import { useCountry } from '../../context/CountryContext';
+import { CITIES_BY_COUNTRY, capitalForCountry } from '../../types/catalog';
 import { VEHICLE_LABELS, type VehicleType } from '../../services/drivers';
-
-const COUNTRIES = [
-  { code: 'SN' as const, label: 'Sénégal' },
-  { code: 'BF' as const, label: 'Burkina Faso' },
-  { code: 'ML' as const, label: 'Mali' },
-];
 
 export default function RegisterDriverPage() {
   const { registerDriver } = useAuth();
+  const { country, countryName } = useCountry();
+  const cities = CITIES_BY_COUNTRY[country];
   const fileRef = useRef<HTMLInputElement>(null);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [country, setCountry] = useState<'SN' | 'BF' | 'ML'>('SN');
-  const [city, setCity] = useState('Dakar');
+  const [city, setCity] = useState(() => capitalForCountry(country));
   const [vehicleType, setVehicleType] = useState<VehicleType>('moto');
   const [vehiclePlate, setVehiclePlate] = useState('');
-  const [zones, setZones] = useState<string[]>(['Dakar']);
+  const [zones, setZones] = useState<string[]>(() => [capitalForCountry(country)]);
   const [licenseNumber, setLicenseNumber] = useState('');
   const [idDocumentType, setIdDocumentType] = useState<'cni' | 'passport' | 'permis'>('cni');
   const [idDocument, setIdDocument] = useState<File | null>(null);
@@ -31,6 +27,12 @@ export default function RegisterDriverPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [doneCode, setDoneCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    const capital = capitalForCountry(country);
+    setCity(capital);
+    setZones([capital]);
+  }, [country]);
 
   const toggleZone = (z: string) => {
     setZones((prev) => (prev.includes(z) ? prev.filter((x) => x !== z) : [...prev, z]));
@@ -40,6 +42,11 @@ export default function RegisterDriverPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    if (zones.length === 0) {
+      setError('Sélectionnez au moins une zone desservie');
+      setLoading(false);
+      return;
+    }
     const result = await registerDriver({
       fullName,
       phone,
@@ -122,20 +129,20 @@ export default function RegisterDriverPage() {
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-bold mb-1">Pays *</label>
-              <select value={country} onChange={(e) => {
-                const next = e.target.value as 'SN' | 'BF' | 'ML';
-                setCountry(next);
-                setCity(CITIES_BY_COUNTRY[next][0]);
-              }} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white">
-                {COUNTRIES.map((c) => (
-                  <option key={c.code} value={c.code}>{c.label}</option>
-                ))}
-              </select>
+              <input
+                type="text"
+                readOnly
+                value={countryName}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-700"
+              />
+              <p className="text-[11px] text-gray-500 mt-1">
+                Pays choisi à l’entrée du site.
+              </p>
             </div>
             <div>
               <label className="block text-sm font-bold mb-1">Ville *</label>
               <select value={city} onChange={(e) => setCity(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white">
-                {(CITIES_BY_COUNTRY[country] || []).map((c) => (
+                {cities.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
@@ -156,18 +163,18 @@ export default function RegisterDriverPage() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-bold mb-2">Zones desservies (pays) *</label>
+            <label className="block text-sm font-bold mb-2">Zones desservies (villes) *</label>
             <div className="flex flex-wrap gap-2">
-              {CATALOG_COUNTRIES.map((z) => (
+              {cities.map((z) => (
                 <button
-                  key={z.code}
+                  key={z}
                   type="button"
-                  onClick={() => toggleZone(z.code)}
+                  onClick={() => toggleZone(z)}
                   className={`px-3 py-1.5 rounded-full text-xs font-bold border-2 ${
-                    zones.includes(z.code) ? 'border-[#FF6B00] bg-orange-50 text-[#FF6B00]' : 'border-gray-200'
+                    zones.includes(z) ? 'border-[#FF6B00] bg-orange-50 text-[#FF6B00]' : 'border-gray-200'
                   }`}
                 >
-                  {z.label}
+                  {z}
                 </button>
               ))}
             </div>

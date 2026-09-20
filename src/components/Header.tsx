@@ -416,6 +416,55 @@ export default function Header() {
                 Mon compte
               </Link>
             )}
+            {isAuthenticated && user?.role === 'vendeur' && (
+              <Link
+                to="/vendeur"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg hover:bg-orange-50 text-[#FF6B00] font-bold text-sm"
+              >
+                Dashboard vendeur
+              </Link>
+            )}
+            {isAuthenticated && user?.role === 'livreur' && (
+              <Link
+                to="/livreur"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg hover:bg-orange-50 text-[#FF6B00] font-bold text-sm"
+              >
+                Dashboard livreur
+              </Link>
+            )}
+            {isAuthenticated && user?.role === 'admin' && (
+              <Link
+                to="/admin"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg hover:bg-orange-50 text-[#FF6B00] font-bold text-sm"
+              >
+                Dashboard admin
+              </Link>
+            )}
+            {isAuthenticated && (
+              <Link
+                to={
+                  user?.role === 'vendeur'
+                    ? '/vendeur/abonnement'
+                    : '/compte/abonnement'
+                }
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
+              >
+                Abonnement
+              </Link>
+            )}
+            {isAuthenticated && (
+              <Link
+                to="/notifications"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg hover:bg-orange-50 hover:text-[#FF6B00] font-medium text-sm"
+              >
+                Notifications
+              </Link>
+            )}
             <Link
               to="/colis"
               onClick={() => setMobileMenuOpen(false)}

@@ -18,7 +18,9 @@ export default function NotificationBell() {
   const navigate = useNavigate();
   const { items, unreadCount, markRead, markAllRead, refresh } = useNotifications();
   const [open, setOpen] = useState(false);
+  const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
   const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -28,11 +30,52 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
+  useEffect(() => {
+    if (!open || !buttonRef.current) return;
+
+    const place = () => {
+      const rect = buttonRef.current!.getBoundingClientRect();
+      const gap = 8;
+      const margin = 12;
+      const isMobile = window.innerWidth < 640;
+
+      if (isMobile) {
+        setPanelStyle({
+          position: 'fixed',
+          top: rect.bottom + gap,
+          left: margin,
+          right: margin,
+          width: 'auto',
+        });
+      } else {
+        const width = 384;
+        let left = rect.right - width;
+        left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
+        setPanelStyle({
+          position: 'fixed',
+          top: rect.bottom + gap,
+          left,
+          width,
+          right: 'auto',
+        });
+      }
+    };
+
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open]);
+
   const recent = items.slice(0, 8);
 
   return (
     <div className="relative" ref={ref}>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => {
           setOpen((v) => !v);
@@ -50,7 +93,10 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+        <div
+          style={panelStyle}
+          className="z-[60] overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-xl"
+        >
           <div className="flex items-center justify-between px-4 py-3 border-b">
             <p className="font-extrabold text-sm">Notifications</p>
             {unreadCount > 0 && (

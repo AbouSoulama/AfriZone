@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,7 +21,12 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useCountry } from '../../context/CountryContext';
 import { validateIdDocument } from '../../lib/auth-helpers';
+import {
+  CITIES_BY_COUNTRY,
+  capitalForCountry,
+} from '../../types/catalog';
 
 const step1Schema = z
   .object({
@@ -62,12 +67,6 @@ type Step1FormData = z.infer<typeof step1Schema>;
 type Step2FormData = z.infer<typeof step2Schema>;
 type Step = 1 | 2 | 3;
 
-const citiesByCountry: Record<string, string[]> = {
-  SN: ['Dakar', 'Thies', 'Saint-Louis', 'Ziguinchor', 'Kaolack', 'Touba'],
-  BF: ['Ouagadougou', 'Bobo-Dioulasso', 'Koudougou', 'Banfora', 'Ouahigouya', 'Kaya'],
-  ML: ['Bamako', 'Sikasso', 'Segou', 'Mopti', 'Kayes'],
-};
-
 const shopCategories = [
   'Électronique',
   'Mode & Vêtements',
@@ -86,13 +85,14 @@ const shopCategories = [
 export default function RegisterVendor() {
   const navigate = useNavigate();
   const { registerVendor } = useAuth();
+  const { country: siteCountry, countryName } = useCountry();
+  const cities = CITIES_BY_COUNTRY[siteCountry];
   const [step, setStep] = useState<Step>(1);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [step1Data, setStep1Data] = useState<Step1FormData | null>(null);
   const [vendorCode, setVendorCode] = useState<string | null>(null);
-  const [country, setCountry] = useState<'SN' | 'BF' | 'ML'>('SN');
   const [idDocFile, setIdDocFile] = useState<File | null>(null);
   const [idDocPreview, setIdDocPreview] = useState<string | null>(null);
   const [shopLogoFile, setShopLogoFile] = useState<File | null>(null);
@@ -123,8 +123,17 @@ export default function RegisterVendor() {
     watch: watch2,
   } = useForm<Step2FormData>({
     resolver: zodResolver(step2Schema),
-    defaultValues: { country: 'SN', city: 'Dakar', acceptPhotoCommitment: false },
+    defaultValues: {
+      country: siteCountry,
+      city: capitalForCountry(siteCountry),
+      acceptPhotoCommitment: false,
+    },
   });
+
+  useEffect(() => {
+    setValue2('country', siteCountry, { shouldValidate: true });
+    setValue2('city', capitalForCountry(siteCountry), { shouldValidate: true });
+  }, [siteCountry, setValue2]);
 
   const handleIdFileChange = (file: File | null) => {
     if (idDocPreview) URL.revokeObjectURL(idDocPreview);
@@ -200,7 +209,7 @@ export default function RegisterVendor() {
       idDocument: idDocFile,
       idDocumentType: step1Data.idDocumentType,
       shopName: data.shopName,
-      country: data.country,
+      country: siteCountry,
       city: data.city,
       address: data.address,
       shopCategory: data.shopCategory,
@@ -585,40 +594,18 @@ export default function RegisterVendor() {
 
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Pays *</label>
-                <div className="grid grid-cols-3 gap-3">
-                  {(
-                    [
-                      { code: 'SN', label: 'Sénégal' },
-                      { code: 'BF', label: 'Burkina' },
-                      { code: 'ML', label: 'Mali' },
-                    ] as const
-                  ).map((p) => (
-                    <label
-                      key={p.code}
-                      className={`flex items-center gap-2 p-3 border-2 rounded-xl cursor-pointer ${
-                        watch2('country') === p.code
-                          ? 'border-[#00A651] bg-green-50'
-                          : 'border-gray-200'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        value={p.code}
-                        checked={watch2('country') === p.code}
-                        onChange={() => {
-                          setCountry(p.code);
-                          setValue2('country', p.code, { shouldValidate: true });
-                          setValue2('city', citiesByCountry[p.code][0]);
-                        }}
-                        className="accent-[#00A651]"
-                      />
-                      <div className="flex items-center gap-1">
-                        <Globe size={14} className="text-green-600" />
-                        <p className="font-bold text-xs">{p.label}</p>
-                      </div>
-                    </label>
-                  ))}
+                <div className="relative">
+                  <Globe size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    readOnly
+                    value={countryName}
+                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-700"
+                  />
                 </div>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Pays choisi à l’entrée du site. Changez-le via le sélecteur en haut si besoin.
+                </p>
               </div>
 
               <div>
@@ -627,7 +614,7 @@ export default function RegisterVendor() {
                   {...reg2('city')}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#00A651] focus:outline-none bg-white"
                 >
-                  {citiesByCountry[country].map((city) => (
+                  {cities.map((city) => (
                     <option key={city} value={city}>
                       {city}
                     </option>

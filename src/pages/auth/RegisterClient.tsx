@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,52 +14,84 @@ import {
   AlertCircle,
   CheckCircle,
   Smartphone,
+  Globe,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useCountry } from '../../context/CountryContext';
+import {
+  CITIES_BY_COUNTRY,
+  capitalForCountry,
+} from '../../types/catalog';
 
-const registerSchema = z
-  .object({
-    fullName: z.string().min(3, 'Le nom complet doit contenir au moins 3 caractères'),
-    phone: z
-      .string()
-      .min(8, 'Numéro de téléphone invalide')
-      .regex(/^\+?[0-9\s.-]{8,20}$/, 'Format de téléphone invalide'),
-    email: z.string().email('Email invalide').optional().or(z.literal('')),
-    password: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères'),
-    confirmPassword: z.string(),
-    city: z.enum(['Dakar', 'Ouagadougou', 'Bamako']),
-    acceptTerms: z.boolean().refine((val) => val === true, 'Vous devez accepter les CGV'),
-    acceptReceiptCommitment: z
-      .boolean()
-      .refine((val) => val === true, 'Vous devez accepter cet engagement pour créer votre compte'),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'Les mots de passe ne correspondent pas',
-    path: ['confirmPassword'],
-  });
-
-type RegisterFormData = z.infer<typeof registerSchema>;
+type RegisterFormData = {
+  fullName: string;
+  phone: string;
+  email?: string;
+  password: string;
+  confirmPassword: string;
+  city: string;
+  acceptTerms: boolean;
+  acceptReceiptCommitment: boolean;
+};
 
 export default function RegisterClient() {
   const navigate = useNavigate();
   const { register: registerUser } = useAuth();
+  const { country, countryName } = useCountry();
+  const cities = CITIES_BY_COUNTRY[country];
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const registerSchema = useMemo(
+    () =>
+      z
+        .object({
+          fullName: z.string().min(3, 'Le nom complet doit contenir au moins 3 caractères'),
+          phone: z
+            .string()
+            .min(8, 'Numéro de téléphone invalide')
+            .regex(/^\+?[0-9\s.-]{8,20}$/, 'Format de téléphone invalide'),
+          email: z.string().email('Email invalide').optional().or(z.literal('')),
+          password: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères'),
+          confirmPassword: z.string(),
+          city: z
+            .string()
+            .min(2, 'Ville requise')
+            .refine((c) => cities.includes(c), 'Choisissez une ville de votre pays'),
+          acceptTerms: z.boolean().refine((val) => val === true, 'Vous devez accepter les CGV'),
+          acceptReceiptCommitment: z
+            .boolean()
+            .refine(
+              (val) => val === true,
+              'Vous devez accepter cet engagement pour créer votre compte'
+            ),
+        })
+        .refine((data) => data.password === data.confirmPassword, {
+          message: 'Les mots de passe ne correspondent pas',
+          path: ['confirmPassword'],
+        }),
+    [cities]
+  );
+
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      city: 'Dakar',
+      city: capitalForCountry(country),
       acceptTerms: false,
       acceptReceiptCommitment: false,
     },
   });
+
+  useEffect(() => {
+    setValue('city', capitalForCountry(country));
+  }, [country, setValue]);
 
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
@@ -241,7 +273,20 @@ export default function RegisterClient() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Ville</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Pays</label>
+              <div className="relative mb-3">
+                <Globe size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  readOnly
+                  value={countryName}
+                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-700"
+                />
+              </div>
+              <p className="text-[11px] text-gray-500 mb-4 -mt-1">
+                Pays choisi à l’entrée du site. Changez-le via le sélecteur en haut si besoin.
+              </p>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Ville *</label>
               <div className="relative">
                 <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <select
@@ -252,9 +297,11 @@ export default function RegisterClient() {
                       : 'border-gray-200 focus:border-[#FF6B00]'
                   }`}
                 >
-                  <option value="Dakar">Dakar</option>
-                  <option value="Ouagadougou">Ouagadougou</option>
-                  <option value="Bamako">Bamako</option>
+                  {cities.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
                 </select>
               </div>
               {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city.message}</p>}
