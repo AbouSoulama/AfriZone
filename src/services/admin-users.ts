@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { UserRole } from '../types/auth';
+import { countryCodeFromLabelOrCity } from '../types/catalog';
 
 export interface AdminUserRow {
   id: string;
@@ -8,12 +9,14 @@ export interface AdminUserRow {
   phone: string | null;
   role: UserRole;
   city: string | null;
+  /** Pays résolu (vendeur/livreur → entité ; sinon ville du profil). */
+  country: string | null;
   verified: boolean;
   avatarUrl: string | null;
   createdAt: string;
 }
 
-function mapUser(row: Record<string, unknown>): AdminUserRow {
+function mapUser(row: Record<string, unknown>, country: string | null): AdminUserRow {
   return {
     id: row.id as string,
     fullName: (row.full_name as string) || 'Sans nom',
@@ -21,18 +24,67 @@ function mapUser(row: Record<string, unknown>): AdminUserRow {
     phone: (row.phone as string) ?? null,
     role: row.role as UserRole,
     city: (row.city as string) ?? null,
+    country,
     verified: Boolean(row.verified),
     avatarUrl: (row.avatar_url as string) ?? null,
     createdAt: row.created_at as string,
   };
 }
 
-export async function fetchUsersForAdmin(role?: UserRole | 'all'): Promise<AdminUserRow[]> {
+export async function fetchUsersForAdmin(
+  role?: UserRole | 'all',
+  country?: string | 'ALL'
+): Promise<AdminUserRow[]> {
   let query = supabase.from('profiles').select('*').order('created_at', { ascending: false });
   if (role && role !== 'all') query = query.eq('role', role);
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => mapUser(r as Record<string, unknown>));
+
+  const rows = data ?? [];
+  const userIds = rows.map((r) => r.id as string);
+
+  const vendorCountry = new Map<string, string>();
+  const driverCountry = new Map<string, string>();
+
+  if (userIds.length) {
+    const [vendorsRes, driversRes] = await Promise.all([
+      supabase.from('vendors').select('user_id, country').in('user_id', userIds),
+      supabase.from('drivers').select('user_id, country').in('user_id', userIds),
+    ]);
+    for (const v of vendorsRes.data ?? []) {
+      const code = String(v.country || '').toUpperCase();
+      if (code) vendorCountry.set(v.user_id as string, code);
+    }
+    for (const d of driversRes.data ?? []) {
+      const code = String(d.country || '').toUpperCase();
+      if (code) driverCountry.set(d.user_id as string, code);
+    }
+  }
+
+  const mapped = rows.map((r) => {
+    const id = r.id as string;
+    const roleValue = r.role as UserRole;
+    let resolved: string | null = null;
+    if (roleValue === 'vendeur') {
+      resolved = vendorCountry.get(id) || countryCodeFromLabelOrCity(r.city as string | null);
+    } else if (roleValue === 'livreur') {
+      resolved = driverCountry.get(id) || countryCodeFromLabelOrCity(r.city as string | null);
+    } else if (roleValue === 'admin') {
+      resolved = countryCodeFromLabelOrCity(r.city as string | null);
+    } else {
+      resolved =
+        countryCodeFromLabelOrCity(r.city as string | null) ||
+        vendorCountry.get(id) ||
+        driverCountry.get(id) ||
+        null;
+    }
+    return mapUser(r as Record<string, unknown>, resolved);
+  });
+
+  if (!country || country === 'ALL') return mapped;
+
+  // Les admins restent visibles dans chaque vue pays (compte plateforme).
+  return mapped.filter((u) => u.role === 'admin' || u.country === country);
 }
 
 export async function updateUserAdmin(

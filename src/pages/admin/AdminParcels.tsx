@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAdminCountry } from '../../context/AdminCountryContext';
 import { formatPrice } from '../../services/catalog';
 import {
   fetchAllParcelsAdmin,
@@ -9,6 +10,7 @@ import {
 } from '../../services/parcels';
 
 export default function AdminParcelsPage() {
+  const { adminCountry, adminCountryName } = useAdminCountry();
   const [parcels, setParcels] = useState<ParcelView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +19,7 @@ export default function AdminParcelsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      setParcels(await fetchAllParcelsAdmin());
+      setParcels(await fetchAllParcelsAdmin(adminCountry));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
@@ -28,7 +30,7 @@ export default function AdminParcelsPage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [adminCountry]);
 
   const onAdvance = async (parcel: ParcelView) => {
     const next = nextParcelStatus(parcel.status);
@@ -48,7 +50,7 @@ export default function AdminParcelsPage() {
     <div>
       <h1 className="text-2xl font-extrabold text-[#1F2937] mb-2">Colis</h1>
       <p className="text-sm text-gray-500 mb-6">
-        Faites avancer le statut des envois (enlèvement → livraison).
+        Faites avancer le statut des envois (enlèvement → livraison) — {adminCountryName}
       </p>
 
       {error && (
@@ -61,7 +63,7 @@ export default function AdminParcelsPage() {
         <div className="h-40 bg-white rounded-2xl border animate-pulse" />
       ) : parcels.length === 0 ? (
         <div className="bg-white border rounded-2xl p-10 text-center text-gray-500">
-          Aucun colis.
+          Aucun colis pour {adminCountryName}
         </div>
       ) : (
         <div className="space-y-3">

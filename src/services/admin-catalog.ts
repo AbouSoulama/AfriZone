@@ -51,11 +51,14 @@ function mapProduct(row: Record<string, unknown>): AdminProductRow {
   };
 }
 
-export async function fetchShopsForAdmin(): Promise<AdminShopRow[]> {
-  const { data, error } = await supabase
-    .from('vendors')
-    .select('*')
-    .order('created_at', { ascending: false });
+export async function fetchShopsForAdmin(
+  country?: string | 'ALL'
+): Promise<AdminShopRow[]> {
+  let query = supabase.from('vendors').select('*').order('created_at', { ascending: false });
+  if (country && country !== 'ALL') {
+    query = query.eq('country', country);
+  }
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
 
   const shops = (data ?? []).map((r) => mapShop(r as Record<string, unknown>));
@@ -78,7 +81,10 @@ export async function fetchShopsForAdmin(): Promise<AdminShopRow[]> {
 
 const ADMIN_PRODUCT_SELECT = '*, vendors(shop_name, city, country, vendor_code)';
 
-export async function fetchProductsForAdmin(vendorId?: string): Promise<AdminProductRow[]> {
+export async function fetchProductsForAdmin(
+  vendorId?: string,
+  country?: string | 'ALL'
+): Promise<AdminProductRow[]> {
   let query = supabase
     .from('products')
     .select(ADMIN_PRODUCT_SELECT)
@@ -89,7 +95,9 @@ export async function fetchProductsForAdmin(vendorId?: string): Promise<AdminPro
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => mapProduct(r as Record<string, unknown>));
+  const rows = (data ?? []).map((r) => mapProduct(r as Record<string, unknown>));
+  if (!country || country === 'ALL' || vendorId) return rows;
+  return rows.filter((p) => (p.vendorCountry || '').toUpperCase() === country);
 }
 
 /**

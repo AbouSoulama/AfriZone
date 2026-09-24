@@ -14,6 +14,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useAdminCountry } from '../../context/AdminCountryContext';
 import { formatPrice } from '../../services/catalog';
 import {
   fetchAdminDashboardData,
@@ -33,21 +34,29 @@ const STATUS_BAR: Array<{ key: OrderStatus; color: string }> = [
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
+  const { adminCountry, adminCountryName } = useAdminCountry();
   const [data, setData] = useState<AdminDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setData(await fetchAdminDashboardData());
+        const next = await fetchAdminDashboardData(adminCountry);
+        if (!cancelled) setData(next);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Erreur de chargement');
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Erreur de chargement');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [adminCountry]);
 
   const stats = data?.stats;
   const alerts =
@@ -138,7 +147,7 @@ export default function AdminDashboardPage() {
           </p>
           <h1 className="text-2xl md:text-3xl font-extrabold text-[#1F2937]">Tableau de bord</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Bonjour {user?.fullName?.split(' ')[0] || 'Admin'} — vue d’ensemble AfriZone
+            Bonjour {user?.fullName?.split(' ')[0] || 'Admin'} — vue d’ensemble {adminCountryName}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

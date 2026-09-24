@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Package, Pencil, Store, Trash2 } from 'lucide-react';
 import AdminModal from '../../components/admin/AdminModal';
+import { useAdminCountry } from '../../context/AdminCountryContext';
 import { formatPrice } from '../../services/catalog';
 import {
   deleteProductAdmin,
@@ -15,6 +16,7 @@ import {
 import { PRODUCT_APPROVAL_LABELS } from '../../types/catalog';
 
 export default function AdminCatalogPage() {
+  const { adminCountry, adminCountryName } = useAdminCountry();
   const [tab, setTab] = useState<'shops' | 'products'>('shops');
   const [shops, setShops] = useState<AdminShopRow[]>([]);
   const [products, setProducts] = useState<AdminProductRow[]>([]);
@@ -45,8 +47,8 @@ export default function AdminCatalogPage() {
     setLoading(true);
     try {
       const [s, p] = await Promise.all([
-        fetchShopsForAdmin(),
-        fetchProductsForAdmin(filterShopId || undefined),
+        fetchShopsForAdmin(adminCountry),
+        fetchProductsForAdmin(filterShopId || undefined, adminCountry),
       ]);
       setShops(s);
       setProducts(p);
@@ -60,7 +62,11 @@ export default function AdminCatalogPage() {
 
   useEffect(() => {
     load();
-  }, [filterShopId]);
+  }, [filterShopId, adminCountry]);
+
+  useEffect(() => {
+    setFilterShopId('');
+  }, [adminCountry]);
 
   const openShop = (s: AdminShopRow) => {
     setShopEdit(s);
@@ -131,7 +137,9 @@ export default function AdminCatalogPage() {
   return (
     <div>
       <h1 className="text-2xl font-extrabold mb-2">Boutiques & produits</h1>
-      <p className="text-sm text-gray-500 mb-6">Gérer le catalogue marketplace.</p>
+      <p className="text-sm text-gray-500 mb-6">
+        Gérer le catalogue marketplace — {adminCountryName}
+      </p>
 
       <div className="flex gap-2 mb-5">
         <button
@@ -182,7 +190,8 @@ export default function AdminCatalogPage() {
                 <div className="min-w-0">
                   <p className="font-extrabold truncate">{s.shopName}</p>
                   <p className="text-xs text-gray-500">
-                    {s.vendorCode} · {s.city} · {s.productsCount ?? 0} produit(s) · {s.status}
+                    {s.vendorCode} · {s.city} · {s.country} · {s.productsCount ?? 0} produit(s) ·{' '}
+                    {s.status}
                   </p>
                 </div>
               </div>
@@ -222,6 +231,11 @@ export default function AdminCatalogPage() {
               </div>
             </div>
           ))}
+          {!shops.length && (
+            <div className="bg-white border rounded-2xl p-8 text-center text-gray-500">
+              Aucune boutique pour {adminCountryName}
+            </div>
+          )}
         </div>
       ) : (
         <div>
@@ -303,7 +317,7 @@ export default function AdminCatalogPage() {
             ))}
             {!products.length && (
               <div className="bg-white border rounded-2xl p-8 text-center text-gray-500">
-                Aucun produit.
+                Aucun produit pour {adminCountryName}
               </div>
             )}
           </div>

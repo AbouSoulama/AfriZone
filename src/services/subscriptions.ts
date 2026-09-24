@@ -1,9 +1,5 @@
 import { supabase } from '../lib/supabase';
-import {
-  CITIES_BY_COUNTRY,
-  countryCodeFromLabelOrCity,
-  type CatalogCountryCode,
-} from '../types/catalog';
+import { countryCodeFromLabelOrCity } from '../types/catalog';
 import { isLivePayment, startCheckout } from './payments';
 
 export type PlanAudience = 'client' | 'vendor';
@@ -365,32 +361,20 @@ export interface AdminSubscriptionRow {
   } | null;
 }
 
-function countryFromCity(city?: string | null): CatalogCountryCode | null {
-  const fromHelper = countryCodeFromLabelOrCity(city);
-  if (fromHelper) return fromHelper;
-  if (!city) return null;
-  const lower = city
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-  for (const [code, cities] of Object.entries(CITIES_BY_COUNTRY) as [
-    CatalogCountryCode,
-    string[],
-  ][]) {
-    if (
-      cities.some(
-        (c) =>
-          c
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toLowerCase() === lower
-      )
-    ) {
-      return code;
-    }
+function resolveSubscriberCountry(
+  audience: string | undefined,
+  userId: string,
+  profileCity: string | null | undefined,
+  vendorCountryByUser: Map<string, string>
+): string | null {
+  if (audience === 'vendor') {
+    return vendorCountryByUser.get(userId) || null;
   }
-  return null;
+  return (
+    countryCodeFromLabelOrCity(profileCity) ||
+    vendorCountryByUser.get(userId) ||
+    null
+  );
 }
 
 async function fetchVendorCountryByUser(
@@ -427,20 +411,6 @@ async function fetchProfileMetaByUser(
     });
   }
   return map;
-}
-
-function resolveSubscriberCountry(
-  audience: string | undefined,
-  userId: string,
-  profileCity: string | null | undefined,
-  vendorCountryByUser: Map<string, string>
-): string | null {
-  if (audience === 'vendor') {
-    return vendorCountryByUser.get(userId) || null;
-  }
-  return (
-    countryFromCity(profileCity) || vendorCountryByUser.get(userId) || null
-  );
 }
 
 export async function adminListSubscriptions(
@@ -523,7 +493,7 @@ export async function adminListAds(
     const profile = profilesByUser.get(ad.subscriberUserId);
     const countryCode =
       vendorCountry ||
-      countryFromCity(profile?.city) ||
+      countryCodeFromLabelOrCity(profile?.city) ||
       vendorCountryByUser.get(ad.subscriberUserId) ||
       null;
     return { ...ad, country: countryCode };

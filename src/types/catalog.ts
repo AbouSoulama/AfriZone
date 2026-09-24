@@ -157,6 +157,23 @@ export function countryCodeFromLabelOrCity(raw?: string | null): CatalogCountryC
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 
+  for (const [code, cities] of Object.entries(CITIES_BY_COUNTRY) as [
+    CatalogCountryCode,
+    string[],
+  ][]) {
+    if (
+      cities.some(
+        (c) =>
+          c
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase() === lower
+      )
+    ) {
+      return code;
+    }
+  }
+
   if (
     lower.includes('burkina') ||
     lower.includes('ouaga') ||

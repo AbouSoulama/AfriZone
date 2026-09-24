@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { KeyRound, Pencil, Trash2 } from 'lucide-react';
 import AdminModal from '../../components/admin/AdminModal';
 import { useAuth } from '../../context/AuthContext';
+import { useAdminCountry } from '../../context/AdminCountryContext';
 import {
   deleteUserAdmin,
   fetchUsersForAdmin,
@@ -11,7 +12,7 @@ import {
   type AdminUserRow,
 } from '../../services/admin-users';
 import type { UserRole } from '../../types/auth';
-import { CITIES_BY_COUNTRY } from '../../types/catalog';
+import { CITIES_BY_COUNTRY, countryLabel } from '../../types/catalog';
 
 const ALL_CITIES = Object.values(CITIES_BY_COUNTRY).flat();
 
@@ -19,10 +20,13 @@ const ROLE_FILTERS: Array<UserRole | 'all'> = ['all', 'client', 'vendeur', 'livr
 
 export default function AdminUsersPage() {
   const { user: me } = useAuth();
+  const { adminCountry, adminCountryName } = useAdminCountry();
   const [filter, setFilter] = useState<UserRole | 'all'>('all');
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const cityOptions =
+    adminCountry !== 'ALL' ? CITIES_BY_COUNTRY[adminCountry] : ALL_CITIES;
   const [selected, setSelected] = useState<AdminUserRow | null>(null);
   const [mode, setMode] = useState<'edit' | 'password'>('edit');
   const [busy, setBusy] = useState(false);
@@ -40,7 +44,7 @@ export default function AdminUsersPage() {
   const load = async () => {
     setLoading(true);
     try {
-      setUsers(await fetchUsersForAdmin(filter));
+      setUsers(await fetchUsersForAdmin(filter, adminCountry));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
@@ -51,7 +55,7 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     load();
-  }, [filter]);
+  }, [filter, adminCountry]);
 
   const openEdit = (u: AdminUserRow) => {
     setSelected(u);
@@ -60,7 +64,7 @@ export default function AdminUsersPage() {
       fullName: u.fullName,
       email: u.email || '',
       phone: u.phone || '',
-      city: u.city || 'Dakar',
+      city: u.city || cityOptions[0] || 'Dakar',
       role: u.role,
       verified: u.verified,
     });
@@ -138,7 +142,8 @@ export default function AdminUsersPage() {
     <div>
       <h1 className="text-2xl font-extrabold mb-2">Utilisateurs</h1>
       <p className="text-sm text-gray-500 mb-6">
-        Consulter, modifier, changer le mot de passe ou supprimer un compte.
+        Consulter, modifier, changer le mot de passe ou supprimer un compte —{' '}
+        {adminCountryName}
       </p>
 
       <div className="flex gap-2 overflow-x-auto mb-5">
@@ -173,6 +178,7 @@ export default function AdminUsersPage() {
                   <th className="px-4 py-3">Utilisateur</th>
                   <th className="px-4 py-3">Rôle</th>
                   <th className="px-4 py-3">Ville</th>
+                  <th className="px-4 py-3">Pays</th>
                   <th className="px-4 py-3">Inscrit</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -192,6 +198,9 @@ export default function AdminUsersPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-600">{u.city || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {u.country ? countryLabel(u.country) : '—'}
+                    </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">
                       {new Date(u.createdAt).toLocaleDateString('fr-FR')}
                     </td>
@@ -226,6 +235,13 @@ export default function AdminUsersPage() {
                     </td>
                   </tr>
                 ))}
+                {!users.length && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                      Aucun utilisateur pour {adminCountryName}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -262,7 +278,7 @@ export default function AdminUsersPage() {
                 onChange={(e) => setForm({ ...form, city: e.target.value })}
                 className="w-full border-2 rounded-xl px-3 py-2"
               >
-                {ALL_CITIES.map((c) => (
+                {cityOptions.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>

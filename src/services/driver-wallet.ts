@@ -51,6 +51,7 @@ export interface WithdrawalRequest {
   createdAt: string;
   driverCode?: string | null;
   driverCity?: string | null;
+  driverCountry?: string | null;
   ownerName?: string | null;
 }
 
@@ -126,6 +127,7 @@ function mapWithdrawal(row: Record<string, unknown>): WithdrawalRequest {
     createdAt: row.created_at as string,
     driverCode: d ? ((d.driver_code as string) ?? null) : null,
     driverCity: d ? ((d.city as string) ?? null) : null,
+    driverCountry: d ? ((d.country as string) ?? null) : null,
   };
 }
 
@@ -212,11 +214,12 @@ export async function requestDriverWithdrawal(amount: number): Promise<{ withdra
 }
 
 export async function fetchWithdrawalsForAdmin(
-  status?: WithdrawalStatus | 'all'
+  status?: WithdrawalStatus | 'all',
+  country?: string | 'ALL'
 ): Promise<WithdrawalRequest[]> {
   let query = supabase
     .from('driver_withdrawal_requests')
-    .select('*, drivers ( driver_code, city, user_id )')
+    .select('*, drivers ( driver_code, city, country, user_id )')
     .order('created_at', { ascending: false });
   if (status && status !== 'all') query = query.eq('status', status);
   const { data, error } = await query;
@@ -236,12 +239,17 @@ export async function fetchWithdrawalsForAdmin(
     profiles = Object.fromEntries((p ?? []).map((x) => [x.id, x.full_name as string]));
   }
 
-  return rows.map((r) => {
+  const mapped = rows.map((r) => {
     const base = mapWithdrawal(r);
     const d = Array.isArray(r.drivers) ? r.drivers[0] : r.drivers;
     const uid = (d as Record<string, unknown> | null)?.user_id as string | undefined;
     return { ...base, ownerName: uid ? profiles[uid] ?? null : null };
   });
+
+  if (!country || country === 'ALL') return mapped;
+  return mapped.filter(
+    (w) => String(w.driverCountry || '').toUpperCase() === country
+  );
 }
 
 export async function adminReviewWithdrawal(input: {

@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { CATALOG_CITIES } from '../types/catalog';
+import { CATALOG_CITIES, countryCodeFromLabelOrCity } from '../types/catalog';
 
 export type ParcelStatus =
   | 'received'
@@ -289,14 +289,23 @@ export function nextParcelStatus(status: ParcelStatus): ParcelStatus | null {
   return PARCEL_TIMELINE[idx + 1];
 }
 
-export async function fetchAllParcelsAdmin(): Promise<ParcelView[]> {
+export async function fetchAllParcelsAdmin(
+  country?: string | 'ALL'
+): Promise<ParcelView[]> {
   const { data, error } = await supabase
     .from('parcel_shipments')
     .select('*')
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => mapParcel(row));
+  const rows = (data ?? []).map((row) => mapParcel(row));
+  if (!country || country === 'ALL') return rows;
+
+  return rows.filter((p) => {
+    const from = countryCodeFromLabelOrCity(p.pickupCity);
+    const to = countryCodeFromLabelOrCity(p.deliveryCity);
+    return from === country || to === country;
+  });
 }
 
 export async function updateParcelStatusAdmin(

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle, Clock, Wallet, XCircle } from 'lucide-react';
+import { useAdminCountry } from '../../context/AdminCountryContext';
 import {
   adminReviewWithdrawal,
   fetchWithdrawalsForAdmin,
@@ -10,6 +11,7 @@ import {
   type WithdrawalStatus,
 } from '../../services/driver-wallet';
 import { formatPrice } from '../../services/catalog';
+import { countryLabel } from '../../types/catalog';
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('fr-FR', {
@@ -22,6 +24,7 @@ function formatDate(iso: string) {
 }
 
 export default function AdminWithdrawalsPage() {
+  const { adminCountry, adminCountryName } = useAdminCountry();
   const [rows, setRows] = useState<WithdrawalRequest[]>([]);
   const [filter, setFilter] = useState<WithdrawalStatus | 'all'>('pending');
   const [loading, setLoading] = useState(true);
@@ -33,7 +36,7 @@ export default function AdminWithdrawalsPage() {
     setLoading(true);
     setError(null);
     try {
-      setRows(await fetchWithdrawalsForAdmin(filter));
+      setRows(await fetchWithdrawalsForAdmin(filter, adminCountry));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
     } finally {
@@ -43,7 +46,7 @@ export default function AdminWithdrawalsPage() {
 
   useEffect(() => {
     void load();
-  }, [filter]);
+  }, [filter, adminCountry]);
 
   const review = async (
     id: string,
@@ -75,7 +78,8 @@ export default function AdminWithdrawalsPage() {
           </div>
           <h1 className="text-2xl font-extrabold">Retraits livreurs</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Validez et marquez comme payés les retraits Mobile Money / Wave (fenêtre ven–dim).
+            Validez et marquez comme payés les retraits Mobile Money / Wave (fenêtre ven–dim) —{' '}
+            {adminCountryName}
           </p>
         </div>
         <select
@@ -101,7 +105,7 @@ export default function AdminWithdrawalsPage() {
         <p className="text-gray-500 text-sm">Chargement…</p>
       ) : rows.length === 0 ? (
         <div className="bg-white border rounded-2xl p-10 text-center text-gray-500">
-          Aucune demande pour ce filtre.
+          Aucune demande pour {adminCountryName}
         </div>
       ) : (
         <div className="space-y-3">
@@ -123,6 +127,7 @@ export default function AdminWithdrawalsPage() {
                       ? PAYOUT_PROVIDER_LABELS[w.provider as PayoutProvider] || w.provider
                       : '—'}{' '}
                     · {w.phone || '—'} · {w.driverCity || '—'}
+                    {w.driverCountry ? ` · ${countryLabel(w.driverCountry)}` : ''}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
                     {formatDate(w.createdAt)} · semaine {w.weekKey}
