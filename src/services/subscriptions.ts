@@ -1,4 +1,9 @@
 import { supabase } from '../lib/supabase';
+import {
+  CITIES_BY_COUNTRY,
+  countryCodeFromLabelOrCity,
+  type CatalogCountryCode,
+} from '../types/catalog';
 import { isLivePayment, startCheckout } from './payments';
 
 export type PlanAudience = 'client' | 'vendor';
@@ -339,26 +344,193 @@ export async function setAdStatus(id: string, status: 'draft' | 'active' | 'ende
   if (error) throw new Error(error.message);
 }
 
-export async function adminListSubscriptions() {
+export interface AdminSubscriptionRow {
+  id: string;
+  status: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  shipping_credits_used: number;
+  term_months: number;
+  discount_pct: number;
+  amount_paid_xof: number | null;
+  user_id: string;
+  userName: string | null;
+  /** Pays résolu (vendeur → boutique ; client → ville du profil). */
+  country: string | null;
+  plan: {
+    code?: string;
+    name?: string;
+    audience?: PlanAudience;
+    price_xof?: number;
+  } | null;
+}
+
+function countryFromCity(city?: string | null): CatalogCountryCode | null {
+  const fromHelper = countryCodeFromLabelOrCity(city);
+  if (fromHelper) return fromHelper;
+  if (!city) return null;
+  const lower = city
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+  for (const [code, cities] of Object.entries(CITIES_BY_COUNTRY) as [
+    CatalogCountryCode,
+    string[],
+  ][]) {
+    if (
+      cities.some(
+        (c) =>
+          c
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase() === lower
+      )
+    ) {
+      return code;
+    }
+  }
+  return null;
+}
+
+async function fetchVendorCountryByUser(
+  userIds: string[]
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (!userIds.length) return map;
+  const { data, error } = await supabase
+    .from('vendors')
+    .select('user_id, country')
+    .in('user_id', userIds);
+  if (error) throw new Error(error.message);
+  for (const row of data || []) {
+    const code = String(row.country || '').toUpperCase();
+    if (code) map.set(row.user_id as string, code);
+  }
+  return map;
+}
+
+async function fetchProfileMetaByUser(
+  userIds: string[]
+): Promise<Map<string, { fullName: string | null; city: string | null }>> {
+  const map = new Map<string, { fullName: string | null; city: string | null }>();
+  if (!userIds.length) return map;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, city')
+    .in('id', userIds);
+  if (error) throw new Error(error.message);
+  for (const row of data || []) {
+    map.set(row.id as string, {
+      fullName: (row.full_name as string) ?? null,
+      city: (row.city as string) ?? null,
+    });
+  }
+  return map;
+}
+
+function resolveSubscriberCountry(
+  audience: string | undefined,
+  userId: string,
+  profileCity: string | null | undefined,
+  vendorCountryByUser: Map<string, string>
+): string | null {
+  if (audience === 'vendor') {
+    return vendorCountryByUser.get(userId) || null;
+  }
+  return (
+    countryFromCity(profileCity) || vendorCountryByUser.get(userId) || null
+  );
+}
+
+export async function adminListSubscriptions(
+  country?: string | 'ALL'
+): Promise<AdminSubscriptionRow[]> {
   const { data, error } = await supabase
     .from('subscriptions')
     .select(
-      'id, status, starts_at, ends_at, shipping_credits_used, term_months, discount_pct, amount_paid_xof, user_id, plan:subscription_plans(code, name, audience, price_xof)'
+      `id, status, starts_at, ends_at, shipping_credits_used, term_months, discount_pct, amount_paid_xof, user_id,
+       plan:subscription_plans(code, name, audience, price_xof)`
     )
     .order('created_at', { ascending: false })
-    .limit(100);
+    .limit(200);
   if (error) throw new Error(error.message);
-  return data || [];
+
+  const rows = data || [];
+  const userIds = [...new Set(rows.map((r) => r.user_id as string))];
+  const [vendorCountryByUser, profilesByUser] = await Promise.all([
+    fetchVendorCountryByUser(userIds),
+    fetchProfileMetaByUser(userIds),
+  ]);
+
+  const mapped: AdminSubscriptionRow[] = rows.map((r) => {
+    const planRaw = Array.isArray(r.plan) ? r.plan[0] : r.plan;
+    const plan = (planRaw as AdminSubscriptionRow['plan']) ?? null;
+    const userId = r.user_id as string;
+    const profile = profilesByUser.get(userId);
+
+    return {
+      id: r.id as string,
+      status: r.status as string,
+      starts_at: (r.starts_at as string) ?? null,
+      ends_at: (r.ends_at as string) ?? null,
+      shipping_credits_used: Number(r.shipping_credits_used ?? 0),
+      term_months: Number(r.term_months ?? 1),
+      discount_pct: Number(r.discount_pct ?? 0),
+      amount_paid_xof:
+        r.amount_paid_xof != null ? Number(r.amount_paid_xof) : null,
+      user_id: userId,
+      userName: profile?.fullName ?? null,
+      country: resolveSubscriberCountry(
+        plan?.audience,
+        userId,
+        profile?.city,
+        vendorCountryByUser
+      ),
+      plan,
+    };
+  });
+
+  if (!country || country === 'ALL') return mapped;
+  return mapped.filter((s) => s.country === country);
 }
 
-export async function adminListAds() {
+export async function adminListAds(
+  country?: string | 'ALL'
+): Promise<(AdPlacement & { country: string | null })[]> {
   const { data, error } = await supabase
     .from('ad_placements')
-    .select('*')
+    .select('*, vendors(country)')
     .order('created_at', { ascending: false })
-    .limit(100);
+    .limit(200);
   if (error) throw new Error(error.message);
-  return (data || []).map((r) => mapAd(r as Record<string, unknown>));
+
+  const rows = data || [];
+  const userIds = [
+    ...new Set(rows.map((r) => r.subscriber_user_id as string).filter(Boolean)),
+  ];
+  const [vendorCountryByUser, profilesByUser] = await Promise.all([
+    fetchVendorCountryByUser(userIds),
+    fetchProfileMetaByUser(userIds),
+  ]);
+
+  const mapped = rows.map((r) => {
+    const ad = mapAd(r as Record<string, unknown>);
+    const vendorRaw = Array.isArray(r.vendors) ? r.vendors[0] : r.vendors;
+    const vendorCountry = String(
+      (vendorRaw as { country?: string } | null)?.country || ''
+    ).toUpperCase();
+    const profile = profilesByUser.get(ad.subscriberUserId);
+    const countryCode =
+      vendorCountry ||
+      countryFromCity(profile?.city) ||
+      vendorCountryByUser.get(ad.subscriberUserId) ||
+      null;
+    return { ...ad, country: countryCode };
+  });
+
+  if (!country || country === 'ALL') return mapped;
+  return mapped.filter((a) => a.country === country);
 }
 
 export function formatPlanPrice(xof: number): string {
