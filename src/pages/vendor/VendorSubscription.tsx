@@ -1,19 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, Loader2, Megaphone, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCountry } from '../../context/CountryContext';
+import SubscriptionTermPicker from '../../components/SubscriptionTermPicker';
 import {
   createAdPlacement,
   fetchActiveSubscription,
   fetchMyAds,
   fetchPlans,
+  fetchSubscriptionTerms,
   formatPlanPrice,
+  formatTermLabel,
+  formatXof,
+  quoteSubscription,
   setAdStatus,
   startSubscriptionCheckout,
   type ActiveSubscription,
   type AdPlacement,
   type AdSlot,
   type SubscriptionPlan,
+  type SubscriptionTerm,
 } from '../../services/subscriptions';
 
 function vendorBenefits(plan: SubscriptionPlan): string[] {
@@ -41,6 +47,8 @@ export default function VendorSubscriptionPage() {
   const { user } = useAuth();
   const { country } = useCountry();
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [terms, setTerms] = useState<SubscriptionTerm[]>([]);
+  const [months, setMonths] = useState(1);
   const [active, setActive] = useState<ActiveSubscription | null>(null);
   const [ads, setAds] = useState<AdPlacement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,15 +69,22 @@ export default function VendorSubscriptionPage() {
 
   const reload = async () => {
     if (!user) return;
-    const [p, a, myAds] = await Promise.all([
+    const [p, a, myAds, t] = await Promise.all([
       fetchPlans('vendor'),
       fetchActiveSubscription(),
       fetchMyAds(user.id),
+      fetchSubscriptionTerms(),
     ]);
     setPlans(p);
     setActive(a?.audience === 'vendor' ? a : null);
     setAds(myAds);
+    setTerms(t);
   };
+
+  const selectedTerm = useMemo(
+    () => terms.find((t) => t.months === months) ?? terms[0],
+    [terms, months]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -97,6 +112,7 @@ export default function VendorSubscriptionPage() {
         planId: plan.id,
         userId: user.id,
         phone: user.phone || '',
+        months,
         customerName: user.fullName,
         customerEmail: user.email,
         country: country || user.vendor?.country || 'BF',
@@ -105,7 +121,9 @@ export default function VendorSubscriptionPage() {
         window.location.assign(res.paymentUrl);
         return;
       }
-      setOkMsg(`Plan ${plan.name} activé (simulation).`);
+      setOkMsg(
+        `Plan ${plan.name} activé pour ${res.months} mois — ${formatXof(res.amountXof)} (simulation).`
+      );
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Paiement impossible');
@@ -163,7 +181,16 @@ export default function VendorSubscriptionPage() {
         </p>
         {active ? (
           <div className="mt-4 rounded-xl bg-[#00A651]/10 border border-[#00A651]/30 p-4 text-sm">
-            <p className="font-bold text-[#00A651]">Actif : {active.planName}</p>
+            <p className="font-bold text-[#00A651]">
+              Actif : {active.planName} · {active.termMonths} mois
+              {active.discountPct > 0 &&
+                ` (remise engagement −${Math.round(active.discountPct * 100)} %)`}
+            </p>
+            {active.amountPaidXof != null && (
+              <p className="text-gray-600 mt-1">
+                Payé : <strong>{formatXof(active.amountPaidXof)}</strong>
+              </p>
+            )}
             {active.endsAt && (
               <p className="text-gray-600 mt-1">
                 Jusqu’au{' '}
@@ -200,9 +227,29 @@ export default function VendorSubscriptionPage() {
         </div>
       )}
 
+      {terms.length > 0 && (
+        <div className="bg-white border border-gray-100 rounded-2xl p-6">
+          <SubscriptionTermPicker
+            terms={terms}
+            selectedMonths={months}
+            onSelect={setMonths}
+            monthlyPriceXof={
+              plans.find((p) => p.code === 'vendor_pro')?.priceXof ??
+              plans.find((p) => p.priceXof > 0)?.priceXof ??
+              0
+            }
+          />
+          <p className="text-xs text-gray-500 mt-3">
+            Remise d’engagement à partir de 12 mois : −10 % sur 1 an, −15 % sur 2 ans, −25 %
+            sur 4 ans. Le tarif est bloqué pendant toute la durée souscrite.
+          </p>
+        </div>
+      )}
+
       <div className="grid md:grid-cols-3 gap-4">
         {plans.map((plan) => {
           const isCurrent = active?.planCode === plan.code;
+          const quote = selectedTerm ? quoteSubscription(plan.priceXof, selectedTerm) : null;
           return (
             <div
               key={plan.id}
@@ -214,6 +261,22 @@ export default function VendorSubscriptionPage() {
             >
               <h3 className="font-extrabold text-lg">{plan.name}</h3>
               <p className="text-[#FF6B00] font-bold mt-1">{formatPlanPrice(plan.priceXof)}</p>
+              {plan.priceXof > 0 && quote && selectedTerm && (
+                <div className="mt-3 rounded-xl bg-gray-50 border border-gray-100 p-3 text-sm">
+                  <p className="font-extrabold text-[#1F2937]">
+                    {formatTermLabel(selectedTerm)} : {formatXof(quote.totalXof)}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    soit {formatXof(quote.effectiveMonthlyXof)} / mois
+                  </p>
+                  {quote.discountXof > 0 && (
+                    <p className="text-xs font-bold text-[#00A651] mt-1">
+                      Économie {formatXof(quote.discountXof)} (−
+                      {Math.round(quote.discountPct * 100)} %)
+                    </p>
+                  )}
+                </div>
+              )}
               <ul className="mt-4 space-y-2 text-sm text-gray-600">
                 {vendorBenefits(plan).map((b) => (
                   <li key={b} className="flex gap-2">
@@ -225,11 +288,15 @@ export default function VendorSubscriptionPage() {
               {plan.priceXof > 0 ? (
                 <button
                   type="button"
-                  disabled={!!busyId || isCurrent}
+                  disabled={!!busyId}
                   onClick={() => subscribe(plan)}
                   className="mt-5 w-full py-3 rounded-xl font-bold text-white bg-[#FF6B00] disabled:bg-gray-300"
                 >
-                  {busyId === plan.id ? '…' : isCurrent ? 'Déjà actif' : 'Choisir'}
+                  {busyId === plan.id
+                    ? '…'
+                    : isCurrent
+                      ? 'Prolonger / changer de durée'
+                      : 'Choisir'}
                 </button>
               ) : (
                 <p className="mt-5 text-xs text-center text-gray-400 font-semibold">Par défaut</p>

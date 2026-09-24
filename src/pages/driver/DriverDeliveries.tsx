@@ -6,6 +6,7 @@ import { coordsForCity, optimizeRouteOrder } from '../../lib/geo';
 import {
   DELIVERY_STATUS_LABELS,
   fetchDriverDeliveries,
+  formatDriverHandle,
   getDriverForUser,
   type DeliveryView,
 } from '../../services/drivers';
@@ -62,6 +63,14 @@ export default function DriverDeliveriesPage() {
   return (
     <div>
       <h1 className="text-2xl font-extrabold mb-2">Mes courses</h1>
+      <div className="mb-6 rounded-2xl border border-gray-200 bg-white px-4 py-3">
+        <p className="text-xs text-gray-500 font-semibold">
+          Identifiant à présenter à la remise des courses
+        </p>
+        <p className="font-mono font-extrabold text-[#FF6B00] break-all">
+          {formatDriverHandle(user?.fullName, user?.driver?.driverCode)}
+        </p>
+      </div>
       <p className="text-sm text-gray-500 mb-6">Géolocalisation et ordre d’itinéraire optimisé</p>
 
       {error && (

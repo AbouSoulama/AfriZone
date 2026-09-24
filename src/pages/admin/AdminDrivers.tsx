@@ -11,7 +11,11 @@ import {
   updateDriverStatus,
   type AdminDriverRow,
 } from '../../services/admin-drivers';
-import { VEHICLE_LABELS, type VehicleType } from '../../services/drivers';
+import {
+  formatDriverHandle,
+  VEHICLE_LABELS,
+  type VehicleType,
+} from '../../services/drivers';
 import type { VendorStatus } from '../../types/auth';
 
 const FILTERS: { key: VendorStatus | 'all' | 'online'; label: string }[] = [
@@ -195,6 +199,9 @@ export default function AdminDriversPage() {
                     )}
                   </div>
                   <p className="text-sm font-semibold mt-0.5">{d.ownerName}</p>
+                  <p className="text-xs font-mono font-bold text-[#1F2937]">
+                    {formatDriverHandle(d.ownerName, d.driverCode)}
+                  </p>
                   <p className="text-xs text-gray-500">
                     {d.ownerPhone} · {d.city} ·{' '}
                     {VEHICLE_LABELS[d.vehicleType as VehicleType] || d.vehicleType}
@@ -270,6 +277,14 @@ export default function AdminDriversPage() {
               <Row label="Téléphone" value={selected.ownerPhone} />
               <Row label="Email" value={selected.ownerEmail} />
               <Row label="Code" value={selected.driverCode} />
+              <Row
+                label="Identifiant remise"
+                value={
+                  <span className="font-mono font-bold">
+                    {formatDriverHandle(selected.ownerName, selected.driverCode)}
+                  </span>
+                }
+              />
               <Row label="Statut" value={STATUS_LABEL[selected.status] || selected.status} />
               <Row
                 label="Présence"
@@ -358,7 +373,7 @@ export default function AdminDriversPage() {
   );
 }
 
-function Row({ label, value }: { label: string; value?: string | null }) {
+function Row({ label, value }: { label: string; value?: React.ReactNode }) {
   return (
     <div>
       <p className="text-[11px] font-bold uppercase text-gray-400">{label}</p>

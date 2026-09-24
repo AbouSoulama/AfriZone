@@ -12,6 +12,7 @@ import {
   type AdminProductRow,
   type AdminShopRow,
 } from '../../services/admin-catalog';
+import { PRODUCT_APPROVAL_LABELS } from '../../types/catalog';
 
 export default function AdminCatalogPage() {
   const [tab, setTab] = useState<'shops' | 'products'>('shops');
@@ -258,7 +259,18 @@ export default function AdminCatalogPage() {
                     <p className="font-extrabold truncate">{p.name}</p>
                     <p className="text-xs text-gray-500">
                       {p.vendorName} · {p.category} · stock {p.stock} ·{' '}
-                      {p.isActive ? 'Actif' : 'Inactif'}
+                      {p.isActive ? 'Actif' : 'Inactif'} ·{' '}
+                      <span
+                        className={
+                          p.approvalStatus === 'approved'
+                            ? 'text-[#00A651] font-bold'
+                            : p.approvalStatus === 'rejected'
+                              ? 'text-red-600 font-bold'
+                              : 'text-amber-600 font-bold'
+                        }
+                      >
+                        {PRODUCT_APPROVAL_LABELS[p.approvalStatus]}
+                      </span>
                     </p>
                     <p className="text-sm font-bold text-[#FF6B00]">{formatPrice(p.price)}</p>
                   </div>

@@ -76,6 +76,24 @@ export const DELIVERY_STATUS_LABELS: Record<DeliveryJobStatus, string> = {
   cancelled: 'Annulée',
 };
 
+/**
+ * Identifiant présenté à la remise des courses : nom complet + code livreur.
+ * Ex. « Issouf KONE » + « LV-BF-OUA-6987 » → `Issouf_KONE_LV-BF-OUA-6987`.
+ */
+export function formatDriverHandle(
+  fullName?: string | null,
+  driverCode?: string | null
+): string {
+  const name = (fullName || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .join('_');
+  if (!name) return driverCode || '—';
+  if (!driverCode) return name;
+  return `${name}_${driverCode}`;
+}
+
 export function mapDriver(row: Record<string, unknown>): DriverProfile {
   return {
     id: row.id as string,

@@ -12,6 +12,8 @@ export interface DeliveryBatchView {
   createdAt: string;
   deliveryCount?: number;
   orderNumbers?: string[];
+  driverCode?: string | null;
+  driverName?: string | null;
 }
 
 function mapBatch(row: Record<string, unknown>): DeliveryBatchView {
@@ -71,13 +73,41 @@ export async function fetchDriverBatches(driverId: string): Promise<DeliveryBatc
 export async function fetchAdminBatches(): Promise<DeliveryBatchView[]> {
   const { data, error } = await supabase
     .from('delivery_batches')
-    .select('*')
+    .select('*, drivers ( driver_code, user_id )')
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) throw new Error(error.message);
 
-  const batches = (data ?? []).map((r) => mapBatch(r as Record<string, unknown>));
+  const rows = data ?? [];
+  const batches = rows.map((r) => mapBatch(r as Record<string, unknown>));
   if (!batches.length) return batches;
+
+  // Identité du livreur (nom + code) affichée à la remise des courses
+  const driverByBatch = new Map<string, { code: string | null; userId: string | null }>();
+  for (const row of rows) {
+    const raw = (row as { drivers?: unknown }).drivers;
+    const driver = (Array.isArray(raw) ? raw[0] : raw) as Record<string, unknown> | null;
+    driverByBatch.set(row.id as string, {
+      code: (driver?.driver_code as string) ?? null,
+      userId: (driver?.user_id as string) ?? null,
+    });
+  }
+
+  const driverUserIds = [
+    ...new Set(
+      [...driverByBatch.values()].map((d) => d.userId).filter((x): x is string => Boolean(x))
+    ),
+  ];
+  let namesByUser: Record<string, string> = {};
+  if (driverUserIds.length) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', driverUserIds);
+    namesByUser = Object.fromEntries(
+      (profiles ?? []).map((p) => [p.id as string, (p.full_name as string) || ''])
+    );
+  }
 
   const ids = batches.map((b) => b.id);
   const { data: dels } = await supabase
@@ -97,11 +127,16 @@ export async function fetchAdminBatches(): Promise<DeliveryBatchView[]> {
     byBatch.set(bid, cur);
   }
 
-  return batches.map((b) => ({
-    ...b,
-    deliveryCount: byBatch.get(b.id)?.count ?? 0,
-    orderNumbers: byBatch.get(b.id)?.numbers ?? [],
-  }));
+  return batches.map((b) => {
+    const driver = driverByBatch.get(b.id);
+    return {
+      ...b,
+      deliveryCount: byBatch.get(b.id)?.count ?? 0,
+      orderNumbers: byBatch.get(b.id)?.numbers ?? [],
+      driverCode: driver?.code ?? null,
+      driverName: driver?.userId ? namesByUser[driver.userId] || null : null,
+    };
+  });
 }
 
 export async function driverRespondBatch(batchId: string, accept: boolean): Promise<void> {

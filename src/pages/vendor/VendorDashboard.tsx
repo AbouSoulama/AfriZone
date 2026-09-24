@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
+  BadgeCheck,
   Package,
   Plus,
   ShoppingBag,
@@ -75,6 +76,20 @@ export default function VendorDashboard() {
       color: '#EF4444',
       to: '/vendeur/produits',
     },
+    {
+      label: 'En attente de validation',
+      value: stats?.pendingApproval ?? 0,
+      icon: BadgeCheck,
+      color: '#D97706',
+      to: '/vendeur/produits',
+    },
+    {
+      label: 'Produits refusés',
+      value: stats?.rejected ?? 0,
+      icon: AlertTriangle,
+      color: '#B91C1C',
+      to: '/vendeur/produits',
+    },
   ];
 
   return (
@@ -116,7 +131,7 @@ export default function VendorDashboard() {
 
       {loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {[1, 2, 3, 4].map((i) => (
+          {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="h-28 bg-white rounded-2xl border animate-pulse" />
           ))}
         </div>

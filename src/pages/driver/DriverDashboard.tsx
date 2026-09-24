@@ -4,6 +4,7 @@ import { CheckCircle, Package, QrCode, Truck, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
   fetchDriverStats,
+  formatDriverHandle,
   getDriverForUser,
   VEHICLE_LABELS,
   type VehicleType,
@@ -52,11 +53,13 @@ export default function DriverDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-extrabold">Tableau de bord</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {user?.fullName} ·{' '}
+          <p className="font-mono font-bold text-[#FF6B00] mt-1 break-all">
+            {formatDriverHandle(user?.fullName, user?.driver?.driverCode)}
+          </p>
+          <p className="text-sm text-gray-500 mt-0.5">
             {VEHICLE_LABELS[(user?.driver?.vehicleType as VehicleType) || 'moto'] ||
               user?.driver?.vehicleType}{' '}
-            · {user?.driver?.city}
+            · {user?.driver?.city} — identifiant à présenter à la remise des courses
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

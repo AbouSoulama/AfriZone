@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
-import type { CatalogProduct, DeliveryMode } from '../types/catalog';
+import type { CatalogProduct } from '../types/catalog';
+import { mapProductRow } from './product-mapper';
 
 export interface CartItemRow {
   id: string;
@@ -28,31 +29,7 @@ function mapProduct(row: Record<string, unknown>): CatalogProduct {
   const vendorRaw = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
   const vendor = vendorRaw as Record<string, unknown> | null | undefined;
   return {
-    id: row.id as string,
-    name: row.name as string,
-    slug: row.slug as string,
-    description: (row.description as string) ?? null,
-    category: row.category as string,
-    subcategory: (row.subcategory as string) ?? null,
-    price: Number(row.price),
-    oldPrice: row.old_price != null ? Number(row.old_price) : null,
-    currency: (row.currency as string) || 'FCFA',
-    stock: Number(row.stock ?? 0),
-    condition: (row.condition as string) || 'neuf',
-    weightKg: row.weight_kg != null ? Number(row.weight_kg) : null,
-    deliveryMode: row.delivery_mode as DeliveryMode,
-    deliveryZones: (row.delivery_zones as string[]) ?? null,
-    vendorDeliveryFee:
-      row.vendor_delivery_fee != null ? Number(row.vendor_delivery_fee) : null,
-    images: (row.images as string[]) ?? [],
-    mainImage: (row.main_image as string) ?? null,
-    rating: Number(row.rating ?? 0),
-    reviewCount: Number(row.review_count ?? 0),
-    soldCount: Number(row.sold_count ?? 0),
-    isActive: Boolean(row.is_active),
-    isFeatured: Boolean(row.is_featured),
-    tags: (row.tags as string[]) ?? [],
-    createdAt: row.created_at as string,
+    ...mapProductRow(row),
     vendor: vendor
       ? {
           id: vendor.id as string,

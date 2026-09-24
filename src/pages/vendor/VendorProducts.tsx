@@ -10,7 +10,14 @@ import {
   setProductActive,
   updateStock,
 } from '../../services/vendor';
-import type { CatalogProduct } from '../../types/catalog';
+import { PRODUCT_APPROVAL_LABELS } from '../../types/catalog';
+import type { CatalogProduct, ProductApprovalStatus } from '../../types/catalog';
+
+const APPROVAL_BADGE: Record<ProductApprovalStatus, string> = {
+  pending: 'bg-amber-50 text-amber-700',
+  approved: 'bg-green-50 text-[#00A651]',
+  rejected: 'bg-red-50 text-red-600',
+};
 
 export default function VendorProductsPage() {
   const { user } = useAuth();
@@ -61,6 +68,8 @@ export default function VendorProductsPage() {
     await load(vendorId);
   };
 
+  const pendingCount = products.filter((p) => p.approvalStatus === 'pending').length;
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -79,6 +88,13 @@ export default function VendorProductsPage() {
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 mb-4 text-sm">
           {error}
+        </div>
+      )}
+
+      {pendingCount > 0 && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 mb-4 text-sm">
+          {pendingCount} produit(s) en attente de validation par l’équipe AfriZone. Ils
+          n’apparaissent ni sur l’accueil ni dans le catalogue avant approbation.
         </div>
       )}
 
@@ -104,7 +120,8 @@ export default function VendorProductsPage() {
                   <th className="px-4 py-3">Prix</th>
                   <th className="px-4 py-3">Stock</th>
                   <th className="px-4 py-3">Livraison</th>
-                  <th className="px-4 py-3">Statut</th>
+                  <th className="px-4 py-3">Validation</th>
+                  <th className="px-4 py-3">Vente</th>
                   <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
@@ -125,6 +142,11 @@ export default function VendorProductsPage() {
                         <div>
                           <p className="font-semibold text-[#1F2937]">{p.name}</p>
                           <p className="text-xs text-gray-400">{p.category}</p>
+                          {p.realImages.length === 0 && (
+                            <p className="text-xs text-amber-600 font-semibold">
+                              Photo réelle manquante (étape 2)
+                            </p>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -145,6 +167,20 @@ export default function VendorProductsPage() {
                     </td>
                     <td className="px-4 py-3 text-xs">
                       {p.deliveryMode === 'afrizone' ? 'AfriZone' : 'Vendeur'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`text-xs font-bold px-2 py-1 rounded-full whitespace-nowrap ${
+                          APPROVAL_BADGE[p.approvalStatus] ?? APPROVAL_BADGE.pending
+                        }`}
+                      >
+                        {PRODUCT_APPROVAL_LABELS[p.approvalStatus]}
+                      </span>
+                      {p.approvalStatus === 'rejected' && p.rejectionReason && (
+                        <p className="text-xs text-red-600 mt-1 max-w-[220px]">
+                          {p.rejectionReason}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span

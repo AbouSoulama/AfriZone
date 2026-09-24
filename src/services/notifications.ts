@@ -1,6 +1,14 @@
 import { supabase } from '../lib/supabase';
 
-export type NotificationType = 'order' | 'parcel' | 'delivery' | 'account' | 'info' | 'system';
+export type NotificationType =
+  | 'order'
+  | 'parcel'
+  | 'delivery'
+  | 'product'
+  | 'payment'
+  | 'account'
+  | 'info'
+  | 'system';
 
 export interface AppNotification {
   id: string;

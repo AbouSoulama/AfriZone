@@ -27,6 +27,12 @@ export interface DriverProfile {
   rating: number;
   totalDeliveries: number;
   rejectionReason: string | null;
+  /** Nom du titulaire (table `profiles`) — renseigné par les requêtes admin. */
+  ownerName?: string | null;
+  isOnline?: boolean;
+  lastLat?: number | null;
+  lastLng?: number | null;
+  lastLocationAt?: string | null;
 }
 
 export interface DriverRegisterInput {
@@ -91,6 +97,24 @@ export const DELIVERY_TIMELINE: DeliveryJobStatus[] = [
   'delivered',
 ];
 
+/**
+ * Identifiant affiché à la remise des courses : nom complet + code livreur.
+ * Ex. « Issouf KONE » + « LV-BF-OUA-6987 » → `Issouf_KONE_LV-BF-OUA-6987`.
+ */
+export function formatDriverHandle(
+  fullName?: string | null,
+  driverCode?: string | null
+): string {
+  const name = (fullName || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .join('_');
+  if (!name) return driverCode || '—';
+  if (!driverCode) return name;
+  return `${name}_${driverCode}`;
+}
+
 export function generateDriverCode(country: string, city: string): string {
   const cityCode = city
     .normalize('NFD')
@@ -120,6 +144,10 @@ export function mapDriver(row: Record<string, unknown>): DriverProfile {
     rating: Number(row.rating ?? 0),
     totalDeliveries: Number(row.total_deliveries ?? 0),
     rejectionReason: (row.rejection_reason as string) ?? null,
+    isOnline: Boolean(row.is_online),
+    lastLat: row.last_lat != null ? Number(row.last_lat) : null,
+    lastLng: row.last_lng != null ? Number(row.last_lng) : null,
+    lastLocationAt: (row.last_location_at as string) ?? null,
   };
 }
 

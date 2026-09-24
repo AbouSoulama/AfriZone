@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
+  BadgeCheck,
   Bike,
   LayoutDashboard,
   LogOut,
@@ -25,6 +26,7 @@ const NAV = [
   { to: '/admin/commandes', label: 'Commandes', icon: ShoppingBag },
   { to: '/admin/utilisateurs', label: 'Utilisateurs', icon: UserSquare2 },
   { to: '/admin/catalogue', label: 'Boutiques', icon: Store },
+  { to: '/admin/produits-a-valider', label: 'Produits à valider', icon: BadgeCheck },
   { to: '/admin/vendeurs', label: 'Vendeurs', icon: Users },
   { to: '/admin/livreurs', label: 'Livreurs', icon: Bike },
   { to: '/admin/suivi-gps', label: 'Suivi GPS', icon: MapPin },

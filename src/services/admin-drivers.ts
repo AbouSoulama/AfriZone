@@ -19,10 +19,17 @@ export interface AdminDriverRow extends DriverProfile {
   lastLocationAt: string | null;
 }
 
-function mapDeliveryAdmin(row: Record<string, unknown>): DeliveryView & {
+export type AdminDeliveryView = DeliveryView & {
   driverCode?: string | null;
   driverName?: string | null;
-} {
+  driverUserId?: string | null;
+  batchId?: string | null;
+  offeredFee?: number | null;
+  acceptDeadlineAt?: string | null;
+  startDeadlineAt?: string | null;
+};
+
+function mapDeliveryAdmin(row: Record<string, unknown>): AdminDeliveryView {
   const driver = Array.isArray(row.drivers) ? row.drivers[0] : row.drivers;
   const d = driver as Record<string, unknown> | null | undefined;
   const order = Array.isArray(row.orders) ? row.orders[0] : row.orders;
@@ -54,6 +61,11 @@ function mapDeliveryAdmin(row: Record<string, unknown>): DeliveryView & {
     kind: row.order_id ? 'order' : 'parcel',
     driverCode: d ? ((d.driver_code as string) ?? null) : null,
     driverName: null,
+    driverUserId: d ? ((d.user_id as string) ?? null) : null,
+    batchId: (row.batch_id as string) ?? null,
+    offeredFee: row.offered_fee != null ? Number(row.offered_fee) : null,
+    acceptDeadlineAt: (row.accept_deadline_at as string) ?? null,
+    startDeadlineAt: (row.start_deadline_at as string) ?? null,
   };
 }
 
@@ -69,7 +81,7 @@ export async function fetchDriversForAdmin(
   if (error) throw new Error(error.message);
 
   const rows = data ?? [];
-  const userIds = rows.map((r) => r.user_id as string);
+  const userIds = [...new Set(rows.map((r) => r.user_id as string).filter(Boolean))];
   let profilesById: Record<string, { full_name?: string; phone?: string; email?: string }> = {};
   if (userIds.length) {
     const { data: profiles } = await supabase
@@ -140,20 +152,43 @@ export async function deleteDriverAdmin(driverId: string): Promise<void> {
   }
 }
 
+/** Nom complet des titulaires de comptes livreurs, indexé par `user_id`. */
+async function fetchOwnerNames(userIds: string[]): Promise<Record<string, string>> {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  if (!ids.length) return {};
+  const { data } = await supabase.from('profiles').select('id, full_name').in('id', ids);
+  return Object.fromEntries(
+    (data ?? []).map((p) => [p.id as string, (p.full_name as string) || ''])
+  );
+}
+
 export async function fetchApprovedDrivers(country?: string | 'ALL'): Promise<DriverProfile[]> {
   let query = supabase.from('drivers').select('*').eq('status', 'approved').order('city');
   if (country && country !== 'ALL') query = query.eq('country', country);
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => mapDriver(row));
+
+  const rows = data ?? [];
+  const names = await fetchOwnerNames(rows.map((r) => r.user_id as string));
+
+  return rows.map((row) => ({
+    ...mapDriver(row),
+    ownerName: names[row.user_id as string] || null,
+  }));
 }
+
+const ASSIGNABLE_ORDER_SELECT = `
+  id, order_number, status, payment_status, payment_method,
+  shipping_address, shipping_city, shipping_country, shipping_phone,
+  shipping_lat, shipping_lng, subtotal, shipping_cost, total, notes,
+  created_at, updated_at,
+  vendors ( id, shop_name, vendor_code, city, country, address )
+`;
 
 export async function fetchAssignableOrders(country?: string | 'ALL') {
   const { data: orders, error } = await supabase
     .from('orders')
-    .select(
-      'id, order_number, status, shipping_address, shipping_city, shipping_country, shipping_phone, total, created_at, vendors(country)'
-    )
+    .select(ASSIGNABLE_ORDER_SELECT)
     .in('status', ['confirmed', 'processing', 'shipped'])
     .order('created_at', { ascending: false })
     .limit(80);
@@ -175,6 +210,132 @@ export async function fetchAssignableOrders(country?: string | 'ALL') {
     const v = Array.isArray(vendors) ? vendors[0] : vendors;
     return String(v?.country || '').toUpperCase() === country;
   });
+}
+
+export interface AssignableOrderItem {
+  productName: string;
+  quantity: number;
+  price: number;
+  total: number;
+  weightKg: number | null;
+  deliveryMode: string | null;
+  mainImage: string | null;
+}
+
+export interface AssignableOrderDetail {
+  id: string;
+  orderNumber: string;
+  status: string;
+  paymentStatus: string | null;
+  paymentMethod: string | null;
+  subtotal: number;
+  shippingCost: number;
+  total: number;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+  shippingAddress: string;
+  shippingCity: string;
+  shippingCountry: string | null;
+  shippingPhone: string | null;
+  shippingLat: number | null;
+  shippingLng: number | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  customerEmail: string | null;
+  vendorName: string | null;
+  vendorCode: string | null;
+  vendorCity: string | null;
+  vendorCountry: string | null;
+  vendorAddress: string | null;
+  items: AssignableOrderItem[];
+  totalWeightKg: number;
+}
+
+/** Fiche complète d'une commande, pour décider de l'assignation à un livreur. */
+export async function fetchAssignableOrderDetail(
+  orderId: string
+): Promise<AssignableOrderDetail | null> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(
+      `
+      ${ASSIGNABLE_ORDER_SELECT},
+      user_id,
+      order_items (
+        quantity, price, total,
+        products ( name, weight_kg, delivery_mode, main_image )
+      )
+    `
+    )
+    .eq('id', orderId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  const row = data as Record<string, unknown>;
+  const vendorRaw = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
+  const vendor = vendorRaw as Record<string, unknown> | null | undefined;
+
+  let customer: { full_name?: string; phone?: string; email?: string } | null = null;
+  if (row.user_id) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, phone, email')
+      .eq('id', row.user_id as string)
+      .maybeSingle();
+    customer = profile ?? null;
+  }
+
+  const items: AssignableOrderItem[] = ((row.order_items as Record<string, unknown>[]) ?? []).map(
+    (it) => {
+      const productRaw = Array.isArray(it.products) ? it.products[0] : it.products;
+      const product = productRaw as Record<string, unknown> | null | undefined;
+      return {
+        productName: (product?.name as string) || 'Produit',
+        quantity: Number(it.quantity ?? 0),
+        price: Number(it.price ?? 0),
+        total: Number(it.total ?? 0),
+        weightKg: product?.weight_kg != null ? Number(product.weight_kg) : null,
+        deliveryMode: (product?.delivery_mode as string) ?? null,
+        mainImage: (product?.main_image as string) ?? null,
+      };
+    }
+  );
+
+  return {
+    id: row.id as string,
+    orderNumber: row.order_number as string,
+    status: row.status as string,
+    paymentStatus: (row.payment_status as string) ?? null,
+    paymentMethod: (row.payment_method as string) ?? null,
+    subtotal: Number(row.subtotal ?? 0),
+    shippingCost: Number(row.shipping_cost ?? 0),
+    total: Number(row.total ?? 0),
+    notes: (row.notes as string) ?? null,
+    createdAt: row.created_at as string,
+    updatedAt: (row.updated_at as string) ?? null,
+    shippingAddress: row.shipping_address as string,
+    shippingCity: row.shipping_city as string,
+    shippingCountry: (row.shipping_country as string) ?? null,
+    shippingPhone: (row.shipping_phone as string) ?? null,
+    shippingLat: row.shipping_lat != null ? Number(row.shipping_lat) : null,
+    shippingLng: row.shipping_lng != null ? Number(row.shipping_lng) : null,
+    customerName: customer?.full_name ?? null,
+    customerPhone: customer?.phone ?? null,
+    customerEmail: customer?.email ?? null,
+    vendorName: (vendor?.shop_name as string) ?? null,
+    vendorCode: (vendor?.vendor_code as string) ?? null,
+    vendorCity: (vendor?.city as string) ?? null,
+    vendorCountry: (vendor?.country as string) ?? null,
+    vendorAddress: (vendor?.address as string) ?? null,
+    items,
+    totalWeightKg: items.reduce(
+      (sum, it) => sum + (it.weightKg ?? 0) * Math.max(1, it.quantity),
+      0
+    ),
+  };
 }
 
 export async function fetchAssignableParcels() {
@@ -265,15 +426,13 @@ export async function assignParcelToDriver(
   if (insertError) throw new Error(insertError.message);
 }
 
-export async function fetchAllDeliveriesAdmin(): Promise<
-  (DeliveryView & { driverCode?: string | null })[]
-> {
+export async function fetchAllDeliveriesAdmin(): Promise<AdminDeliveryView[]> {
   const { data, error } = await supabase
     .from('deliveries')
     .select(
       `
       *,
-      drivers ( driver_code ),
+      drivers ( driver_code, user_id ),
       orders ( order_number ),
       parcel_shipments ( tracking_number )
     `
@@ -281,7 +440,16 @@ export async function fetchAllDeliveriesAdmin(): Promise<
     .order('created_at', { ascending: false })
     .limit(100);
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => mapDeliveryAdmin(row as Record<string, unknown>));
+
+  const jobs = (data ?? []).map((row) => mapDeliveryAdmin(row as Record<string, unknown>));
+  const names = await fetchOwnerNames(
+    jobs.map((j) => j.driverUserId).filter((x): x is string => Boolean(x))
+  );
+
+  return jobs.map((job) => ({
+    ...job,
+    driverName: job.driverUserId ? names[job.driverUserId] || null : null,
+  }));
 }
 
 export async function getDriverDocumentUrl(path: string): Promise<string | null> {

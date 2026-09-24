@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { CatalogProduct, CatalogVendor } from '../types/catalog';
+import { mapProductRow } from './product-mapper';
 
 export interface AdminShopRow extends CatalogVendor {
   userId: string;
@@ -11,6 +12,9 @@ export interface AdminShopRow extends CatalogVendor {
 export interface AdminProductRow extends CatalogProduct {
   vendorId: string;
   vendorName?: string | null;
+  vendorCity?: string | null;
+  vendorCountry?: string | null;
+  vendorCode?: string | null;
 }
 
 function mapShop(row: Record<string, unknown>): AdminShopRow {
@@ -38,33 +42,12 @@ function mapProduct(row: Record<string, unknown>): AdminProductRow {
   const vendor = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
   const v = vendor as Record<string, unknown> | null | undefined;
   return {
-    id: row.id as string,
+    ...mapProductRow(row),
     vendorId: row.vendor_id as string,
     vendorName: v ? ((v.shop_name as string) ?? null) : null,
-    name: row.name as string,
-    slug: row.slug as string,
-    description: (row.description as string) ?? null,
-    category: row.category as string,
-    subcategory: (row.subcategory as string) ?? null,
-    price: Number(row.price),
-    oldPrice: row.old_price != null ? Number(row.old_price) : null,
-    currency: (row.currency as string) || 'FCFA',
-    stock: Number(row.stock ?? 0),
-    condition: (row.condition as string) || 'neuf',
-    weightKg: row.weight_kg != null ? Number(row.weight_kg) : null,
-    deliveryMode: row.delivery_mode as CatalogProduct['deliveryMode'],
-    deliveryZones: (row.delivery_zones as string[]) ?? null,
-    vendorDeliveryFee:
-      row.vendor_delivery_fee != null ? Number(row.vendor_delivery_fee) : null,
-    images: (row.images as string[]) ?? [],
-    mainImage: (row.main_image as string) ?? null,
-    rating: Number(row.rating ?? 0),
-    reviewCount: Number(row.review_count ?? 0),
-    soldCount: Number(row.sold_count ?? 0),
-    isActive: Boolean(row.is_active),
-    isFeatured: Boolean(row.is_featured),
-    tags: (row.tags as string[]) ?? [],
-    createdAt: row.created_at as string,
+    vendorCity: v ? ((v.city as string) ?? null) : null,
+    vendorCountry: v ? ((v.country as string) ?? null) : null,
+    vendorCode: v ? ((v.vendor_code as string) ?? null) : null,
   };
 }
 
@@ -93,10 +76,12 @@ export async function fetchShopsForAdmin(): Promise<AdminShopRow[]> {
   return shops.map((s) => ({ ...s, productsCount: counts[s.id] || 0 }));
 }
 
+const ADMIN_PRODUCT_SELECT = '*, vendors(shop_name, city, country, vendor_code)';
+
 export async function fetchProductsForAdmin(vendorId?: string): Promise<AdminProductRow[]> {
   let query = supabase
     .from('products')
-    .select('*, vendors(shop_name)')
+    .select(ADMIN_PRODUCT_SELECT)
     .order('created_at', { ascending: false })
     .limit(200);
 
@@ -105,6 +90,46 @@ export async function fetchProductsForAdmin(vendorId?: string): Promise<AdminPro
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []).map((r) => mapProduct(r as Record<string, unknown>));
+}
+
+/**
+ * Produits soumis par les vendeurs, à valider avant publication.
+ * `status` = 'pending' par défaut ; 'rejected' pour relire les refus.
+ */
+export async function fetchProductsToReview(
+  status: 'pending' | 'rejected' | 'approved' = 'pending',
+  country?: string | 'ALL'
+): Promise<AdminProductRow[]> {
+  const { data, error } = await supabase
+    .from('products')
+    .select(ADMIN_PRODUCT_SELECT)
+    .eq('approval_status', status)
+    .order('approval_requested_at', { ascending: true })
+    .limit(200);
+
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []).map((r) => mapProduct(r as Record<string, unknown>));
+  if (!country || country === 'ALL') return rows;
+  return rows.filter((p) => (p.vendorCountry || '').toUpperCase() === country);
+}
+
+export async function reviewProductAdmin(
+  productId: string,
+  approve: boolean,
+  reason?: string
+): Promise<void> {
+  const { error } = await supabase.rpc('admin_review_product', {
+    p_product_id: productId,
+    p_approve: approve,
+    p_reason: reason?.trim() || null,
+  });
+  if (error) {
+    throw new Error(
+      error.message.includes('function') || error.message.includes('schema cache')
+        ? 'Validation produit indisponible : exécutez la migration 027_product_approval_reception.sql'
+        : error.message
+    );
+  }
 }
 
 export async function updateShopAdmin(

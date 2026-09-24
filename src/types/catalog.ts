@@ -1,6 +1,27 @@
 export type DeliveryMode = 'vendor' | 'afrizone';
 export type ProductCondition = 'neuf' | 'occasion';
 
+/** Validation admin : un produit n'est public qu'une fois `approved`. */
+export type ProductApprovalStatus = 'pending' | 'approved' | 'rejected';
+
+/** Comment AfriZone réceptionne le produit (étape 2 du formulaire vendeur). */
+export type HandoverMethod = 'drop_off' | 'pickup_request' | 'vendor_stock';
+
+/** Étape 2 : réception du produit dans l'entrepôt AfriZone. */
+export interface ProductReception {
+  handoverMethod: HandoverMethod | null;
+  warehouseCity: string | null;
+  expectedDropoffAt: string | null;
+  packageCount: number | null;
+  packageWeightKg: number | null;
+  packageLengthCm: number | null;
+  packageWidthCm: number | null;
+  packageHeightCm: number | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  notes: string | null;
+}
+
 export interface CatalogVendor {
   id: string;
   shopName: string;
@@ -39,8 +60,11 @@ export interface CatalogProduct {
   deliveryMode: DeliveryMode;
   deliveryZones: string[] | null;
   vendorDeliveryFee: number | null;
+  /** Photos génériques / catalogue (étape 1) */
   images: string[];
   mainImage: string | null;
+  /** Photos réelles du produit (étape 2, réception entrepôt) */
+  realImages: string[];
   rating: number;
   reviewCount: number;
   soldCount: number;
@@ -48,6 +72,11 @@ export interface CatalogProduct {
   isFeatured: boolean;
   tags: string[];
   createdAt: string;
+  approvalStatus: ProductApprovalStatus;
+  approvalRequestedAt: string | null;
+  approvedAt: string | null;
+  rejectionReason: string | null;
+  reception: ProductReception;
   vendor?: CatalogVendor | null;
 }
 
@@ -161,3 +190,62 @@ export function countryCodeFromLabelOrCity(raw?: string | null): CatalogCountryC
 export function capitalForCountry(code: CatalogCountryCode): string {
   return CATALOG_COUNTRIES.find((c) => c.code === code)?.capital || 'Dakar';
 }
+
+/** Entrepôts / hubs AfriZone où le vendeur dépose sa marchandise */
+export interface AfrizoneWarehouse {
+  city: string;
+  label: string;
+  address: string;
+}
+
+export const AFRIZONE_WAREHOUSES: Record<CatalogCountryCode, AfrizoneWarehouse[]> = {
+  BF: [
+    {
+      city: 'Ouagadougou',
+      label: 'Hub Ouagadougou (Zone industrielle Kossodo)',
+      address: 'Entrepôt AfriZone, Zone industrielle de Kossodo, Ouagadougou',
+    },
+    {
+      city: 'Bobo-Dioulasso',
+      label: 'Hub Bobo-Dioulasso (Secteur 21)',
+      address: 'Entrepôt AfriZone, Secteur 21, Bobo-Dioulasso',
+    },
+  ],
+  ML: [
+    {
+      city: 'Bamako',
+      label: 'Hub Bamako (Sotuba ACI)',
+      address: 'Entrepôt AfriZone, Sotuba ACI, Bamako',
+    },
+  ],
+  SN: [
+    {
+      city: 'Dakar',
+      label: 'Hub Dakar (Zone de captage)',
+      address: 'Entrepôt AfriZone, Zone de captage, Dakar',
+    },
+    {
+      city: 'Thies',
+      label: 'Hub Thiès (Route de Dakar)',
+      address: 'Entrepôt AfriZone, Route de Dakar, Thiès',
+    },
+  ],
+};
+
+export function warehousesForCountry(code?: string | null): AfrizoneWarehouse[] {
+  const normalized = countryCodeFromLabelOrCity(code);
+  if (normalized) return AFRIZONE_WAREHOUSES[normalized];
+  return Object.values(AFRIZONE_WAREHOUSES).flat();
+}
+
+export const HANDOVER_METHOD_LABELS: Record<HandoverMethod, string> = {
+  drop_off: 'Je dépose au hub AfriZone',
+  pickup_request: 'AfriZone vient enlever chez moi',
+  vendor_stock: 'Je garde le stock et je livre moi-même',
+};
+
+export const PRODUCT_APPROVAL_LABELS: Record<ProductApprovalStatus, string> = {
+  pending: 'En attente de validation',
+  approved: 'Approuvé',
+  rejected: 'Refusé',
+};

@@ -1,11 +1,12 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
+import withAllowScreenShare from './plugins/withAllowScreenShare';
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   const next: ExpoConfig = {
     ...config,
     name: 'AfriZone Livraison',
     slug: 'afrizone-driver',
-    version: '1.2.0',
+    version: '1.2.1',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
@@ -27,6 +28,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     android: {
       package: 'com.afrizone.driver',
+      versionCode: 12,
       adaptiveIcon: {
         backgroundColor: '#1FAE4B',
         foregroundImage: './assets/adaptive-icon.png',
@@ -44,6 +46,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       favicon: './assets/favicon.png',
     },
     plugins: [
+      withAllowScreenShare,
       'expo-image',
       [
         'expo-image-picker',

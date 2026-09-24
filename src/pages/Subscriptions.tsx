@@ -16,6 +16,15 @@ const VENDOR_PRO = [
   'Priorité dans les vendeurs vedettes',
 ];
 
+/** Barème d'engagement (miroir de `subscription_terms`, migration 028). */
+const TERM_HIGHLIGHTS = [
+  { label: '1 mois', discount: 0 },
+  { label: '6 mois', discount: 0 },
+  { label: '12 mois', discount: 10 },
+  { label: '24 mois', discount: 15 },
+  { label: '48 mois', discount: 25 },
+];
+
 const VENDOR_BIZ = [
   'Tout Pro inclus',
   'Jusqu’à 8 produits mis en avant',
@@ -50,6 +59,35 @@ export default function SubscriptionsPage() {
             recréer un profil. Nouveaux visiteurs : créez un compte client ou vendeur,
             puis choisissez votre plan.
           </p>
+        </div>
+
+        <div className="mb-10 rounded-2xl border border-[#FF6B00]/30 bg-white p-6">
+          <h2 className="font-extrabold text-lg mb-1">Choisissez votre durée</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            1, 6, 12, 24 ou 48 mois. Les remises d’engagement démarrent à partir de 1 an et
+            s’appliquent aux plans client comme vendeur.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            {TERM_HIGHLIGHTS.map((t) => (
+              <div
+                key={t.label}
+                className={`rounded-xl border-2 p-3 text-center ${
+                  t.discount > 0
+                    ? 'border-[#00A651]/40 bg-green-50/60'
+                    : 'border-gray-200 bg-gray-50'
+                }`}
+              >
+                <p className="font-extrabold text-sm">{t.label}</p>
+                <p
+                  className={`text-xs font-bold mt-1 ${
+                    t.discount > 0 ? 'text-[#00A651]' : 'text-gray-400'
+                  }`}
+                >
+                  {t.discount > 0 ? `−${t.discount} %` : 'tarif de base'}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6 mb-8">

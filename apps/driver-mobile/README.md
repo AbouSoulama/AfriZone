@@ -39,7 +39,7 @@ Distribution interne, **pas** Play Store.
 cd apps/driver-mobile
 npm install -g eas-cli   # une fois
 eas login
-eas build -p android --profile preview
+eas build --platform android --profile preview
 ```
 
 Le profil `preview` dans `eas.json` produit un **APK**.  
@@ -67,7 +67,7 @@ Sans App Store public :
 | **Ad Hoc** | UDID de chaque iPhone, profil de provisioning Ad Hoc, redistribution à chaque nouvel appareil |
 
 ```bash
-eas build -p ios --profile preview-ios
+eas build --platform ios --profile preview-ios
 ```
 
 Priorité terrain : **Android APK** pour les premiers livreurs ; iOS dès que les UDID / emails TestFlight sont recensés.

@@ -6,10 +6,14 @@ import type {
   CatalogVendor,
 } from '../types/catalog';
 import { countryCodeFromLabelOrCity } from '../types/catalog';
+import { mapProductRow } from './product-mapper';
 
 type ProductRow = Record<string, unknown> & {
   vendors?: Record<string, unknown> | Record<string, unknown>[] | null;
 };
+
+/** Un produit n'est public que s'il est actif ET approuvé par l'admin. */
+const PUBLIC_APPROVAL_STATUS = 'approved';
 
 function mapVendor(row: Record<string, unknown> | null | undefined): CatalogVendor | null {
   if (!row) return null;
@@ -37,31 +41,7 @@ function mapVendor(row: Record<string, unknown> | null | undefined): CatalogVend
 function mapProduct(row: ProductRow): CatalogProduct {
   const vendorRaw = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
   return {
-    id: row.id as string,
-    name: row.name as string,
-    slug: row.slug as string,
-    description: (row.description as string) ?? null,
-    category: row.category as string,
-    subcategory: (row.subcategory as string) ?? null,
-    price: Number(row.price),
-    oldPrice: row.old_price != null ? Number(row.old_price) : null,
-    currency: (row.currency as string) || 'FCFA',
-    stock: Number(row.stock ?? 0),
-    condition: (row.condition as string) || 'neuf',
-    weightKg: row.weight_kg != null ? Number(row.weight_kg) : null,
-    deliveryMode: row.delivery_mode as CatalogProduct['deliveryMode'],
-    deliveryZones: (row.delivery_zones as string[]) ?? null,
-    vendorDeliveryFee:
-      row.vendor_delivery_fee != null ? Number(row.vendor_delivery_fee) : null,
-    images: (row.images as string[]) ?? [],
-    mainImage: (row.main_image as string) ?? null,
-    rating: Number(row.rating ?? 0),
-    reviewCount: Number(row.review_count ?? 0),
-    soldCount: Number(row.sold_count ?? 0),
-    isActive: Boolean(row.is_active),
-    isFeatured: Boolean(row.is_featured),
-    tags: (row.tags as string[]) ?? [],
-    createdAt: row.created_at as string,
+    ...mapProductRow(row),
     vendor: mapVendor(vendorRaw as Record<string, unknown> | null),
   };
 }
@@ -98,6 +78,7 @@ export async function fetchProducts(filters: CatalogFilters = {}): Promise<Catal
     .from('products')
     .select(PRODUCT_SELECT, { count: 'exact' })
     .eq('is_active', true)
+    .eq('approval_status', PUBLIC_APPROVAL_STATUS)
     .eq('vendors.status', 'approved');
 
   if (filters.q?.trim()) {
@@ -182,6 +163,7 @@ export async function fetchProductBySlug(slug: string): Promise<CatalogProduct |
     .select(PRODUCT_SELECT_OPTIONAL)
     .eq('slug', slug)
     .eq('is_active', true)
+    .eq('approval_status', PUBLIC_APPROVAL_STATUS)
     .maybeSingle();
 
   if (error) {
@@ -200,6 +182,7 @@ export async function fetchFeaturedProducts(
     .from('products')
     .select(PRODUCT_SELECT)
     .eq('is_active', true)
+    .eq('approval_status', PUBLIC_APPROVAL_STATUS)
     .eq('vendors.status', 'approved');
 
   if (country) {
@@ -264,6 +247,7 @@ export async function fetchVendorProducts(vendorId: string): Promise<CatalogProd
     .select(PRODUCT_SELECT_OPTIONAL)
     .eq('vendor_id', vendorId)
     .eq('is_active', true)
+    .eq('approval_status', PUBLIC_APPROVAL_STATUS)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -277,7 +261,8 @@ export async function countProductsByCategory(): Promise<Record<string, number>>
   const { data, error } = await supabase
     .from('products')
     .select('category')
-    .eq('is_active', true);
+    .eq('is_active', true)
+    .eq('approval_status', PUBLIC_APPROVAL_STATUS);
 
   if (error || !data) return {};
   return data.reduce<Record<string, number>>((acc, row) => {

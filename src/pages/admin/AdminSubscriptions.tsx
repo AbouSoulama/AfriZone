@@ -3,6 +3,7 @@ import { Loader2, Megaphone, Crown } from 'lucide-react';
 import {
   adminListAds,
   adminListSubscriptions,
+  formatXof,
   setAdStatus,
   type AdPlacement,
 } from '../../services/subscriptions';
@@ -60,6 +61,8 @@ export default function AdminSubscriptionsPage() {
               <tr>
                 <th className="px-4 py-2">Plan</th>
                 <th className="px-4 py-2">Audience</th>
+                <th className="px-4 py-2">Durée</th>
+                <th className="px-4 py-2">Montant payé</th>
                 <th className="px-4 py-2">Statut</th>
                 <th className="px-4 py-2">Fin</th>
                 <th className="px-4 py-2">User</th>
@@ -76,6 +79,17 @@ export default function AdminSubscriptionsPage() {
                     <td className="px-4 py-2">
                       {(plan as { audience?: string } | null)?.audience || '—'}
                     </td>
+                    <td className="px-4 py-2">
+                      {Number(s.term_months ?? 1)} mois
+                      {Number(s.discount_pct ?? 0) > 0 && (
+                        <span className="ml-1 text-xs font-bold text-[#00A651]">
+                          −{Math.round(Number(s.discount_pct) * 100)} %
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {s.amount_paid_xof != null ? formatXof(Number(s.amount_paid_xof)) : '—'}
+                    </td>
                     <td className="px-4 py-2">{s.status}</td>
                     <td className="px-4 py-2">
                       {s.ends_at
@@ -88,7 +102,7 @@ export default function AdminSubscriptionsPage() {
               })}
               {!subs.length && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                     Aucun abonnement
                   </td>
                 </tr>

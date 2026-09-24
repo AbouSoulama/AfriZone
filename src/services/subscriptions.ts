@@ -32,12 +32,46 @@ export interface ActiveSubscription {
   startsAt: string | null;
   endsAt: string | null;
   shippingCreditsUsed: number;
+  /** Quota total de crédits livraison sur la durée écoulée de l'abonnement. */
+  shippingCreditsQuota: number;
+  /** Durée souscrite : 1, 6, 12, 24 ou 48 mois. */
+  termMonths: number;
+  discountPct: number;
+  amountPaidXof: number | null;
   planCode: string;
   planName: string;
   audience: PlanAudience;
   priceXof: number;
   features: PlanFeatures;
 }
+
+/** Durée d'engagement proposée, avec sa remise. */
+export interface SubscriptionTerm {
+  id: string;
+  months: number;
+  label: string;
+  discountPct: number;
+  sortOrder: number;
+}
+
+export interface SubscriptionQuote {
+  months: number;
+  monthlyPriceXof: number;
+  baseXof: number;
+  discountPct: number;
+  discountXof: number;
+  totalXof: number;
+  effectiveMonthlyXof: number;
+}
+
+/** Barème de repli si la migration 028 n'est pas encore appliquée. */
+export const FALLBACK_SUBSCRIPTION_TERMS: SubscriptionTerm[] = [
+  { id: 'm1', months: 1, label: '1 mois', discountPct: 0, sortOrder: 1 },
+  { id: 'm6', months: 6, label: '6 mois', discountPct: 0, sortOrder: 2 },
+  { id: 'm12', months: 12, label: '12 mois', discountPct: 0.1, sortOrder: 3 },
+  { id: 'm24', months: 24, label: '24 mois', discountPct: 0.15, sortOrder: 4 },
+  { id: 'm48', months: 48, label: '48 mois', discountPct: 0.25, sortOrder: 5 },
+];
 
 export interface AdPlacement {
   id: string;
@@ -96,22 +130,69 @@ export async function fetchPlans(audience: PlanAudience): Promise<SubscriptionPl
   return (data || []).map((r) => mapPlan(r as Record<string, unknown>));
 }
 
+export async function fetchSubscriptionTerms(): Promise<SubscriptionTerm[]> {
+  const { data, error } = await supabase
+    .from('subscription_terms')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+
+  // Migration 028 pas encore appliquée : on reste utilisable avec le barème local.
+  if (error || !data?.length) return FALLBACK_SUBSCRIPTION_TERMS;
+
+  return data.map((row) => ({
+    id: row.id as string,
+    months: Number(row.months),
+    label: row.label as string,
+    discountPct: Number(row.discount_pct ?? 0),
+    sortOrder: Number(row.sort_order ?? 0),
+  }));
+}
+
+/** Calcul local du devis (même formule que la RPC `subscription_quote`). */
+export function quoteSubscription(
+  monthlyPriceXof: number,
+  term: Pick<SubscriptionTerm, 'months' | 'discountPct'>
+): SubscriptionQuote {
+  const months = Math.max(1, term.months);
+  const base = monthlyPriceXof * months;
+  const discountXof = Math.round(base * term.discountPct);
+  const totalXof = base - discountXof;
+  return {
+    months,
+    monthlyPriceXof,
+    baseXof: base,
+    discountPct: term.discountPct,
+    discountXof,
+    totalXof,
+    effectiveMonthlyXof: Math.round(totalXof / months),
+  };
+}
+
 export async function fetchActiveSubscription(): Promise<ActiveSubscription | null> {
   const { data, error } = await supabase.rpc('get_active_subscription');
   if (error) throw new Error(error.message);
   if (!data) return null;
   const row = data as Record<string, unknown>;
+  const features = (row.features as PlanFeatures) || {};
+  const termMonths = Number(row.term_months ?? 1);
   return {
     id: row.id as string,
     status: row.status as string,
     startsAt: (row.starts_at as string) ?? null,
     endsAt: (row.ends_at as string) ?? null,
     shippingCreditsUsed: Number(row.shipping_credits_used ?? 0),
+    shippingCreditsQuota: Number(
+      row.shipping_credits_quota ?? features.shippingCreditsPerMonth ?? 0
+    ),
+    termMonths,
+    discountPct: Number(row.discount_pct ?? 0),
+    amountPaidXof: row.amount_paid_xof != null ? Number(row.amount_paid_xof) : null,
     planCode: row.plan_code as string,
     planName: row.plan_name as string,
     audience: row.audience as PlanAudience,
     priceXof: Number(row.price_xof ?? 0),
-    features: (row.features as PlanFeatures) || {},
+    features,
   };
 }
 
@@ -125,10 +206,18 @@ export async function startSubscriptionCheckout(input: {
   planId: string;
   userId: string;
   phone: string;
+  /** Durée souscrite en mois (1, 6, 12, 24, 48). Défaut : 1. */
+  months?: number;
   customerName?: string;
   customerEmail?: string | null;
   country?: string;
-}): Promise<{ paymentUrl?: string; subscriptionId: string; mode: 'simulate' | 'live' }> {
+}): Promise<{
+  paymentUrl?: string;
+  subscriptionId: string;
+  amountXof: number;
+  months: number;
+  mode: 'simulate' | 'live';
+}> {
   const { data: plan, error: planErr } = await supabase
     .from('subscription_plans')
     .select('*')
@@ -137,38 +226,48 @@ export async function startSubscriptionCheckout(input: {
   if (planErr || !plan) throw new Error(planErr?.message || 'Plan introuvable.');
   if (Number(plan.price_xof) <= 0) throw new Error('Ce plan est gratuit.');
 
-  const { data: sub, error: subErr } = await supabase
-    .from('subscriptions')
-    .insert({
-      user_id: input.userId,
-      plan_id: input.planId,
-      status: 'pending',
-    })
-    .select('id')
-    .single();
-  if (subErr || !sub) throw new Error(subErr?.message || 'Impossible de créer l’abonnement.');
+  const months = Math.max(1, input.months ?? 1);
+
+  // Le montant est calculé côté serveur (barème `subscription_terms`).
+  const { data: created, error: createErr } = await supabase.rpc('create_my_subscription', {
+    p_plan_id: input.planId,
+    p_months: months,
+  });
+  if (createErr) {
+    throw new Error(
+      createErr.message.includes('function') || createErr.message.includes('schema cache')
+        ? 'Durées d’abonnement indisponibles : exécutez la migration 028_subscription_terms.sql'
+        : createErr.message
+    );
+  }
+
+  const quote = created as Record<string, unknown>;
+  const subscriptionId = quote.subscription_id as string;
+  const amountXof = Number(quote.total_xof ?? 0);
 
   if (!isLivePayment()) {
     const { error: actErr } = await supabase.rpc('activate_my_pending_subscription', {
-      p_subscription_id: sub.id,
+      p_subscription_id: subscriptionId,
     });
     if (actErr) throw new Error(actErr.message);
-    return { subscriptionId: sub.id, mode: 'simulate' };
+    return { subscriptionId, amountXof, months, mode: 'simulate' };
   }
 
   const checkout = await startCheckout({
-    amount: Number(plan.price_xof),
+    amount: amountXof,
     phone: input.phone,
     provider: 'mobile_money',
     kind: 'subscription',
-    subscriptionId: sub.id,
+    subscriptionId,
     customerName: input.customerName,
     customerEmail: input.customerEmail,
     country: input.country,
   });
 
   return {
-    subscriptionId: sub.id,
+    subscriptionId,
+    amountXof,
+    months,
     paymentUrl: checkout.paymentUrl,
     mode: 'live',
   };
@@ -244,7 +343,7 @@ export async function adminListSubscriptions() {
   const { data, error } = await supabase
     .from('subscriptions')
     .select(
-      'id, status, starts_at, ends_at, shipping_credits_used, user_id, plan:subscription_plans(code, name, audience, price_xof)'
+      'id, status, starts_at, ends_at, shipping_credits_used, term_months, discount_pct, amount_paid_xof, user_id, plan:subscription_plans(code, name, audience, price_xof)'
     )
     .order('created_at', { ascending: false })
     .limit(100);
@@ -265,4 +364,16 @@ export async function adminListAds() {
 export function formatPlanPrice(xof: number): string {
   if (xof <= 0) return 'Gratuit';
   return `${xof.toLocaleString('fr-FR')} FCFA / mois`;
+}
+
+export function formatXof(xof: number): string {
+  return `${Math.round(xof).toLocaleString('fr-FR')} FCFA`;
+}
+
+/** Libellé d'une durée, ex. « 24 mois (2 ans) ». */
+export function formatTermLabel(term: SubscriptionTerm): string {
+  if (term.months < 12) return term.label;
+  const years = term.months / 12;
+  const suffix = years === 1 ? '1 an' : `${years} ans`;
+  return `${term.label} (${suffix})`;
 }

@@ -75,6 +75,25 @@ MODES DE LIVRAISON définis par le vendeur sur chaque produit :
 - "Je livre moi-même" : le vendeur devient lui-même le livreur ; il démarre sa course
   depuis le détail de commande puis partage sa position GPS. Le client suit en direct.
 
+VALIDATION DES PRODUITS : chaque produit ajouté par un vendeur passe par une
+validation administrateur avant d'apparaître sur l'accueil et le catalogue.
+Le formulaire vendeur comporte deux étapes :
+- Étape 1 (le produit) : titre, description, catégorie, prix, stock, mode de livraison
+  et les PHOTOS GÉNÉRIQUES (visuels catalogue).
+- Étape 2 (réception AfriZone) : les PHOTOS RÉELLES du produit prises par le vendeur,
+  le mode de remise (dépôt au hub, enlèvement par AfriZone, ou stock gardé par le vendeur),
+  le hub de réception, la date prévue, le nombre de colis, le poids, les dimensions,
+  le contact sur place et les consignes de manutention.
+Statuts possibles : en attente de validation, approuvé, refusé (avec motif notifié au
+vendeur). Toute modification du contenu ou des photos renvoie le produit en validation.
+
+ABONNEMENTS : durées au choix de 1, 6, 12, 24 ou 48 mois, payées en une fois.
+Les remises d'engagement démarrent à 1 an : −10 % sur 12 mois, −15 % sur 24 mois,
+−25 % sur 48 mois. 1 et 6 mois sont au tarif de base.
+
+IDENTIFIANT LIVREUR : à la remise des courses, le livreur est identifié par son nom
+suivi de son code, par exemple Issouf_KONE_LV-BF-OUA-6987.
+
 BADGES VENDEURS : Vérifié (dossier validé), Gold Seller (volume de ventes élevé),
 Top Rated (note ≥ 4,5 avec au moins 5 avis).
 
@@ -123,7 +142,8 @@ ESPACE ADMIN (rôle admin)
 /admin : tableau de bord · /admin/commandes · /admin/colis
 /admin/vendeurs : valider ou refuser les boutiques
 /admin/livreurs : valider les livreurs · /admin/livraisons : assigner les courses
-/admin/utilisateurs · /admin/catalogue
+/admin/produits-a-valider : approuver ou refuser les produits soumis par les vendeurs
+/admin/utilisateurs · /admin/catalogue · /admin/abonnements
 `.trim();
 
 export const KNOWLEDGE_TOPICS: KnowledgeTopic[] = [
@@ -314,13 +334,32 @@ export const KNOWLEDGE_TOPICS: KnowledgeTopic[] = [
       "Cela dépend du mode choisi par le vendeur sur chaque produit. En « Livraison par AfriZone », c'est le tarif de la plateforme qui s'applique. En « Je livre moi-même », le vendeur fixe ses propres frais et ses zones de livraison. Le montant exact est affiché dans le récapitulatif du panier et du checkout, avant tout paiement.",
     links: [{ label: 'Mon panier', to: '/panier' }],
   },
+  {
+    id: 'abonnement-duree',
+    keywords: [
+      'abonnement', 'abonner', 'club', 'plan', 'duree', 'engagement', 'remise',
+      'reduction', '1 mois', '6 mois', '12 mois', '24 mois', '48 mois', 'an', 'annuel',
+    ],
+    question: 'Quelles durées d’abonnement et quelles remises ?',
+    answer:
+      "Vous choisissez la durée au moment de souscrire : 1, 6, 12, 24 ou 48 mois, payés en une seule fois. Les remises d’engagement démarrent à 1 an : −10 % sur 12 mois, −15 % sur 24 mois et −25 % sur 48 mois ; 1 et 6 mois restent au tarif de base. Le prix total, l’équivalent mensuel et l’économie réalisée s’affichent avant paiement. Les clients gèrent leur abonnement dans « Mon compte → Abonnement », les vendeurs dans « Espace vendeur → Abonnement & publicité ».",
+    links: [
+      { label: 'Abonnements', to: '/abonnements' },
+      { label: 'Mon abonnement', to: '/compte/abonnement' },
+      { label: 'Abonnement vendeur', to: '/vendeur/abonnement' },
+    ],
+  },
   // ── Vendeur ─────────────────────────────────────────────
   {
     id: 'vendeur-produit',
-    keywords: ['ajouter un produit', 'publier', 'nouveau produit', 'article', 'stock', 'photo produit'],
+    keywords: [
+      'ajouter un produit', 'publier', 'nouveau produit', 'article', 'stock', 'photo produit',
+      'photo réelle', 'photo générique', 'validation produit', 'produit en attente',
+      'produit refusé', 'entrepôt', 'hub',
+    ],
     question: 'Comment publier un produit ?',
     answer:
-      "Depuis « Mes produits » → « Nouveau produit », renseignez le nom, la description, la catégorie, le prix, le stock et jusqu'à 5 images. Choisissez ensuite le mode de livraison : par AfriZone, ou « Je livre moi-même » avec vos pays desservis et vos frais. Une fois enregistré, le produit apparaît immédiatement dans le catalogue de votre pays.",
+      "Depuis « Mes produits » → « Nouveau produit », le formulaire se déroule en deux étapes. Étape 1, le produit : nom, description, catégorie, prix, stock, mode de livraison et les photos génériques (visuels catalogue, jusqu'à 5). Étape 2, la réception AfriZone : les photos réelles du produit que vous prenez vous-même, le mode de remise (dépôt au hub, enlèvement par AfriZone, ou stock gardé chez vous), le hub de réception, la date prévue, le nombre de colis, le poids, les dimensions et les consignes de manutention. À l'enregistrement, le produit passe « en attente de validation » : un administrateur compare les deux photos et vérifie la fiche avant publication sur l'accueil et le catalogue. En cas de refus, le motif vous est notifié et vous pouvez corriger puis resoumettre.",
     links: [
       { label: 'Nouveau produit', to: '/vendeur/produits/nouveau' },
       { label: 'Mes produits', to: '/vendeur/produits' },

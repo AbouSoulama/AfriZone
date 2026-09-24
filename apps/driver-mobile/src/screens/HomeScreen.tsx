@@ -19,6 +19,7 @@ import {
   driverRespondBatch,
   fetchDriverStats,
   fetchOpenBatchesForDriver,
+  formatDriverHandle,
   VEHICLE_LABELS,
 } from '../services/drivers';
 import { fetchDriverWalletBalance } from '../services/wallet';
@@ -152,6 +153,13 @@ export default function HomeScreen() {
           {driver.city} · {VEHICLE_LABELS[driver.vehicleType] || driver.vehicleType}
         </Text>
 
+        <Card style={styles.handleCard}>
+          <Text style={styles.handleLabel}>Identifiant à présenter à la remise</Text>
+          <Text style={styles.handleValue} selectable>
+            {formatDriverHandle(fullName, driver.driverCode)}
+          </Text>
+        </Card>
+
         <Card style={styles.onlineCard}>
           <View style={styles.onlineRow}>
             <View style={{ flex: 1 }}>
@@ -263,6 +271,15 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '800', color: colors.ink, textAlign: 'center' },
   muted: { color: colors.muted, textAlign: 'center', lineHeight: 20 },
   mutedSmall: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  handleCard: { marginBottom: spacing.md, backgroundColor: colors.ink },
+  handleLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: '700' },
+  handleValue: {
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: '900',
+    marginTop: 4,
+    letterSpacing: 0.3,
+  },
   onlineCard: { backgroundColor: colors.brandSoft, borderColor: '#B7E7C8' },
   onlineRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   onlineLabel: { fontWeight: '900', fontSize: 16, color: colors.ink },

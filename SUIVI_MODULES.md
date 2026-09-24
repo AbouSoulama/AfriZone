@@ -1,7 +1,7 @@
 # AfriZone — Suivi des modules
 
 > Fichier de suivi du développement MVP.  
-> Dernière mise à jour : **24 juillet 2026**
+> Dernière mise à jour : **24 septembre 2026**
 
 ---
 
@@ -134,6 +134,16 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 - [x] Edge Function `ai-assistant` (optionnelle) vers un fournisseur compatible OpenAI
 - [x] Repli automatique sur le mode local si la fonction ou la clé IA est absente
 
+### ✅ Module 15 — Validation produits, assignation éclairée, abonnements longue durée
+- [x] **Produits validés par l’admin** avant affichage accueil / catalogue (`approval_status`)
+- [x] Formulaire vendeur en **2 étapes** : étape 1 produit + photo générique, étape 2 réception entrepôt + photo réelle
+- [x] Page admin `/admin/produits-a-valider` (comparaison des 2 photos, infos réception, approuver / refuser avec motif)
+- [x] Badge de validation + motif de refus côté vendeur (`/vendeur/produits`, dashboard)
+- [x] **Assignation des courses** : fiche complète de la commande avant d’assigner (distance, GPS, dates, heures, articles, poids) + tri par distance
+- [x] **Identifiant livreur à la remise** : `Prenom_NOM_CODE` (ex. `Issouf_KONE_LV-BF-OUA-6987`) côté admin, espace livreur et app mobile
+- [x] **Abonnements 1 / 6 / 12 / 24 / 48 mois** avec remises d’engagement à partir de 1 an (−10 %, −15 %, −25 %)
+- [x] Migrations `027_product_approval_reception.sql` et `028_subscription_terms.sql`
+
 ---
 
 ## Migrations SQL à cocher
@@ -159,16 +169,22 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 | `017_seed_rich_catalog.sql` | seed démo | [ ] |
 | `018_seed_drivers.sql` | seed livreurs | [ ] |
 | `019_cinetpay.sql` | paiements CinetPay | [ ] |
+| `020_driver_wallet.sql` → `026_newsletter.sql` | portefeuille, lots, abonnements, newsletter | [ ] |
+| `027_product_approval_reception.sql` | validation produits + réception entrepôt | [ ] |
+| `028_subscription_terms.sql` | durées d’abonnement 1–48 mois + remises | [ ] |
 
 ---
 
 ## Prochaine étape recommandée
 
-1. Exécuter `015_fix_admin_deletes.sql` (suppressions admin users / boutiques / produits)  
-2. Exécuter `014_order_emails.sql` + config Resend si pas encore fait  
-3. Tester suppressions depuis `/admin`  
-4. *(optionnel)* Déployer `ai-assistant` + `AI_API_KEY` pour passer l’assistant en mode IA  
-5. Paiements réels : compte CinetPay (pas PayDunya) + migration `019_cinetpay.sql` + `VITE_PAYMENT_MODE=live`
+1. **Exécuter `027_product_approval_reception.sql`** — obligatoire : le catalogue filtre désormais sur `approval_status`
+2. **Exécuter `028_subscription_terms.sql`** — obligatoire pour souscrire sur plusieurs mois
+3. Tester : ajout produit vendeur (2 étapes) → `/admin/produits-a-valider` → approbation → visible sur l’accueil
+4. Exécuter `015_fix_admin_deletes.sql` (suppressions admin users / boutiques / produits)  
+5. Exécuter `014_order_emails.sql` + config Resend si pas encore fait  
+6. Tester suppressions depuis `/admin`  
+7. *(optionnel)* Déployer `ai-assistant` + `AI_API_KEY` pour passer l’assistant en mode IA  
+8. Paiements réels : compte CinetPay (pas PayDunya) + migration `019_cinetpay.sql` + `VITE_PAYMENT_MODE=live`
 
 ---
 

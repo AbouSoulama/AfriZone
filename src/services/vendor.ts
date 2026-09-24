@@ -1,12 +1,19 @@
 import { supabase } from '../lib/supabase';
 import { slugify } from '../lib/auth-helpers';
 import type { CatalogProduct, DeliveryMode, ProductCondition } from '../types/catalog';
+import {
+  mapProductRow,
+  receptionPayload,
+  type ReceptionInput,
+} from './product-mapper';
 
 export interface VendorStats {
   productsActive: number;
   productsTotal: number;
   lowStock: number;
   totalSold: number;
+  pendingApproval: number;
+  rejected: number;
 }
 
 export interface ProductInput {
@@ -24,38 +31,45 @@ export interface ProductInput {
   vendorDeliveryFee?: number | null;
   tags?: string[];
   isActive?: boolean;
+  /** Étape 1 : photos génériques / catalogue */
   images?: string[];
   mainImage?: string | null;
+  /** Étape 2 : photos réelles du produit */
+  realImages?: string[];
+  /** Étape 2 : réception du produit dans l'entrepôt AfriZone */
+  reception?: ReceptionInput;
 }
 
-function mapProduct(row: Record<string, unknown>): CatalogProduct {
-  return {
-    id: row.id as string,
-    name: row.name as string,
-    slug: row.slug as string,
-    description: (row.description as string) ?? null,
-    category: row.category as string,
-    subcategory: (row.subcategory as string) ?? null,
-    price: Number(row.price),
-    oldPrice: row.old_price != null ? Number(row.old_price) : null,
-    currency: (row.currency as string) || 'FCFA',
-    stock: Number(row.stock ?? 0),
-    condition: (row.condition as string) || 'neuf',
-    weightKg: row.weight_kg != null ? Number(row.weight_kg) : null,
-    deliveryMode: row.delivery_mode as DeliveryMode,
-    deliveryZones: (row.delivery_zones as string[]) ?? null,
-    vendorDeliveryFee:
-      row.vendor_delivery_fee != null ? Number(row.vendor_delivery_fee) : null,
-    images: (row.images as string[]) ?? [],
-    mainImage: (row.main_image as string) ?? null,
-    rating: Number(row.rating ?? 0),
-    reviewCount: Number(row.review_count ?? 0),
-    soldCount: Number(row.sold_count ?? 0),
-    isActive: Boolean(row.is_active),
-    isFeatured: Boolean(row.is_featured),
-    tags: (row.tags as string[]) ?? [],
-    createdAt: row.created_at as string,
-  };
+const mapProduct = mapProductRow;
+
+/** Validations communes création / mise à jour. */
+function assertProductInput(input: ProductInput): void {
+  if (!input.deliveryMode) {
+    throw new Error('Le mode de livraison est obligatoire.');
+  }
+  if (input.deliveryMode === 'vendor') {
+    if (!input.deliveryZones?.length) {
+      throw new Error('Indiquez au moins une zone de livraison.');
+    }
+    if (input.vendorDeliveryFee == null) {
+      throw new Error('Indiquez les frais de livraison vendeur.');
+    }
+  }
+  if (!input.images?.length) {
+    throw new Error('Étape 1 : ajoutez au moins 1 photo générique du produit.');
+  }
+  if (!input.realImages?.length) {
+    throw new Error('Étape 2 : ajoutez au moins 1 photo réelle du produit.');
+  }
+  if (!input.reception?.handoverMethod) {
+    throw new Error('Étape 2 : indiquez comment AfriZone réceptionne le produit.');
+  }
+  if (
+    input.reception.handoverMethod !== 'vendor_stock' &&
+    !input.reception.warehouseCity
+  ) {
+    throw new Error('Étape 2 : choisissez le hub AfriZone de réception.');
+  }
 }
 
 export async function getVendorIdForUser(userId: string): Promise<string | null> {
@@ -72,16 +86,19 @@ export async function getVendorIdForUser(userId: string): Promise<string | null>
 export async function fetchVendorStats(vendorId: string): Promise<VendorStats> {
   const { data, error } = await supabase
     .from('products')
-    .select('id, stock, is_active, sold_count')
+    .select('id, stock, is_active, sold_count, approval_status')
     .eq('vendor_id', vendorId);
 
   if (error) throw new Error(error.message);
   const rows = data ?? [];
+  const approved = rows.filter((r) => r.approval_status === 'approved');
   return {
     productsTotal: rows.length,
-    productsActive: rows.filter((r) => r.is_active).length,
-    lowStock: rows.filter((r) => r.is_active && Number(r.stock) <= 5).length,
+    productsActive: approved.filter((r) => r.is_active).length,
+    lowStock: approved.filter((r) => r.is_active && Number(r.stock) <= 5).length,
     totalSold: rows.reduce((sum, r) => sum + Number(r.sold_count ?? 0), 0),
+    pendingApproval: rows.filter((r) => r.approval_status === 'pending').length,
+    rejected: rows.filter((r) => r.approval_status === 'rejected').length,
   };
 }
 
@@ -111,48 +128,47 @@ export async function fetchMyProduct(
   return data ? mapProduct(data) : null;
 }
 
+/** Colonnes communes création / mise à jour d'un produit vendeur. */
+function productPayload(input: ProductInput): Record<string, unknown> {
+  const images = input.images ?? [];
+  return {
+    name: input.name,
+    description: input.description,
+    category: input.category,
+    subcategory: input.subcategory || null,
+    price: input.price,
+    old_price: input.oldPrice ?? null,
+    stock: input.stock,
+    condition: input.condition,
+    weight_kg: input.weightKg ?? null,
+    delivery_mode: input.deliveryMode,
+    delivery_zones: input.deliveryMode === 'vendor' ? input.deliveryZones : null,
+    vendor_delivery_fee:
+      input.deliveryMode === 'vendor' ? input.vendorDeliveryFee : null,
+    images,
+    main_image: input.mainImage || images[0] || null,
+    real_images: input.realImages ?? [],
+    tags: input.tags ?? [],
+    is_active: input.isActive ?? true,
+    ...receptionPayload(input.reception),
+  };
+}
+
 export async function createProduct(
   vendorId: string,
   input: ProductInput
 ): Promise<CatalogProduct> {
-  if (!input.deliveryMode) {
-    throw new Error('Le mode de livraison est obligatoire.');
-  }
-  if (input.deliveryMode === 'vendor') {
-    if (!input.deliveryZones?.length) {
-      throw new Error('Indiquez au moins une zone de livraison.');
-    }
-    if (input.vendorDeliveryFee == null) {
-      throw new Error('Indiquez les frais de livraison vendeur.');
-    }
-  }
+  assertProductInput(input);
 
   const base = slugify(input.name) || 'produit';
   const slug = `${base}-${Date.now().toString(36)}`;
-  const images = input.images ?? [];
 
   const { data, error } = await supabase
     .from('products')
     .insert({
       vendor_id: vendorId,
-      name: input.name,
       slug,
-      description: input.description,
-      category: input.category,
-      subcategory: input.subcategory || null,
-      price: input.price,
-      old_price: input.oldPrice ?? null,
-      stock: input.stock,
-      condition: input.condition,
-      weight_kg: input.weightKg ?? null,
-      delivery_mode: input.deliveryMode,
-      delivery_zones: input.deliveryMode === 'vendor' ? input.deliveryZones : null,
-      vendor_delivery_fee:
-        input.deliveryMode === 'vendor' ? input.vendorDeliveryFee : null,
-      images,
-      main_image: input.mainImage || images[0] || null,
-      tags: input.tags ?? [],
-      is_active: input.isActive ?? true,
+      ...productPayload(input),
     })
     .select('*')
     .single();
@@ -166,38 +182,11 @@ export async function updateProduct(
   productId: string,
   input: ProductInput
 ): Promise<CatalogProduct> {
-  if (input.deliveryMode === 'vendor') {
-    if (!input.deliveryZones?.length) {
-      throw new Error('Indiquez au moins une zone de livraison.');
-    }
-    if (input.vendorDeliveryFee == null) {
-      throw new Error('Indiquez les frais de livraison vendeur.');
-    }
-  }
-
-  const images = input.images ?? [];
+  assertProductInput(input);
 
   const { data, error } = await supabase
     .from('products')
-    .update({
-      name: input.name,
-      description: input.description,
-      category: input.category,
-      subcategory: input.subcategory || null,
-      price: input.price,
-      old_price: input.oldPrice ?? null,
-      stock: input.stock,
-      condition: input.condition,
-      weight_kg: input.weightKg ?? null,
-      delivery_mode: input.deliveryMode,
-      delivery_zones: input.deliveryMode === 'vendor' ? input.deliveryZones : null,
-      vendor_delivery_fee:
-        input.deliveryMode === 'vendor' ? input.vendorDeliveryFee : null,
-      images,
-      main_image: input.mainImage || images[0] || null,
-      tags: input.tags ?? [],
-      is_active: input.isActive ?? true,
-    })
+    .update(productPayload(input))
     .eq('id', productId)
     .eq('vendor_id', vendorId)
     .select('*')
@@ -242,9 +231,14 @@ export async function updateStock(
   if (error) throw new Error(error.message);
 }
 
-export async function uploadProductImage(userId: string, file: File): Promise<string> {
+export async function uploadProductImage(
+  userId: string,
+  file: File,
+  kind: 'generic' | 'real' = 'generic'
+): Promise<string> {
   const ext = file.name.split('.').pop() || 'jpg';
-  const path = `${userId}/products/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const folder = kind === 'real' ? 'products/reelles' : 'products';
+  const path = `${userId}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const { error } = await supabase.storage.from('product-images').upload(path, file, {
     upsert: false,
     contentType: file.type,

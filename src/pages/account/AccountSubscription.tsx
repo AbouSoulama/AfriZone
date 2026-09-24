@@ -1,14 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, Crown, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCountry } from '../../context/CountryContext';
+import SubscriptionTermPicker from '../../components/SubscriptionTermPicker';
 import {
   fetchActiveSubscription,
   fetchPlans,
+  fetchSubscriptionTerms,
   formatPlanPrice,
+  formatTermLabel,
+  formatXof,
+  quoteSubscription,
   startSubscriptionCheckout,
   type ActiveSubscription,
   type SubscriptionPlan,
+  type SubscriptionTerm,
 } from '../../services/subscriptions';
 
 function planBenefits(plan: SubscriptionPlan): string[] {
@@ -30,6 +36,8 @@ export default function AccountSubscriptionPage() {
   const { user } = useAuth();
   const { country } = useCountry();
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [terms, setTerms] = useState<SubscriptionTerm[]>([]);
+  const [months, setMonths] = useState(1);
   const [active, setActive] = useState<ActiveSubscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -37,10 +45,20 @@ export default function AccountSubscriptionPage() {
   const [okMsg, setOkMsg] = useState<string | null>(null);
 
   const reload = async () => {
-    const [p, a] = await Promise.all([fetchPlans('client'), fetchActiveSubscription()]);
+    const [p, a, t] = await Promise.all([
+      fetchPlans('client'),
+      fetchActiveSubscription(),
+      fetchSubscriptionTerms(),
+    ]);
     setPlans(p);
     setActive(a?.audience === 'client' ? a : null);
+    setTerms(t);
   };
+
+  const selectedTerm = useMemo(
+    () => terms.find((t) => t.months === months) ?? terms[0],
+    [terms, months]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -68,6 +86,7 @@ export default function AccountSubscriptionPage() {
         planId: plan.id,
         userId: user.id,
         phone: user.phone || '',
+        months,
         customerName: user.fullName,
         customerEmail: user.email,
         country: country || 'BF',
@@ -76,7 +95,9 @@ export default function AccountSubscriptionPage() {
         window.location.assign(res.paymentUrl);
         return;
       }
-      setOkMsg('AfriZone Club activé (simulation).');
+      setOkMsg(
+        `AfriZone Club activé pour ${res.months} mois — ${formatXof(res.amountXof)} (simulation).`
+      );
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Paiement impossible');
@@ -95,10 +116,7 @@ export default function AccountSubscriptionPage() {
 
   const creditsLeft =
     active && active.planCode === 'client_club'
-      ? Math.max(
-          0,
-          (active.features.shippingCreditsPerMonth ?? 4) - active.shippingCreditsUsed
-        )
+      ? Math.max(0, active.shippingCreditsQuota - active.shippingCreditsUsed)
       : 0;
 
   return (
@@ -113,7 +131,16 @@ export default function AccountSubscriptionPage() {
         </p>
         {active ? (
           <div className="mt-4 rounded-xl bg-[#00A651]/10 border border-[#00A651]/30 p-4 text-sm">
-            <p className="font-bold text-[#00A651]">Actif : {active.planName}</p>
+            <p className="font-bold text-[#00A651]">
+              Actif : {active.planName} · {active.termMonths} mois
+              {active.discountPct > 0 &&
+                ` (remise engagement −${Math.round(active.discountPct * 100)} %)`}
+            </p>
+            {active.amountPaidXof != null && (
+              <p className="text-gray-600 mt-1">
+                Payé : <strong>{formatXof(active.amountPaidXof)}</strong>
+              </p>
+            )}
             {active.endsAt && (
               <p className="text-gray-600 mt-1">
                 Valable jusqu’au{' '}
@@ -127,7 +154,8 @@ export default function AccountSubscriptionPage() {
             {active.planCode === 'client_club' && (
               <>
                 <p className="text-gray-600 mt-1">
-                  Crédits livraison restants ce mois : <strong>{creditsLeft}</strong>
+                  Crédits livraison restants : <strong>{creditsLeft}</strong> /{' '}
+                  {active.shippingCreditsQuota}
                 </p>
                 <p className="text-xs text-gray-500 mt-2">
                   Avantage réel : −1 000 FCFA sur les frais de livraison au checkout (max 4
@@ -150,9 +178,25 @@ export default function AccountSubscriptionPage() {
         </div>
       )}
 
+      {terms.length > 0 && (
+        <div className="bg-white border border-gray-100 rounded-2xl p-6">
+          <SubscriptionTermPicker
+            terms={terms}
+            selectedMonths={months}
+            onSelect={setMonths}
+            monthlyPriceXof={plans.find((p) => p.priceXof > 0)?.priceXof ?? 0}
+          />
+          <p className="text-xs text-gray-500 mt-3">
+            Plus l’engagement est long, plus la remise est forte : les réductions démarrent à
+            partir de 12 mois. Le paiement se fait en une fois pour toute la durée choisie.
+          </p>
+        </div>
+      )}
+
       <div className="grid sm:grid-cols-2 gap-4">
         {plans.map((plan) => {
           const isCurrent = active?.planCode === plan.code;
+          const quote = selectedTerm ? quoteSubscription(plan.priceXof, selectedTerm) : null;
           return (
             <div
               key={plan.id}
@@ -162,6 +206,22 @@ export default function AccountSubscriptionPage() {
             >
               <h3 className="font-extrabold text-lg">{plan.name}</h3>
               <p className="text-[#FF6B00] font-bold mt-1">{formatPlanPrice(plan.priceXof)}</p>
+              {plan.priceXof > 0 && quote && selectedTerm && (
+                <div className="mt-3 rounded-xl bg-gray-50 border border-gray-100 p-3 text-sm">
+                  <p className="font-extrabold text-[#1F2937]">
+                    {formatTermLabel(selectedTerm)} : {formatXof(quote.totalXof)}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    soit {formatXof(quote.effectiveMonthlyXof)} / mois
+                  </p>
+                  {quote.discountXof > 0 && (
+                    <p className="text-xs font-bold text-[#00A651] mt-1">
+                      Vous économisez {formatXof(quote.discountXof)} (−
+                      {Math.round(quote.discountPct * 100)} %)
+                    </p>
+                  )}
+                </div>
+              )}
               <ul className="mt-4 space-y-2 text-sm text-gray-600">
                 {planBenefits(plan).map((b) => (
                   <li key={b} className="flex gap-2">
@@ -173,14 +233,14 @@ export default function AccountSubscriptionPage() {
               {plan.priceXof > 0 ? (
                 <button
                   type="button"
-                  disabled={!!busyId || isCurrent}
+                  disabled={!!busyId}
                   onClick={() => subscribe(plan)}
                   className="mt-5 w-full py-3 rounded-xl font-bold text-white bg-[#FF6B00] hover:bg-[#E05E00] disabled:bg-gray-300"
                 >
                   {busyId === plan.id
                     ? 'Ouverture…'
                     : isCurrent
-                      ? 'Déjà actif'
+                      ? 'Prolonger / changer de durée'
                       : 'S’abonner'}
                 </button>
               ) : (
