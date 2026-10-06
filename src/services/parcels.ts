@@ -1,5 +1,11 @@
 import { supabase } from '../lib/supabase';
-import { CATALOG_CITIES, countryCodeFromLabelOrCity } from '../types/catalog';
+import { coordsForCity, haversineKm, type LatLng } from '../lib/geo';
+import {
+  CITIES_BY_COUNTRY,
+  capitalForCountry,
+  countryCodeFromLabelOrCity,
+  type CatalogCountryCode,
+} from '../types/catalog';
 
 export type ParcelStatus =
   | 'received'
@@ -17,10 +23,14 @@ export interface ParcelInput {
   senderPhone: string;
   pickupAddress: string;
   pickupCity: string;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
   recipientName: string;
   recipientPhone: string;
   deliveryAddress: string;
   deliveryCity: string;
+  deliveryLat?: number | null;
+  deliveryLng?: number | null;
   parcelType: ParcelType;
   weightKg: number;
   contentDescription: string;
@@ -39,10 +49,14 @@ export interface ParcelView {
   senderPhone: string;
   pickupAddress: string;
   pickupCity: string;
+  pickupLat: number | null;
+  pickupLng: number | null;
   recipientName: string;
   recipientPhone: string;
   deliveryAddress: string;
   deliveryCity: string;
+  deliveryLat: number | null;
+  deliveryLng: number | null;
   parcelType: string;
   weightKg: number;
   contentDescription: string;
@@ -52,6 +66,22 @@ export interface ParcelView {
   paymentStatus: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Détail transparent du tarif colis (kg + km). */
+export interface ParcelQuote {
+  totalXof: number;
+  distanceKm: number;
+  billedKm: number;
+  weightKg: number;
+  billedKg: number;
+  baseXof: number;
+  distanceXof: number;
+  weightXof: number;
+  typeXof: number;
+  ratePerKm: number;
+  ratePerKg: number;
+  usedGps: boolean;
 }
 
 export const PARCEL_TYPE_LABELS: Record<ParcelType, string> = {
@@ -80,13 +110,19 @@ export const PARCEL_TIMELINE: ParcelStatus[] = [
   'delivered',
 ];
 
-export const PARCEL_CITIES = [...CATALOG_CITIES];
+/** @deprecated utiliser citiesForParcelCountry */
+export const PARCEL_CITIES = Object.values(CITIES_BY_COUNTRY).flat();
 
-const CITY_COUNTRY: Record<string, string> = {
-  Dakar: 'SN',
-  Ouagadougou: 'BF',
-  Bamako: 'ML',
-};
+/** Prise en charge fixe (enregistrement + premier km) */
+export const PARCEL_BASE_XOF = 1000;
+/** Tarif au kilomètre (distance GPS ou centroïdes villes) */
+export const PARCEL_RATE_PER_KM = 75;
+/** Tarif au kilogramme (arrondi au kg supérieur) */
+export const PARCEL_RATE_PER_KG = 400;
+/** Kilomètres minimum facturés (même ville / trajet court) */
+export const PARCEL_MIN_BILLED_KM = 3;
+/** Total minimum */
+export const PARCEL_MIN_TOTAL_XOF = 1500;
 
 const TYPE_SURCHARGE: Record<ParcelType, number> = {
   document: 0,
@@ -95,25 +131,113 @@ const TYPE_SURCHARGE: Record<ParcelType, number> = {
   volumineux: 2500,
 };
 
-/** Estimation tarif MVP (FCFA) */
+export function citiesForParcelCountry(code: CatalogCountryCode): string[] {
+  return CITIES_BY_COUNTRY[code] ?? CITIES_BY_COUNTRY.SN;
+}
+
+export function defaultParcelCity(code: CatalogCountryCode): string {
+  return capitalForCountry(code);
+}
+
+function resolvePoint(
+  city: string,
+  lat?: number | null,
+  lng?: number | null
+): { point: LatLng | null; usedGps: boolean } {
+  if (
+    lat != null &&
+    lng != null &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
+  ) {
+    return { point: { lat, lng }, usedGps: true };
+  }
+  return { point: coordsForCity(city), usedGps: false };
+}
+
+/**
+ * Tarification transparente :
+ * prise en charge + (km × 75 FCFA) + (kg × 400 FCFA) + surcoût type.
+ * Distance = GPS si disponible, sinon centroïdes des villes.
+ */
+export function quoteParcel(input: {
+  weightKg: number;
+  pickupCity: string;
+  deliveryCity: string;
+  parcelType: ParcelType;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  deliveryLat?: number | null;
+  deliveryLng?: number | null;
+}): ParcelQuote {
+  const weight = Math.max(0.1, input.weightKg || 0.1);
+  const billedKg = Math.max(1, Math.ceil(weight));
+
+  const from = resolvePoint(input.pickupCity, input.pickupLat, input.pickupLng);
+  const to = resolvePoint(input.deliveryCity, input.deliveryLat, input.deliveryLng);
+
+  let distanceKm = 0;
+  if (from.point && to.point) {
+    distanceKm = haversineKm(from.point, to.point);
+  } else {
+    // Repli : même ville ≈ 5 km, sinon estimation large
+    distanceKm =
+      input.pickupCity.trim().toLowerCase() === input.deliveryCity.trim().toLowerCase()
+        ? 5
+        : 120;
+  }
+
+  const billedKm = Math.max(PARCEL_MIN_BILLED_KM, Math.round(distanceKm));
+  const baseXof = PARCEL_BASE_XOF;
+  const distanceXof = billedKm * PARCEL_RATE_PER_KM;
+  const weightXof = billedKg * PARCEL_RATE_PER_KG;
+  const typeXof = TYPE_SURCHARGE[input.parcelType] ?? 500;
+  const raw = baseXof + distanceXof + weightXof + typeXof;
+  const totalXof = Math.max(PARCEL_MIN_TOTAL_XOF, raw);
+
+  return {
+    totalXof,
+    distanceKm: Math.round(distanceKm * 10) / 10,
+    billedKm,
+    weightKg: weight,
+    billedKg,
+    baseXof,
+    distanceXof,
+    weightXof,
+    typeXof,
+    ratePerKm: PARCEL_RATE_PER_KM,
+    ratePerKg: PARCEL_RATE_PER_KG,
+    usedGps: from.usedGps && to.usedGps,
+  };
+}
+
+/** Estimation tarif (FCFA) — total uniquement. */
 export function estimateParcelPrice(
   weightKg: number,
   pickupCity: string,
   deliveryCity: string,
-  parcelType: ParcelType
+  parcelType: ParcelType,
+  coords?: {
+    pickupLat?: number | null;
+    pickupLng?: number | null;
+    deliveryLat?: number | null;
+    deliveryLng?: number | null;
+  }
 ): number {
-  const weight = Math.max(0.1, weightKg || 0.1);
-  const sameCity = pickupCity === deliveryCity;
-  const sameCountry = CITY_COUNTRY[pickupCity] === CITY_COUNTRY[deliveryCity];
-
-  let base = 2000;
-  if (sameCity) base = 1500;
-  else if (sameCountry) base = 3500;
-  else base = 5500;
-
-  const weightFee = Math.ceil(weight) * 400;
-  const typeFee = TYPE_SURCHARGE[parcelType] ?? 500;
-  return base + weightFee + typeFee;
+  return quoteParcel({
+    weightKg,
+    pickupCity,
+    deliveryCity,
+    parcelType,
+    pickupLat: coords?.pickupLat,
+    pickupLng: coords?.pickupLng,
+    deliveryLat: coords?.deliveryLat,
+    deliveryLng: coords?.deliveryLng,
+  }).totalXof;
 }
 
 function generateTrackingNumber(): string {
@@ -134,10 +258,14 @@ function mapParcel(row: Record<string, unknown>): ParcelView {
     senderPhone: row.sender_phone as string,
     pickupAddress: row.pickup_address as string,
     pickupCity: row.pickup_city as string,
+    pickupLat: row.pickup_lat != null ? Number(row.pickup_lat) : null,
+    pickupLng: row.pickup_lng != null ? Number(row.pickup_lng) : null,
     recipientName: row.recipient_name as string,
     recipientPhone: row.recipient_phone as string,
     deliveryAddress: row.delivery_address as string,
     deliveryCity: row.delivery_city as string,
+    deliveryLat: row.delivery_lat != null ? Number(row.delivery_lat) : null,
+    deliveryLng: row.delivery_lng != null ? Number(row.delivery_lng) : null,
     parcelType: row.parcel_type as string,
     weightKg: Number(row.weight_kg),
     contentDescription: row.content_description as string,
@@ -171,12 +299,17 @@ export async function createParcel(userId: string, input: ParcelInput): Promise<
     throw new Error('Le poids doit être entre 0,1 et 50 kg.');
   }
 
-  const price = estimateParcelPrice(
-    input.weightKg,
-    input.pickupCity,
-    input.deliveryCity,
-    input.parcelType
-  );
+  const quote = quoteParcel({
+    weightKg: input.weightKg,
+    pickupCity: input.pickupCity,
+    deliveryCity: input.deliveryCity,
+    parcelType: input.parcelType,
+    pickupLat: input.pickupLat,
+    pickupLng: input.pickupLng,
+    deliveryLat: input.deliveryLat,
+    deliveryLng: input.deliveryLng,
+  });
+  const price = quote.totalXof;
   const trackingNumber = generateTrackingNumber();
   const methodLabel =
     input.paymentMethod === 'wave'
@@ -203,10 +336,14 @@ export async function createParcel(userId: string, input: ParcelInput): Promise<
       sender_phone: input.senderPhone.trim(),
       pickup_address: input.pickupAddress.trim(),
       pickup_city: input.pickupCity.trim(),
+      pickup_lat: input.pickupLat ?? null,
+      pickup_lng: input.pickupLng ?? null,
       recipient_name: input.recipientName.trim(),
       recipient_phone: input.recipientPhone.trim(),
       delivery_address: input.deliveryAddress.trim(),
       delivery_city: input.deliveryCity.trim(),
+      delivery_lat: input.deliveryLat ?? null,
+      delivery_lng: input.deliveryLng ?? null,
       parcel_type: input.parcelType,
       weight_kg: input.weightKg,
       content_description: input.contentDescription.trim(),
@@ -218,7 +355,13 @@ export async function createParcel(userId: string, input: ParcelInput): Promise<
     .select('*')
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    throw new Error(
+      error.message.includes('pickup_lat') || error.message.includes('column')
+        ? 'GPS colis indisponible : exécutez la migration 029_parcel_gps.sql'
+        : error.message
+    );
+  }
   return mapParcel(data);
 }
 

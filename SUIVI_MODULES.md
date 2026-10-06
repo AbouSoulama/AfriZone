@@ -172,6 +172,7 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 | `020_driver_wallet.sql` → `026_newsletter.sql` | portefeuille, lots, abonnements, newsletter | [ ] |
 | `027_product_approval_reception.sql` | validation produits + réception entrepôt | [ ] |
 | `028_subscription_terms.sql` | durées d’abonnement 1–48 mois + remises | [ ] |
+| `029_parcel_gps.sql` | GPS enlèvement / livraison colis | [ ] |
 
 ---
 

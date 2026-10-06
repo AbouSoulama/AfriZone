@@ -133,10 +133,36 @@ export default function ParcelDetailPage() {
               <p>
                 <span className="text-gray-500">De :</span> {parcel.senderName} —{' '}
                 {parcel.pickupAddress}, {parcel.pickupCity} ({parcel.senderPhone})
+                {parcel.pickupLat != null && parcel.pickupLng != null && (
+                  <>
+                    {' · '}
+                    <a
+                      href={`https://www.google.com/maps?q=${parcel.pickupLat},${parcel.pickupLng}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[#00A651] font-semibold"
+                    >
+                      GPS enlèvement
+                    </a>
+                  </>
+                )}
               </p>
               <p>
                 <span className="text-gray-500">Vers :</span> {parcel.recipientName} —{' '}
                 {parcel.deliveryAddress}, {parcel.deliveryCity} ({parcel.recipientPhone})
+                {parcel.deliveryLat != null && parcel.deliveryLng != null && (
+                  <>
+                    {' · '}
+                    <a
+                      href={`https://www.google.com/maps?q=${parcel.deliveryLat},${parcel.deliveryLng}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[#00A651] font-semibold"
+                    >
+                      GPS livraison
+                    </a>
+                  </>
+                )}
               </p>
               <p>
                 <span className="text-gray-500">Type :</span>{' '}

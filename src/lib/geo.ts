@@ -16,7 +16,14 @@ export const CITY_COORDS: Record<string, LatLng> = {
   Touba: { lat: 14.85, lng: -15.8833 },
   Bobo: { lat: 11.178, lng: -4.289 },
   'Bobo-Dioulasso': { lat: 11.178, lng: -4.289 },
+  Koudougou: { lat: 12.2526, lng: -2.3627 },
+  Banfora: { lat: 10.6333, lng: -4.7667 },
+  Ouahigouya: { lat: 13.5828, lng: -2.4216 },
+  Kaya: { lat: 13.0916, lng: -1.0844 },
   Sikasso: { lat: 11.3176, lng: -5.6665 },
+  Segou: { lat: 13.4317, lng: -6.2157 },
+  Mopti: { lat: 14.4843, lng: -4.183 },
+  Kayes: { lat: 14.4469, lng: -11.4447 },
 };
 
 export function coordsForCity(city?: string | null): LatLng | null {
