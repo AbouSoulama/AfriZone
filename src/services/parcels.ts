@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase';
-import { coordsForCity, haversineKm, type LatLng } from '../lib/geo';
 import {
   CITIES_BY_COUNTRY,
   capitalForCountry,
@@ -68,20 +67,16 @@ export interface ParcelView {
   updatedAt: string;
 }
 
-/** Détail transparent du tarif colis (kg + km). */
+/** Détail transparent du tarif colis (prise en charge + kg + type). */
 export interface ParcelQuote {
   totalXof: number;
-  distanceKm: number;
-  billedKm: number;
   weightKg: number;
   billedKg: number;
   baseXof: number;
-  distanceXof: number;
   weightXof: number;
   typeXof: number;
-  ratePerKm: number;
   ratePerKg: number;
-  usedGps: boolean;
+  sameCity: boolean;
 }
 
 export const PARCEL_TYPE_LABELS: Record<ParcelType, string> = {
@@ -113,14 +108,12 @@ export const PARCEL_TIMELINE: ParcelStatus[] = [
 /** @deprecated utiliser citiesForParcelCountry */
 export const PARCEL_CITIES = Object.values(CITIES_BY_COUNTRY).flat();
 
-/** Prise en charge fixe (enregistrement + premier km) */
-export const PARCEL_BASE_XOF = 1000;
-/** Tarif au kilomètre (distance GPS ou centroïdes villes) */
-export const PARCEL_RATE_PER_KM = 75;
+/** Prise en charge même ville */
+export const PARCEL_BASE_SAME_CITY_XOF = 1500;
+/** Prise en charge ville différente (même pays) */
+export const PARCEL_BASE_INTERCITY_XOF = 3500;
 /** Tarif au kilogramme (arrondi au kg supérieur) */
 export const PARCEL_RATE_PER_KG = 400;
-/** Kilomètres minimum facturés (même ville / trajet court) */
-export const PARCEL_MIN_BILLED_KM = 3;
 /** Total minimum */
 export const PARCEL_MIN_TOTAL_XOF = 1500;
 
@@ -139,30 +132,9 @@ export function defaultParcelCity(code: CatalogCountryCode): string {
   return capitalForCountry(code);
 }
 
-function resolvePoint(
-  city: string,
-  lat?: number | null,
-  lng?: number | null
-): { point: LatLng | null; usedGps: boolean } {
-  if (
-    lat != null &&
-    lng != null &&
-    Number.isFinite(lat) &&
-    Number.isFinite(lng) &&
-    lat >= -90 &&
-    lat <= 90 &&
-    lng >= -180 &&
-    lng <= 180
-  ) {
-    return { point: { lat, lng }, usedGps: true };
-  }
-  return { point: coordsForCity(city), usedGps: false };
-}
-
 /**
- * Tarification transparente :
- * prise en charge + (km × 75 FCFA) + (kg × 400 FCFA) + surcoût type.
- * Distance = GPS si disponible, sinon centroïdes des villes.
+ * Tarification : prise en charge (même ville / interville) + kg × 400 FCFA + surcoût type.
+ * Le GPS sert au livreur, pas au calcul du prix.
  */
 export function quoteParcel(input: {
   weightKg: number;
@@ -176,42 +148,23 @@ export function quoteParcel(input: {
 }): ParcelQuote {
   const weight = Math.max(0.1, input.weightKg || 0.1);
   const billedKg = Math.max(1, Math.ceil(weight));
+  const sameCity =
+    input.pickupCity.trim().toLowerCase() === input.deliveryCity.trim().toLowerCase();
 
-  const from = resolvePoint(input.pickupCity, input.pickupLat, input.pickupLng);
-  const to = resolvePoint(input.deliveryCity, input.deliveryLat, input.deliveryLng);
-
-  let distanceKm = 0;
-  if (from.point && to.point) {
-    distanceKm = haversineKm(from.point, to.point);
-  } else {
-    // Repli : même ville ≈ 5 km, sinon estimation large
-    distanceKm =
-      input.pickupCity.trim().toLowerCase() === input.deliveryCity.trim().toLowerCase()
-        ? 5
-        : 120;
-  }
-
-  const billedKm = Math.max(PARCEL_MIN_BILLED_KM, Math.round(distanceKm));
-  const baseXof = PARCEL_BASE_XOF;
-  const distanceXof = billedKm * PARCEL_RATE_PER_KM;
+  const baseXof = sameCity ? PARCEL_BASE_SAME_CITY_XOF : PARCEL_BASE_INTERCITY_XOF;
   const weightXof = billedKg * PARCEL_RATE_PER_KG;
   const typeXof = TYPE_SURCHARGE[input.parcelType] ?? 500;
-  const raw = baseXof + distanceXof + weightXof + typeXof;
-  const totalXof = Math.max(PARCEL_MIN_TOTAL_XOF, raw);
+  const totalXof = Math.max(PARCEL_MIN_TOTAL_XOF, baseXof + weightXof + typeXof);
 
   return {
     totalXof,
-    distanceKm: Math.round(distanceKm * 10) / 10,
-    billedKm,
     weightKg: weight,
     billedKg,
     baseXof,
-    distanceXof,
     weightXof,
     typeXof,
-    ratePerKm: PARCEL_RATE_PER_KM,
     ratePerKg: PARCEL_RATE_PER_KG,
-    usedGps: from.usedGps && to.usedGps,
+    sameCity,
   };
 }
 

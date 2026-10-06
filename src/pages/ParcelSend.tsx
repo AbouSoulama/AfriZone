@@ -12,7 +12,6 @@ import {
   createParcel,
   defaultParcelCity,
   PARCEL_RATE_PER_KG,
-  PARCEL_RATE_PER_KM,
   PARCEL_TYPE_LABELS,
   quoteParcel,
   type ParcelType,
@@ -373,7 +372,7 @@ export default function ParcelSendPage() {
         </p>
       ) : (
         <p className="text-xs text-amber-700 font-medium">
-          Recommandé : sans GPS, le tarif utilise le centre de la ville.
+          Recommandé : sans GPS, le livreur utilisera seulement la ville / l’adresse.
         </p>
       )}
     </div>
@@ -390,7 +389,7 @@ export default function ParcelSendPage() {
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold">Envoyer un colis</h1>
             <p className="text-sm text-gray-500 mt-1">
-              {countryName} — villes du pays sélectionné · tarif au kg et au km · paiement FedaPay.
+              {countryName} — villes du pays sélectionné · tarif au kg · paiement FedaPay.
             </p>
           </div>
           <div className="flex gap-2">
@@ -613,8 +612,7 @@ export default function ParcelSendPage() {
           <aside className="bg-white border border-gray-100 rounded-2xl p-5 h-fit lg:sticky lg:top-24">
             <h2 className="font-extrabold mb-1">Estimation</h2>
             <p className="text-xs text-gray-500 mb-4">
-              Tarif = prise en charge + km × {PARCEL_RATE_PER_KM} FCFA + kg × {PARCEL_RATE_PER_KG}{' '}
-              FCFA + type
+              Tarif = prise en charge + kg × {PARCEL_RATE_PER_KG} FCFA + type
             </p>
             <div className="space-y-2 text-sm mb-4">
               <div className="flex justify-between gap-2">
@@ -624,21 +622,10 @@ export default function ParcelSendPage() {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Distance</span>
-                <span>
-                  {quote.distanceKm} km
-                  {quote.usedGps ? ' (GPS)' : ' (villes)'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Prise en charge</span>
-                <span>{formatPrice(quote.baseXof)}</span>
-              </div>
-              <div className="flex justify-between">
                 <span className="text-gray-500">
-                  Distance ({quote.billedKm} km × {PARCEL_RATE_PER_KM})
+                  Prise en charge ({quote.sameCity ? 'même ville' : 'interville'})
                 </span>
-                <span>{formatPrice(quote.distanceXof)}</span>
+                <span>{formatPrice(quote.baseXof)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">
@@ -656,8 +643,7 @@ export default function ParcelSendPage() {
               </div>
             </div>
             <p className="text-[11px] text-gray-400 mb-4 leading-relaxed">
-              Ajoutez le GPS aux deux points pour un calcul kilométrique précis. Minimum facturé : 3
-              km.
+              Le GPS aide le livreur à vous retrouver ; il n’entre pas dans le prix.
             </p>
             <button
               type="submit"
