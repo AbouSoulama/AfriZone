@@ -86,8 +86,9 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 - [x] Centre `/notifications`
 - [x] Événements : commande, colis, course livreur, validation vendeur/livreur
 - [x] Migration `009_notifications.sql`
-- [x] Emails transactionnels commandes (client + admin, payé → livré) — migration `014` + Edge Function `order-emails`
-- [ ] Configurer Resend + `app_settings` (voir README `order-emails`)
+- [x] Emails transactionnels commandes (client + vendeur + admin, payé → livré) — migrations `014` + `030` + Edge Function `order-emails`
+- [x] Emails plateforme : colis, validation boutique/livreur/produit, courses, retraits, abonnements (`030_platform_emails.sql`)
+- [ ] **Configurer Resend + `app_settings`** (voir README `order-emails`) — obligatoire pour l’envoi réel
 
 ---
 
@@ -173,19 +174,19 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 | `027_product_approval_reception.sql` | validation produits + réception entrepôt | [ ] |
 | `028_subscription_terms.sql` | durées d’abonnement 1–48 mois + remises | [ ] |
 | `029_parcel_gps.sql` | GPS enlèvement / livraison colis | [ ] |
+| `030_platform_emails.sql` | emails plateforme tous rôles | [ ] |
 
 ---
 
 ## Prochaine étape recommandée
 
-1. **Exécuter `027_product_approval_reception.sql`** — obligatoire : le catalogue filtre désormais sur `approval_status`
-2. **Exécuter `028_subscription_terms.sql`** — obligatoire pour souscrire sur plusieurs mois
-3. Tester : ajout produit vendeur (2 étapes) → `/admin/produits-a-valider` → approbation → visible sur l’accueil
-4. Exécuter `015_fix_admin_deletes.sql` (suppressions admin users / boutiques / produits)  
-5. Exécuter `014_order_emails.sql` + config Resend si pas encore fait  
-6. Tester suppressions depuis `/admin`  
-7. *(optionnel)* Déployer `ai-assistant` + `AI_API_KEY` pour passer l’assistant en mode IA  
-8. Paiements réels : compte CinetPay (pas PayDunya) + migration `019_cinetpay.sql` + `VITE_PAYMENT_MODE=live`
+1. **Exécuter `030_platform_emails.sql`** + redéployer `order-emails`
+2. **Configurer Resend** : secrets `RESEND_API_KEY`, `EMAIL_HOOK_SECRET`, `APP_URL`, `EMAIL_FROM` + `app_settings`
+3. **Exécuter `027` / `028` / `029`** si pas encore fait
+4. Tester : commande payée → e-mails client + vendeur + admin ; validation boutique/produit ; course livreur ; retrait
+5. Exécuter `015_fix_admin_deletes.sql` (suppressions admin) si besoin
+6. *(optionnel)* Déployer `ai-assistant` + `AI_API_KEY`
+7. Paiements réels : CinetPay/FedaPay + `VITE_PAYMENT_MODE=live`
 
 ---
 

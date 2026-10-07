@@ -1,9 +1,14 @@
-// AfriZone — Emails transactionnels commandes (client + admin)
+// AfriZone — Emails transactionnels (commandes + plateforme)
 // Deploy: supabase functions deploy order-emails --no-verify-jwt
-// Secrets: RESEND_API_KEY, EMAIL_HOOK_SECRET, (optionnel) EMAIL_FROM
+// Secrets: RESEND_API_KEY, EMAIL_HOOK_SECRET, APP_URL, (optionnel) EMAIL_FROM
 //          + SUPABASE_SERVICE_ROLE_KEY (injecté auto sur hosted)
+//
+// Modes :
+// 1) Commande (legacy) : { order_id, event: purchase|status_update, status? }
+// 2) Générique : { kind: 'generic', event, subject, title, body, link?,
+//                  cta_label?, role?, order_id?, user_ids?: string[], to_admins?: boolean }
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -31,6 +36,39 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+function wrapHtml(opts: {
+  brand: string;
+  brandBg: string;
+  name: string;
+  title: string;
+  bodyHtml: string;
+  ctaUrl?: string;
+  ctaLabel?: string;
+}): string {
+  const cta =
+    opts.ctaUrl && opts.ctaLabel
+      ? `<p style="margin-top:24px">
+        <a href="${escapeHtml(opts.ctaUrl)}"
+           style="background:#FF6B00;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">
+          ${escapeHtml(opts.ctaLabel)}
+        </a>
+      </p>`
+      : '';
+  return `
+  <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#1F2937">
+    <div style="background:${opts.brandBg};color:#fff;padding:20px 24px;border-radius:12px 12px 0 0">
+      <strong style="font-size:18px">${escapeHtml(opts.brand)}</strong>
+    </div>
+    <div style="border:1px solid #E5E7EB;border-top:0;padding:24px;border-radius:0 0 12px 12px">
+      <p>Bonjour ${escapeHtml(opts.name || '')},</p>
+      <h2 style="margin:12px 0;font-size:20px">${escapeHtml(opts.title)}</h2>
+      <div style="line-height:1.6">${opts.bodyHtml}</div>
+      ${cta}
+      <p style="margin-top:28px;font-size:12px;color:#6B7280">Cet email est automatique — AfriZone.</p>
+    </div>
+  </div>`;
+}
+
 function buildClientHtml(opts: {
   name: string;
   orderNumber: string;
@@ -44,25 +82,16 @@ function buildClientHtml(opts: {
     opts.event === 'purchase'
       ? 'Paiement confirmé'
       : `Commande ${opts.statusLabel.toLowerCase()}`;
-  return `
-  <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#1F2937">
-    <div style="background:#FF6B00;color:#fff;padding:20px 24px;border-radius:12px 12px 0 0">
-      <strong style="font-size:18px">AfriZone</strong>
-    </div>
-    <div style="border:1px solid #E5E7EB;border-top:0;padding:24px;border-radius:0 0 12px 12px">
-      <p>Bonjour ${escapeHtml(opts.name || 'client')},</p>
-      <h2 style="margin:12px 0;font-size:20px">${escapeHtml(title)}</h2>
-      <p>Commande <strong>${escapeHtml(opts.orderNumber)}</strong> — ${opts.total.toLocaleString('fr-FR')} FCFA</p>
-      <p>Statut : <strong>${escapeHtml(opts.statusLabel)}</strong></p>
-      <p style="margin-top:24px">
-        <a href="${escapeHtml(opts.appUrl)}/commandes/${escapeHtml(opts.orderId)}"
-           style="background:#FF6B00;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">
-          Voir ma commande
-        </a>
-      </p>
-      <p style="margin-top:28px;font-size:12px;color:#6B7280">Cet email est automatique — AfriZone.</p>
-    </div>
-  </div>`;
+  return wrapHtml({
+    brand: 'AfriZone',
+    brandBg: '#FF6B00',
+    name: opts.name || 'client',
+    title,
+    bodyHtml: `<p>Commande <strong>${escapeHtml(opts.orderNumber)}</strong> — ${opts.total.toLocaleString('fr-FR')} FCFA</p>
+      <p>Statut : <strong>${escapeHtml(opts.statusLabel)}</strong></p>`,
+    ctaUrl: `${opts.appUrl}/commandes/${opts.orderId}`,
+    ctaLabel: 'Voir ma commande',
+  });
 }
 
 function buildAdminHtml(opts: {
@@ -74,34 +103,74 @@ function buildAdminHtml(opts: {
   city: string;
   event: OrderEvent;
   appUrl: string;
-  orderId: string;
 }): string {
   const title =
     opts.event === 'purchase'
       ? 'Nouvel achat payé'
       : `Mise à jour commande — ${opts.statusLabel}`;
-  return `
-  <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#1F2937">
-    <div style="background:#1F2937;color:#fff;padding:20px 24px;border-radius:12px 12px 0 0">
-      <strong style="font-size:18px">AfriZone Admin</strong>
-    </div>
-    <div style="border:1px solid #E5E7EB;border-top:0;padding:24px;border-radius:0 0 12px 12px">
-      <h2 style="margin:0 0 12px;font-size:20px">${escapeHtml(title)}</h2>
-      <ul style="padding-left:18px;line-height:1.7">
+  return wrapHtml({
+    brand: 'AfriZone Admin',
+    brandBg: '#1F2937',
+    name: 'Admin',
+    title,
+    bodyHtml: `<ul style="padding-left:18px;line-height:1.7">
         <li>N° : <strong>${escapeHtml(opts.orderNumber)}</strong></li>
         <li>Montant : <strong>${opts.total.toLocaleString('fr-FR')} FCFA</strong></li>
         <li>Statut : <strong>${escapeHtml(opts.statusLabel)}</strong></li>
         <li>Client : ${escapeHtml(opts.customerName)} (${escapeHtml(opts.customerEmail || '—')})</li>
         <li>Ville : ${escapeHtml(opts.city || '—')}</li>
-      </ul>
-      <p style="margin-top:24px">
-        <a href="${escapeHtml(opts.appUrl)}/admin/commandes"
-           style="background:#FF6B00;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">
-          Ouvrir l’admin
-        </a>
-      </p>
-    </div>
-  </div>`;
+      </ul>`,
+    ctaUrl: `${opts.appUrl}/admin/commandes`,
+    ctaLabel: 'Ouvrir l’admin',
+  });
+}
+
+function buildVendorOrderHtml(opts: {
+  name: string;
+  orderNumber: string;
+  total: number;
+  statusLabel: string;
+  appUrl: string;
+  orderId: string;
+}): string {
+  return wrapHtml({
+    brand: 'AfriZone Vendeur',
+    brandBg: '#00A651',
+    name: opts.name || 'vendeur',
+    title: 'Nouvelle commande',
+    bodyHtml: `<p>Commande <strong>${escapeHtml(opts.orderNumber)}</strong> — ${opts.total.toLocaleString('fr-FR')} FCFA</p>
+      <p>Statut : <strong>${escapeHtml(opts.statusLabel)}</strong></p>
+      <p>Préparez la commande rapidement pour le client.</p>`,
+    ctaUrl: `${opts.appUrl}/vendeur/commandes/${opts.orderId}`,
+    ctaLabel: 'Voir la commande',
+  });
+}
+
+function buildGenericHtml(opts: {
+  name: string;
+  title: string;
+  body: string;
+  appUrl: string;
+  link?: string | null;
+  ctaLabel?: string | null;
+  brand?: string;
+  brandBg?: string;
+}): string {
+  const path = (opts.link || '').trim();
+  const ctaUrl = path
+    ? path.startsWith('http')
+      ? path
+      : `${opts.appUrl}${path.startsWith('/') ? '' : '/'}${path}`
+    : undefined;
+  return wrapHtml({
+    brand: opts.brand || 'AfriZone',
+    brandBg: opts.brandBg || '#FF6B00',
+    name: opts.name || '',
+    title: opts.title,
+    bodyHtml: `<p style="white-space:pre-wrap">${escapeHtml(opts.body)}</p>`,
+    ctaUrl,
+    ctaLabel: opts.ctaLabel || (ctaUrl ? 'Ouvrir' : undefined),
+  });
 }
 
 async function sendResend(opts: {
@@ -141,6 +210,13 @@ function isSyntheticEmail(email: string | null | undefined): boolean {
   return Boolean(email?.endsWith('@phone.afrizone.app'));
 }
 
+async function logEmail(
+  admin: SupabaseClient,
+  row: Record<string, unknown>
+): Promise<void> {
+  await admin.from('email_logs').insert(row);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: cors });
@@ -153,14 +229,11 @@ Deno.serve(async (req) => {
       req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
       '';
 
-    // Autorise : secret dédié, service role, ou JWT utilisateur (appel front)
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+    // Auth stricte : secret hook OU service role (plus d’acceptation JWT quelconque)
     const authOk =
       (hookSecret && incomingSecret === hookSecret) ||
-      (serviceKey && incomingSecret === serviceKey) ||
-      (anonKey && incomingSecret === anonKey) ||
-      Boolean(req.headers.get('authorization'));
+      (serviceKey && incomingSecret === serviceKey);
 
     if (!authOk) {
       return new Response(JSON.stringify({ error: 'Non autorisé' }), {
@@ -170,19 +243,19 @@ Deno.serve(async (req) => {
     }
 
     const body = (await req.json()) as {
+      kind?: string;
       order_id?: string;
-      event?: OrderEvent;
+      event?: string;
       status?: string;
+      subject?: string;
+      title?: string;
+      body?: string;
+      link?: string | null;
+      cta_label?: string | null;
+      role?: string;
+      user_ids?: string[];
+      to_admins?: boolean;
     };
-
-    const orderId = body.order_id;
-    const event: OrderEvent = body.event === 'status_update' ? 'status_update' : 'purchase';
-    if (!orderId) {
-      return new Response(JSON.stringify({ error: 'order_id requis' }), {
-        status: 400,
-        headers: { ...cors, 'Content-Type': 'application/json' },
-      });
-    }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     if (!supabaseUrl || !serviceKey) {
@@ -193,10 +266,128 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(supabaseUrl, serviceKey);
+    const appUrl = (Deno.env.get('APP_URL') || 'https://afrizone.app').replace(/\/$/, '');
+    const from = Deno.env.get('EMAIL_FROM') || 'AfriZone <onboarding@resend.dev>';
+    const resendKey = Deno.env.get('RESEND_API_KEY') || '';
+    const results: Array<Record<string, unknown>> = [];
+
+    // ─── Mode générique ───────────────────────────────────────────
+    if (body.kind === 'generic') {
+      const event = body.event || 'info';
+      const subject = (body.subject || body.title || 'AfriZone').trim();
+      const title = (body.title || subject).trim();
+      const textBody = (body.body || '').trim();
+      const role = body.role || 'user';
+      if (!subject || !textBody) {
+        return new Response(JSON.stringify({ error: 'subject/title et body requis' }), {
+          status: 400,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
+      type Recipient = { id: string; full_name: string | null; email: string | null; role: string };
+      const recipients: Recipient[] = [];
+
+      if (body.to_admins) {
+        const { data: admins } = await admin
+          .from('profiles')
+          .select('id, full_name, email, role')
+          .eq('role', 'admin');
+        for (const a of admins || []) {
+          recipients.push(a as Recipient);
+        }
+      }
+
+      if (body.user_ids?.length) {
+        const { data: users } = await admin
+          .from('profiles')
+          .select('id, full_name, email, role')
+          .in('id', body.user_ids);
+        for (const u of users || []) {
+          if (!recipients.some((r) => r.id === u.id)) {
+            recipients.push(u as Recipient);
+          }
+        }
+      }
+
+      const brandBg =
+        role === 'admin'
+          ? '#1F2937'
+          : role === 'vendor'
+            ? '#00A651'
+            : role === 'driver'
+              ? '#2563EB'
+              : '#FF6B00';
+      const brand =
+        role === 'admin'
+          ? 'AfriZone Admin'
+          : role === 'vendor'
+            ? 'AfriZone Vendeur'
+            : role === 'driver'
+              ? 'AfriZone Livreur'
+              : 'AfriZone';
+
+      for (const r of recipients) {
+        const email = r.email;
+        if (!email || isSyntheticEmail(email)) continue;
+        const html = buildGenericHtml({
+          name: r.full_name || '',
+          title,
+          body: textBody,
+          appUrl,
+          link: body.link,
+          ctaLabel: body.cta_label,
+          brand,
+          brandBg,
+        });
+        const sent = await sendResend({
+          to: email,
+          subject,
+          html,
+          from,
+          apiKey: resendKey,
+        });
+        results.push({ role, to: email, ...sent });
+        await logEmail(admin, {
+          order_id: body.order_id || null,
+          recipient: email,
+          role,
+          event,
+          status: null,
+          subject,
+          success: sent.ok,
+          provider_id: sent.id || null,
+          error: sent.error || null,
+          mode: sent.mode,
+        });
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          mode: resendKey ? 'live' : 'simulate',
+          kind: 'generic',
+          sent: results.length,
+          results,
+        }),
+        { headers: { ...cors, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ─── Mode commande (legacy enrichi : client + admin + vendeur) ─
+    const orderId = body.order_id;
+    const event: OrderEvent = body.event === 'status_update' ? 'status_update' : 'purchase';
+    if (!orderId) {
+      return new Response(JSON.stringify({ error: 'order_id requis' }), {
+        status: 400,
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { data: order, error: orderErr } = await admin
       .from('orders')
       .select(
-        'id, order_number, status, total, shipping_city, user_id, payment_status'
+        'id, order_number, status, total, shipping_city, user_id, vendor_id, payment_status'
       )
       .eq('id', orderId)
       .maybeSingle();
@@ -222,12 +413,23 @@ Deno.serve(async (req) => {
       .select('id, full_name, email')
       .eq('role', 'admin');
 
-    const appUrl = (Deno.env.get('APP_URL') || 'https://afrizone.app').replace(/\/$/, '');
-    const from =
-      Deno.env.get('EMAIL_FROM') || 'AfriZone <onboarding@resend.dev>';
-    const resendKey = Deno.env.get('RESEND_API_KEY') || '';
+    let vendorOwner: { id: string; full_name: string | null; email: string | null } | null = null;
+    if (order.vendor_id) {
+      const { data: vendor } = await admin
+        .from('vendors')
+        .select('user_id')
+        .eq('id', order.vendor_id)
+        .maybeSingle();
+      if (vendor?.user_id) {
+        const { data: vp } = await admin
+          .from('profiles')
+          .select('id, full_name, email')
+          .eq('id', vendor.user_id)
+          .maybeSingle();
+        vendorOwner = vp;
+      }
+    }
 
-    const results: Array<Record<string, unknown>> = [];
     const customerEmail = customer?.email as string | undefined;
     const customerName = (customer?.full_name as string) || 'Client';
 
@@ -253,10 +455,45 @@ Deno.serve(async (req) => {
         apiKey: resendKey,
       });
       results.push({ role: 'customer', to: customerEmail, ...sent });
-      await admin.from('email_logs').insert({
+      await logEmail(admin, {
         order_id: order.id,
         recipient: customerEmail,
         role: 'customer',
+        event,
+        status,
+        subject,
+        success: sent.ok,
+        provider_id: sent.id || null,
+        error: sent.error || null,
+        mode: sent.mode,
+      });
+    }
+
+    if (vendorOwner?.email && !isSyntheticEmail(vendorOwner.email)) {
+      const subject =
+        event === 'purchase'
+          ? `AfriZone — Nouvelle commande ${order.order_number}`
+          : `AfriZone — Commande ${order.order_number} : ${statusLabel}`;
+      const html = buildVendorOrderHtml({
+        name: vendorOwner.full_name || 'vendeur',
+        orderNumber: String(order.order_number),
+        total: Number(order.total) || 0,
+        statusLabel,
+        appUrl,
+        orderId: String(order.id),
+      });
+      const sent = await sendResend({
+        to: vendorOwner.email,
+        subject,
+        html,
+        from,
+        apiKey: resendKey,
+      });
+      results.push({ role: 'vendor', to: vendorOwner.email, ...sent });
+      await logEmail(admin, {
+        order_id: order.id,
+        recipient: vendorOwner.email,
+        role: 'vendor',
         event,
         status,
         subject,
@@ -283,7 +520,6 @@ Deno.serve(async (req) => {
         city: String(order.shipping_city || ''),
         event,
         appUrl,
-        orderId: String(order.id),
       });
       const sent = await sendResend({
         to: email,
@@ -293,7 +529,7 @@ Deno.serve(async (req) => {
         apiKey: resendKey,
       });
       results.push({ role: 'admin', to: email, ...sent });
-      await admin.from('email_logs').insert({
+      await logEmail(admin, {
         order_id: order.id,
         recipient: email,
         role: 'admin',
@@ -311,6 +547,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         mode: resendKey ? 'live' : 'simulate',
+        kind: 'order',
         sent: results.length,
         results,
       }),

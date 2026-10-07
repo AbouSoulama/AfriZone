@@ -312,7 +312,7 @@ export const KNOWLEDGE_TOPICS: KnowledgeTopic[] = [
     keywords: ['notification', 'notifications', 'cloche', 'alerte', 'email', 'mail'],
     question: 'Où voir mes notifications ?',
     answer:
-      "La cloche dans l'en-tête affiche vos notifications non lues, et la page Notifications regroupe tout l'historique. En parallèle, un email automatique part à chaque étape de votre commande, du paiement jusqu'à la livraison.",
+      "La cloche dans l'en-tête affiche vos notifications non lues, et la page Notifications regroupe tout l'historique. En parallèle, un email automatique part aux étapes importantes : commande payée et changements de statut (client, vendeur, admin), colis, validation boutique ou livreur, courses assignées, retraits, abonnements. Un compte sans email réel (téléphone seul) ne reçoit que les notifications in-app.",
     links: [{ label: 'Mes notifications', to: '/notifications' }],
   },
   {
@@ -389,7 +389,7 @@ export const KNOWLEDGE_TOPICS: KnowledgeTopic[] = [
     keywords: ['validation', 'valide', 'en attente de validation', 'approuve', 'refuse', 'dossier'],
     question: 'Ma boutique est en attente de validation, que se passe-t-il ?',
     answer:
-      "Un administrateur doit vérifier votre pièce d'identité et les informations de votre boutique avant l'ouverture. Tant que le dossier est en attente, vous ne pouvez ni publier de produit ni recevoir de commande. Vous êtes prévenu par notification et par email dès que la décision est prise. En cas de refus, le motif vous est communiqué et vous pouvez soumettre un nouveau dossier.",
+      "Un administrateur doit vérifier votre pièce d'identité et les informations de votre boutique avant l'ouverture. Tant que le dossier est en attente, vous ne pouvez ni publier de produit ni recevoir de commande. Vous êtes prévenu par notification in-app et par email (si un email est renseigné) dès que la décision est prise. En cas de refus, le motif vous est communiqué et vous pouvez soumettre un nouveau dossier.",
     audiences: ['vendeur', 'visiteur', 'admin'],
   },
   // ── Livreur ─────────────────────────────────────────────
