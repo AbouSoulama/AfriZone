@@ -47,6 +47,7 @@ function mapLive(row: Record<string, unknown>): LiveDeliveryView {
     assignedAt: row.assigned_at as string,
     acceptedAt: (row.accepted_at as string) ?? null,
     deliveredAt: (row.delivered_at as string) ?? null,
+    arrivedAt: (row.arrived_at as string) ?? null,
     createdAt: row.created_at as string,
     orderNumber: o ? ((o.order_number as string) ?? null) : null,
     parcelTracking: p ? ((p.tracking_number as string) ?? null) : null,

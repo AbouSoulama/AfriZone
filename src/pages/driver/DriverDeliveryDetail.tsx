@@ -15,6 +15,8 @@ import {
   getDriverForUser,
   nextDeliveryStatus,
   updateDeliveryStatusByDriver,
+  signalDriverArrival,
+  confirmDeliveryWithCode,
   type DeliveryJobStatus,
   type DeliveryView,
 } from '../../services/drivers';
@@ -27,7 +29,6 @@ const NEXT_LABEL: Partial<Record<DeliveryJobStatus, string>> = {
   assigned: 'Accepter la course',
   accepted: 'Marquer collectée',
   picked_up: 'En route',
-  in_transit: 'Marquer livrée',
 };
 
 export default function DriverDeliveryDetailPage() {
@@ -39,6 +40,7 @@ export default function DriverDeliveryDetailPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [arrivalCode, setArrivalCode] = useState('');
   const [lastPos, setLastPos] = useState<LatLng | null>(null);
   const [routeInfo, setRouteInfo] = useState<{ km: number; eta: number } | null>(null);
   const watchRef = useRef<number | null>(null);
@@ -146,6 +148,36 @@ export default function DriverDeliveryDetailPage() {
         if (!sharing) startSharing();
       }
       if (next === 'delivered') stopSharing();
+      await load(driverId, delivery.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onArrive = async () => {
+    if (!driverId || !delivery) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await signalDriverArrival(delivery.id);
+      await load(driverId, delivery.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onConfirmCode = async () => {
+    if (!driverId || !delivery) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await confirmDeliveryWithCode(delivery.id, arrivalCode);
+      stopSharing();
+      setArrivalCode('');
       await load(driverId, delivery.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
@@ -288,7 +320,7 @@ export default function DriverDeliveryDetailPage() {
             </div>
           )}
 
-          {next && (
+          {next && next !== 'delivered' && (
             <button
               type="button"
               onClick={onAdvance}
@@ -297,6 +329,52 @@ export default function DriverDeliveryDetailPage() {
             >
               {busy ? 'Mise à jour...' : NEXT_LABEL[delivery.status] || DELIVERY_STATUS_LABELS[next]}
             </button>
+          )}
+
+          {delivery.status === 'in_transit' && !delivery.arrivedAt && (
+            <button
+              type="button"
+              onClick={onArrive}
+              disabled={busy}
+              className="w-full py-3 bg-[#FF6B00] hover:bg-[#E05E00] disabled:opacity-50 text-white rounded-xl font-bold"
+            >
+              {busy ? 'Envoi du code...' : 'Je suis arrivé'}
+            </button>
+          )}
+
+          {delivery.status === 'in_transit' && delivery.arrivedAt && (
+            <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-3">
+              <h2 className="font-extrabold">Code du client</h2>
+              <p className="text-sm text-gray-500">
+                Un code à 6 chiffres a été envoyé au client (email et notification). Demandez-le
+                avant de valider la remise.
+              </p>
+              <input
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={arrivalCode}
+                onChange={(e) => setArrivalCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                className="w-full text-center tracking-[0.4em] text-2xl font-extrabold px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#00A651] focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={onConfirmCode}
+                disabled={busy || arrivalCode.length !== 6}
+                className="w-full py-3 bg-[#00A651] hover:bg-[#008A43] disabled:opacity-50 text-white rounded-xl font-bold"
+              >
+                {busy ? 'Vérification...' : 'Valider la livraison'}
+              </button>
+              <button
+                type="button"
+                onClick={onArrive}
+                disabled={busy}
+                className="w-full py-2.5 text-sm font-bold text-gray-600"
+              >
+                Renvoyer le code
+              </button>
+            </div>
           )}
 
           {delivery.status === 'assigned' && (

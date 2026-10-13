@@ -76,6 +76,7 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 - [x] Validation admin `/admin/livreurs`
 - [x] Assignation courses `/admin/livraisons`
 - [x] Espace livreur `/livreur` + courses + statuts
+- [x] Code d’arrivée : « Je suis arrivé » envoie un code au client (email + notification), saisie obligatoire avant « livrée » — web + app mobile (`031_delivery_arrival_code.sql`)
 - [x] Migration `008_drivers.sql`
 
 ---
@@ -175,15 +176,16 @@ Coche `[x]` quand c’est validé de ton côté (tests + migrations SQL).
 | `028_subscription_terms.sql` | durées d’abonnement 1–48 mois + remises | [ ] |
 | `029_parcel_gps.sql` | GPS enlèvement / livraison colis | [ ] |
 | `030_platform_emails.sql` | emails plateforme tous rôles | [ ] |
+| `031_delivery_arrival_code.sql` | code client à l’arrivée du livreur | [ ] |
 
 ---
 
 ## Prochaine étape recommandée
 
-1. **Exécuter `030_platform_emails.sql`** + redéployer `order-emails`
-2. **Configurer Resend** : secrets `RESEND_API_KEY`, `EMAIL_HOOK_SECRET`, `APP_URL`, `EMAIL_FROM` + `app_settings`
+1. **Exécuter `031_delivery_arrival_code.sql`** (code d’arrivée livreur) — après `030` si pas encore fait
+2. **Configurer Resend** : secrets `RESEND_API_KEY`, `EMAIL_HOOK_SECRET`, `APP_URL`, `EMAIL_FROM` + `app_settings` (sinon le code part seulement en notification in-app)
 3. **Exécuter `027` / `028` / `029`** si pas encore fait
-4. Tester : commande payée → e-mails client + vendeur + admin ; validation boutique/produit ; course livreur ; retrait
+4. Tester : course « En route » → « Je suis arrivé » → code client → validation ; commande payée → e-mails
 5. Exécuter `015_fix_admin_deletes.sql` (suppressions admin) si besoin
 6. *(optionnel)* Déployer `ai-assistant` + `AI_API_KEY`
 7. Paiements réels : CinetPay/FedaPay + `VITE_PAYMENT_MODE=live`

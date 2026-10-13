@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import type { RouteProp } from '@react-navigation/native';
@@ -28,6 +29,8 @@ import {
   nextDeliveryStatus,
   prepareDeliveryRoute,
   pushDeliveryLocation,
+  signalDriverArrival,
+  confirmDeliveryWithCode,
   updateDeliveryStatusByDriver,
   uploadDeliveryProof,
   type DeliveryJobStatus,
@@ -39,7 +42,6 @@ const ACTION_LABELS: Partial<Record<DeliveryJobStatus, string>> = {
   assigned: 'Accepter la course',
   accepted: 'Marquer collectée',
   picked_up: 'Partir en livraison',
-  in_transit: 'Marquer livrée (avec photo)',
 };
 
 export default function DeliveryDetailScreen() {
@@ -53,6 +55,7 @@ export default function DeliveryDetailScreen() {
   const [gpsActive, setGpsActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [proofUri, setProofUri] = useState<string | null>(null);
+  const [arrivalCode, setArrivalCode] = useState('');
   const watchRef = useRef<Location.LocationSubscription | null>(null);
 
   const load = useCallback(async () => {
@@ -191,9 +194,46 @@ export default function DeliveryDetailScreen() {
       }
       if (next === 'delivered') stopGps();
       await load();
-      if (next === 'delivered') {
-        Alert.alert('Livraison validée', 'Preuve enregistrée. Gain crédité selon le tarif du lot.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const signalArrival = async () => {
+    if (!delivery) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await signalDriverArrival(delivery.id);
+      await load();
+      Alert.alert(
+        'Code envoyé',
+        'Le client a reçu un code à 6 chiffres par email et dans ses notifications. Demandez-le pour valider la remise.'
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmWithCode = async () => {
+    if (!driver || !delivery) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const url = await takeProofPhoto();
+      if (!url) {
+        setBusy(false);
+        return;
       }
+      await confirmDeliveryWithCode(delivery.id, arrivalCode, url);
+      stopGps();
+      setArrivalCode('');
+      await load();
+      Alert.alert('Livraison validée', 'Code confirmé. Preuve enregistrée.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
     } finally {
@@ -360,7 +400,7 @@ export default function DeliveryDetailScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        {actionLabel && next ? (
+        {actionLabel && next && next !== 'delivered' ? (
           <Button
             title={actionLabel}
             variant="accent"
@@ -368,6 +408,50 @@ export default function DeliveryDetailScreen() {
             onPress={() => void advance()}
             style={{ marginTop: spacing.lg }}
           />
+        ) : null}
+
+        {delivery.status === 'in_transit' && !delivery.arrivedAt ? (
+          <Button
+            title="Je suis arrivé"
+            variant="accent"
+            loading={busy}
+            onPress={() => void signalArrival()}
+            style={{ marginTop: spacing.lg }}
+          />
+        ) : null}
+
+        {delivery.status === 'in_transit' && delivery.arrivedAt ? (
+          <Card style={{ marginTop: spacing.lg }}>
+            <Text style={styles.section}>Code du client</Text>
+            <Text style={styles.meta}>
+              Un code à 6 chiffres a été envoyé au client. Saisissez-le, puis prenez la photo de
+              preuve pour valider.
+            </Text>
+            <TextInput
+              value={arrivalCode}
+              onChangeText={(value) => setArrivalCode(value.replace(/\D/g, '').slice(0, 6))}
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="000000"
+              placeholderTextColor={colors.muted}
+              style={styles.codeInput}
+            />
+            <Button
+              title="Photo + valider la livraison"
+              variant="accent"
+              loading={busy}
+              disabled={arrivalCode.length !== 6}
+              onPress={() => void confirmWithCode()}
+              style={{ marginTop: 12 }}
+            />
+            <Button
+              title="Renvoyer le code"
+              variant="ghost"
+              loading={busy}
+              onPress={() => void signalArrival()}
+              style={{ marginTop: 8 }}
+            />
+          </Card>
         ) : null}
 
         {delivery.status === 'assigned' ? (
@@ -405,4 +489,17 @@ const styles = StyleSheet.create({
   meta: { color: colors.muted, marginTop: 6, fontSize: 13 },
   error: { color: colors.danger, marginTop: 12, fontWeight: '600' },
   proof: { width: '100%', height: 220, borderRadius: 12, marginTop: 8, backgroundColor: '#E5E7EB' },
+  codeInput: {
+    marginTop: 12,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingVertical: 14,
+    textAlign: 'center',
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: 8,
+    color: colors.ink,
+    backgroundColor: colors.bg,
+  },
 });

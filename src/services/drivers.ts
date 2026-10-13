@@ -62,6 +62,8 @@ export interface DeliveryView {
   assignedAt: string;
   acceptedAt: string | null;
   deliveredAt: string | null;
+  /** Clic « Arrivé » : le code a été envoyé au client. */
+  arrivedAt: string | null;
   createdAt: string;
   orderNumber?: string | null;
   parcelTracking?: string | null;
@@ -175,6 +177,7 @@ function mapDelivery(row: Record<string, unknown>): DeliveryView {
     assignedAt: row.assigned_at as string,
     acceptedAt: (row.accepted_at as string) ?? null,
     deliveredAt: (row.delivered_at as string) ?? null,
+    arrivedAt: (row.arrived_at as string) ?? null,
     createdAt: row.created_at as string,
     orderNumber: o ? ((o.order_number as string) ?? null) : null,
     parcelTracking: p ? ((p.tracking_number as string) ?? null) : null,
@@ -317,7 +320,11 @@ export async function updateDeliveryStatusByDriver(
     payload.accepted_at = new Date().toISOString();
     payload.start_deadline_at = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
   }
-  if (nextStatus === 'delivered') payload.delivered_at = new Date().toISOString();
+  if (nextStatus === 'delivered') {
+    throw new Error(
+      'Saisissez le code reçu par le client (bouton Arrivé) pour valider la livraison.'
+    );
+  }
 
   const { error: updateError } = await supabase
     .from('deliveries')
@@ -331,7 +338,6 @@ export async function updateDeliveryStatusByDriver(
   if (delivery.order_id) {
     let orderStatus: string | null = null;
     if (nextStatus === 'picked_up' || nextStatus === 'in_transit') orderStatus = 'shipped';
-    if (nextStatus === 'delivered') orderStatus = 'delivered';
     if (orderStatus) {
       const { error: orderErr } = await supabase
         .from('orders')
@@ -346,7 +352,6 @@ export async function updateDeliveryStatusByDriver(
     if (nextStatus === 'accepted') parcelStatus = 'pickup_scheduled';
     if (nextStatus === 'picked_up') parcelStatus = 'collected';
     if (nextStatus === 'in_transit') parcelStatus = 'in_transit';
-    if (nextStatus === 'delivered') parcelStatus = 'delivered';
     if (parcelStatus) {
       const { error: parcelErr } = await supabase
         .from('parcel_shipments')
@@ -355,6 +360,42 @@ export async function updateDeliveryStatusByDriver(
       if (parcelErr) throw new Error(`Statut colis : ${parcelErr.message}`);
     }
   }
+}
+
+function arrivalRpcError(message: string): Error {
+  if (message.includes('function') || message.includes('schema cache')) {
+    return new Error(
+      'Confirmation par code indisponible : exécutez la migration 031_delivery_arrival_code.sql'
+    );
+  }
+  return new Error(message);
+}
+
+/** Signale l'arrivée et envoie un code au client (email + notification). */
+export async function signalDriverArrival(deliveryId: string): Promise<void> {
+  const { error } = await supabase.rpc('driver_signal_arrival', {
+    p_delivery_id: deliveryId,
+  });
+  if (error) throw arrivalRpcError(error.message);
+}
+
+/** Valide la livraison uniquement si le code client correspond. */
+export async function confirmDeliveryWithCode(
+  deliveryId: string,
+  code: string
+): Promise<void> {
+  const trimmed = code.replace(/\s/g, '');
+  if (!/^\d{6}$/.test(trimmed)) {
+    throw new Error('Le code doit contenir 6 chiffres.');
+  }
+  const { data, error } = await supabase.rpc('driver_confirm_delivery_code', {
+    p_delivery_id: deliveryId,
+    p_code: trimmed,
+    p_proof_url: null,
+  });
+  if (error) throw arrivalRpcError(error.message);
+  const result = data as { ok?: boolean; error?: string } | null;
+  if (!result?.ok) throw new Error(result?.error || 'Code incorrect.');
 }
 
 export async function fetchDriverStats(driverId: string) {
