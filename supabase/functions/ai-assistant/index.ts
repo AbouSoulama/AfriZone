@@ -57,7 +57,7 @@ Deno.serve(async (req: Request) => {
 
   const systemPrompt =
     (payload.systemPrompt || '').trim() ||
-    "Tu es Zoni, l'assistant de la marketplace AfriZone (Burkina Faso, Mali, Sénégal). Réponds en français, brièvement.";
+    "Tu es Zoni, l'assistant de la marketplace AfriZone (Burkina Faso, Mali, Sénégal, Guinée). Réponds en français, brièvement.";
 
   const history = (Array.isArray(payload.history) ? payload.history : [])
     .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')

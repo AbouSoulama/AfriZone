@@ -37,8 +37,8 @@ export const COUNTRY_LABELS: Record<string, string> = {
 
 /** Résumé factuel de la plateforme — sert de contexte au modèle IA. */
 export const PLATFORM_OVERVIEW = `
-AfriZone est une marketplace multi-vendeurs en Afrique de l'Ouest couvrant trois pays :
-Burkina Faso (BF), Mali (ML) et Sénégal (SN). Devise : FCFA.
+AfriZone est une marketplace multi-vendeurs en Afrique de l'Ouest couvrant quatre pays :
+Burkina Faso (BF), Mali (ML), Sénégal (SN) et Guinée (GN). Les prix, y compris en Guinée, sont en FCFA.
 
 La plateforme propose :
 1. Une marketplace (boutiques de vendeurs indépendants, catalogue, panier, commandes).
@@ -48,16 +48,17 @@ La plateforme propose :
 QUATRE RÔLES existent : client, vendeur, livreur, admin.
 Un vendeur et un livreur doivent être validés par un administrateur avant de pouvoir travailler.
 
-SÉLECTEUR PAYS : en haut du site, l'utilisateur choisit son pays (Burkina Faso, Mali, Sénégal).
+SÉLECTEUR PAYS : en haut du site, l'utilisateur choisit son pays (Burkina Faso, Mali, Sénégal, Guinée).
 Le catalogue et les boutiques affichés dépendent du pays sélectionné. Les villes servent
 uniquement aux adresses de livraison, pas au filtre principal.
 
-PAIEMENT : deux canaux distincts, encaissés via FedaPay.
-- Mobile Money : opérateurs télécoms (Orange Money, Moov Money, MTN Money).
-- Wave : portefeuille indépendant, proposé séparément.
-Au checkout, le client est redirigé vers la page FedaPay pour confirmer.
-Le paiement est confirmé AVANT que le vendeur ne prépare la commande.
-En mode simulation (développement), la commande est confirmée sans prélèvement réel.
+PAIEMENT : Mobile Money de l'opérateur du pays sélectionné, choisi sur la page de paiement.
+- Burkina Faso : Orange Money Burkina, Moov Money Burkina, Telecel Money Burkina.
+- Mali : Orange Money Mali, Malitel Money. MTN n'opère pas au Mali.
+- Sénégal : Orange Money Sénégal.
+- Guinée : Orange Money Guinée, MTN Mobile Money Guinée.
+FedaPay n'est plus utilisé. Tant que le contrat marchand de l'opérateur n'est pas branché,
+la commande est confirmée en mode test sans prélèvement réel.
 
 STATUTS DE COMMANDE, dans l'ordre :
 en attente (pending) → confirmée/payée (confirmed) → en préparation (processing)
@@ -169,7 +170,7 @@ export const KNOWLEDGE_TOPICS: KnowledgeTopic[] = [
     ],
     question: 'Quels moyens de paiement sont acceptés ?',
     answer:
-      "Deux canaux : **Mobile Money** (Orange Money, Moov Money, MTN Money selon votre pays) et **Wave**. Au checkout, choisissez le canal puis l'opérateur. Vous êtes ensuite redirigé vers FedaPay pour confirmer le paiement sur votre téléphone. Le paiement est validé avant que le vendeur ne prépare la commande.",
+      "Le moyen dépend du pays choisi en haut du site. Burkina Faso : Orange Money, Moov Money et Telecel Money. Mali : Orange Money et Malitel. Sénégal : Orange Money. Guinée : Orange Money et MTN Mobile Money. Vous le choisissez au moment de payer. Aucun agrégateur FedaPay : le débit réel sur le téléphone demande un contrat marchand signé avec chaque opérateur.",
     links: [{ label: 'Aller au checkout', to: '/checkout' }],
   },
   {
@@ -274,12 +275,12 @@ export const KNOWLEDGE_TOPICS: KnowledgeTopic[] = [
   {
     id: 'pays',
     keywords: [
-      'pays', 'burkina', 'mali', 'senegal', 'changer de pays', 'ville', 'zone',
+      'pays', 'burkina', 'mali', 'senegal', 'guinee', 'guinea', 'conakry', 'changer de pays', 'ville', 'zone',
       'dakar', 'ouagadougou', 'bamako', 'localisation',
     ],
     question: 'Comment changer de pays ?',
     answer:
-      "AfriZone couvre le Burkina Faso, le Mali et le Sénégal. Le sélecteur de pays se trouve en haut du site, à côté de la barre de recherche : il filtre le catalogue et les boutiques affichées. Les villes, elles, servent au moment de la livraison, quand vous saisissez votre adresse.",
+      "AfriZone couvre le Burkina Faso, le Mali, le Sénégal et la Guinée. Le sélecteur de pays se trouve en haut du site, à côté de la barre de recherche : il filtre le catalogue, les boutiques et les moyens de paiement. Les villes servent au moment de la livraison, quand vous saisissez votre adresse.",
     links: [{ label: 'Parcourir le catalogue', to: '/catalogue' }],
   },
   {

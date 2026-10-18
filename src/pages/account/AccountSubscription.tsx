@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Check, Crown, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCountry } from '../../context/CountryContext';
+import PaymentMethodPicker from '../../components/PaymentMethodPicker';
 import SubscriptionTermPicker from '../../components/SubscriptionTermPicker';
+import { paymentMethodLabel, paymentMethodsForCountry } from '../../data/country-payments';
 import {
   fetchActiveSubscription,
   fetchPlans,
@@ -43,6 +45,7 @@ export default function AccountSubscriptionPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState('');
 
   const reload = async () => {
     const [p, a, t] = await Promise.all([
@@ -76,6 +79,13 @@ export default function AccountSubscriptionPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const methods = paymentMethodsForCountry(country);
+    setPaymentMethod((current) =>
+      methods.some((m) => m.id === current) ? current : methods[0]?.id || ''
+    );
+  }, [country]);
+
   const subscribe = async (plan: SubscriptionPlan) => {
     if (!user || plan.priceXof <= 0) return;
     setBusyId(plan.id);
@@ -90,13 +100,10 @@ export default function AccountSubscriptionPage() {
         customerName: user.fullName,
         customerEmail: user.email,
         country: country || 'BF',
+        provider: paymentMethod,
       });
-      if (res.paymentUrl) {
-        window.location.assign(res.paymentUrl);
-        return;
-      }
       setOkMsg(
-        `AfriZone Club activé pour ${res.months} mois — ${formatXof(res.amountXof)} (simulation).`
+        `AfriZone Club activé pour ${res.months} mois — ${formatXof(res.amountXof)} via ${paymentMethodLabel(paymentMethod)} (mode test, aucun prélèvement).`
       );
       await reload();
     } catch (e) {
@@ -190,6 +197,13 @@ export default function AccountSubscriptionPage() {
             Plus l’engagement est long, plus la remise est forte : les réductions démarrent à
             partir de 12 mois. Le paiement se fait en une fois pour toute la durée choisie.
           </p>
+          <div className="mt-5">
+            <PaymentMethodPicker
+              country={country}
+              value={paymentMethod}
+              onChange={setPaymentMethod}
+            />
+          </div>
         </div>
       )}
 

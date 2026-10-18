@@ -16,7 +16,7 @@ export default function TermsPage() {
             <h2 className="font-extrabold text-[#1F2937] text-base mb-2">1. Objet</h2>
             <p>
               AfriZone est une marketplace qui met en relation acheteurs, vendeurs et livreurs en Afrique
-              de l’Ouest (notamment Sénégal, Burkina Faso et Mali). Les présentes CGU régissent l’accès
+              de l’Ouest (Burkina Faso, Mali, Sénégal et Guinée). Les présentes CGU régissent l’accès
               et l’usage de la plateforme.
             </p>
           </section>
@@ -30,8 +30,8 @@ export default function TermsPage() {
           <section>
             <h2 className="font-extrabold text-[#1F2937] text-base mb-2">3. Commandes & paiements</h2>
             <p>
-              Les paiements s’effectuent via Mobile Money (Orange Money, Moov Money, MTN Money) ou
-              Wave, selon disponibilité. Une commande confirmée engage le vendeur à préparer et
+              Les paiements s’effectuent via Mobile Money selon le pays : Orange Money, Moov Money,
+              Telecel Money, Malitel ou MTN Mobile Money. Une commande confirmée engage le vendeur à préparer et
               expédier les articles dans les délais indiqués.
             </p>
           </section>

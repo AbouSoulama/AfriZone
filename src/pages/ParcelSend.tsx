@@ -16,11 +16,9 @@ import {
   quoteParcel,
   type ParcelType,
 } from '../services/parcels';
-import {
-  isFedaPaySandbox,
-  isLivePayment,
-  startCheckout,
-} from '../services/payments';
+import PaymentMethodPicker from '../components/PaymentMethodPicker';
+import { paymentMethodById, paymentMethodLabel, paymentMethodsForCountry } from '../data/country-payments';
+import { isLivePayment, OPERATOR_COLLECTION_NOT_READY } from '../services/payments';
 import { countryCodeFromLabelOrCity, countryLabel } from '../types/catalog';
 
 type GpsTarget = 'pickup' | 'delivery';
@@ -34,6 +32,8 @@ export default function ParcelSendPage() {
 
   const [senderName, setSenderName] = useState(user?.fullName || '');
   const [senderPhone, setSenderPhone] = useState(user?.phone || '');
+  const [payPhone, setPayPhone] = useState(user?.phone || '');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [pickupAddress, setPickupAddress] = useState('');
   const [pickupCity, setPickupCity] = useState(defaultCity);
   const [pickupLat, setPickupLat] = useState<number | null>(null);
@@ -65,6 +65,13 @@ export default function ParcelSendPage() {
     const capital = defaultParcelCity(siteCountry);
     setPickupCity((prev) => (list.includes(prev) ? prev : capital));
     setDeliveryCity((prev) => (list.includes(prev) ? prev : capital));
+  }, [siteCountry]);
+
+  useEffect(() => {
+    const methods = paymentMethodsForCountry(siteCountry);
+    setPaymentMethod((current) =>
+      methods.some((m) => m.id === current) ? current : methods[0]?.id || ''
+    );
   }, [siteCountry]);
 
   useEffect(() => {
@@ -221,7 +228,10 @@ export default function ParcelSendPage() {
           <div className="bg-white border rounded-2xl p-8">
             <CheckCircle size={48} className="mx-auto text-[#00A651] mb-4" />
             <h1 className="text-2xl font-extrabold mb-2">Colis enregistré</h1>
-            <p className="text-gray-500 text-sm mb-2">Paiement confirmé.</p>
+            <p className="text-gray-500 text-sm mb-2">
+              Envoi confirmé en mode test via {paymentMethodLabel(paymentMethod)}. Aucun argent n’a
+              été débité.
+            </p>
             <p className="font-mono font-bold text-[#FF6B00] text-lg mb-6">{tracking}</p>
             <div className="flex flex-col gap-2">
               <button
@@ -250,7 +260,12 @@ export default function ParcelSendPage() {
     setLoading(true);
     setError(null);
     try {
-      const live = isLivePayment();
+      if (isLivePayment()) throw new Error(OPERATOR_COLLECTION_NOT_READY);
+      if (!paymentMethod) throw new Error('Choisissez un moyen de paiement.');
+      const paidWith = payPhone.trim() || senderPhone.trim();
+      if (paidWith.replace(/\D/g, '').length < 8) {
+        throw new Error('Indiquez le numéro Mobile Money utilisé pour payer.');
+      }
       const parcel = await createParcel(user.id, {
         senderName,
         senderPhone,
@@ -268,28 +283,10 @@ export default function ParcelSendPage() {
         weightKg,
         contentDescription,
         specialInstructions,
-        paymentPhone: senderPhone,
-        paymentMethod: 'mobile_money',
-        markPaid: !live,
+        paymentPhone: paidWith,
+        paymentMethod,
+        markPaid: true,
       });
-
-      if (live) {
-        const checkout = await startCheckout({
-          amount: quote.totalXof,
-          phone: senderPhone,
-          provider: 'mobile_money',
-          kind: 'parcel',
-          parcelId: parcel.id,
-          customerName: senderName || user.fullName,
-          customerEmail: user.email,
-          country: siteCountry,
-        });
-        if (checkout.paymentUrl) {
-          window.location.assign(checkout.paymentUrl);
-          return;
-        }
-        throw new Error('Lien de paiement FedaPay manquant.');
-      }
 
       setDoneId(parcel.id);
       setTracking(parcel.trackingNumber);
@@ -389,7 +386,7 @@ export default function ParcelSendPage() {
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold">Envoyer un colis</h1>
             <p className="text-sm text-gray-500 mt-1">
-              {countryName} — villes du pays sélectionné · tarif au kg · paiement FedaPay.
+              {countryName} — villes du pays sélectionné · tarif au kg · paiement Mobile Money.
             </p>
           </div>
           <div className="flex gap-2">
@@ -583,20 +580,27 @@ export default function ParcelSendPage() {
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl resize-none focus:border-[#FF6B00] focus:outline-none"
                 />
               </div>
-              <div className="rounded-2xl border border-[#FF6B00]/30 bg-orange-50/60 p-4">
-                <h3 className="font-extrabold mb-1">Paiement sécurisé</h3>
+              <div className="rounded-2xl border border-[#FF6B00]/30 bg-orange-50/60 p-4 space-y-3">
+                <h3 className="font-extrabold">Paiement</h3>
+                <PaymentMethodPicker
+                  country={siteCountry}
+                  value={paymentMethod}
+                  onChange={setPaymentMethod}
+                />
+                <div>
+                  <label className="block text-sm font-bold mb-2">
+                    Numéro {paymentMethodLabel(paymentMethod)}
+                  </label>
+                  <input
+                    value={payPhone}
+                    onChange={(e) => setPayPhone(e.target.value)}
+                    placeholder={`${paymentMethodById(paymentMethod)?.dial || ''} …`}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none bg-white"
+                  />
+                </div>
                 <p className="text-sm text-gray-600 leading-relaxed">
-                  {isLivePayment()
-                    ? 'Après validation, vous serez redirigé vers FedaPay pour choisir le moyen de paiement et confirmer.'
-                    : 'Mode simulation : l’envoi sera confirmé sans prélèvement réel.'}
+                  Mode test : l’envoi est confirmé et le moyen est enregistré, sans prélèvement.
                 </p>
-                {isLivePayment() && isFedaPaySandbox() && (
-                  <p className="mt-2 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
-                    Sandbox : <strong>Momo Test</strong>, drapeau <strong>Bénin (+229)</strong>, numéro{' '}
-                    <strong>64000001</strong> / <strong>66000001</strong> — ou carte Visa{' '}
-                    <strong>4111111111111111</strong>.
-                  </p>
-                )}
               </div>
               {geoHint && (
                 <p className="text-xs text-gray-600 bg-gray-50 border rounded-xl px-3 py-2">{geoHint}</p>
@@ -650,11 +654,7 @@ export default function ParcelSendPage() {
               disabled={loading}
               className="w-full py-3.5 bg-[#00A651] hover:bg-[#008A43] disabled:bg-gray-300 text-white rounded-xl font-bold"
             >
-              {loading
-                ? isLivePayment()
-                  ? 'Ouverture de FedaPay...'
-                  : 'Paiement...'
-                : `Payer ${formatPrice(quote.totalXof)}`}
+              {loading ? 'Paiement...' : `Payer ${formatPrice(quote.totalXof)}`}
             </button>
           </aside>
         </form>

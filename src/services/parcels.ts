@@ -1,3 +1,4 @@
+import { paymentMethodLabel } from '../data/country-payments';
 import { supabase } from '../lib/supabase';
 import {
   CITIES_BY_COUNTRY,
@@ -264,16 +265,7 @@ export async function createParcel(userId: string, input: ParcelInput): Promise<
   });
   const price = quote.totalXof;
   const trackingNumber = generateTrackingNumber();
-  const methodLabel =
-    input.paymentMethod === 'wave'
-      ? 'Wave'
-      : input.paymentMethod === 'orange_money'
-        ? 'Orange Money'
-        : input.paymentMethod === 'moov_money'
-          ? 'Moov Money'
-          : input.paymentMethod === 'mtn_money'
-            ? 'MTN Money'
-            : 'Mobile Money';
+  const methodLabel = paymentMethodLabel(input.paymentMethod);
   const paid = input.markPaid !== false;
   const note = `${paid ? 'Payé' : 'Paiement en cours'} via ${methodLabel} (${input.paymentPhone.trim()})${
     input.paymentTransactionId ? ` · réf. ${input.paymentTransactionId}` : ''

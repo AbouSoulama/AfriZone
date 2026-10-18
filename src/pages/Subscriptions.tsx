@@ -177,7 +177,7 @@ export default function SubscriptionsPage() {
                 /vendeur/abonnement
               </Link>
             </li>
-            <li>Choisissez un plan payant et validez (FedaPay en mode live).</li>
+            <li>Choisissez un plan payant et le Mobile Money de votre pays, puis validez.</li>
           </ol>
         </div>
       </main>

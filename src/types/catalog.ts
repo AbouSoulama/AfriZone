@@ -123,9 +123,10 @@ export const CATALOG_CATEGORIES = [
 
 /** Pays couverts par AfriZone (sélecteur principal du site) */
 export const CATALOG_COUNTRIES = [
-  { code: 'BF', label: 'Burkina Faso', capital: 'Ouagadougou' },
-  { code: 'ML', label: 'Mali', capital: 'Bamako' },
-  { code: 'SN', label: 'Sénégal', capital: 'Dakar' },
+  { code: 'BF', label: 'Burkina Faso', capital: 'Ouagadougou', dial: '+226', currency: 'XOF' },
+  { code: 'ML', label: 'Mali', capital: 'Bamako', dial: '+223', currency: 'XOF' },
+  { code: 'SN', label: 'Sénégal', capital: 'Dakar', dial: '+221', currency: 'XOF' },
+  { code: 'GN', label: 'Guinée', capital: 'Conakry', dial: '+224', currency: 'XOF' },
 ] as const;
 
 export type CatalogCountryCode = (typeof CATALOG_COUNTRIES)[number]['code'];
@@ -135,6 +136,7 @@ export const CITIES_BY_COUNTRY: Record<CatalogCountryCode, string[]> = {
   SN: ['Dakar', 'Thies', 'Saint-Louis', 'Ziguinchor', 'Kaolack', 'Touba'],
   BF: ['Ouagadougou', 'Bobo-Dioulasso', 'Koudougou', 'Banfora', 'Ouahigouya', 'Kaya'],
   ML: ['Bamako', 'Sikasso', 'Segou', 'Mopti', 'Kayes'],
+  GN: ['Conakry', 'Kindia', 'Kankan', 'Nzerekore', 'Labe', 'Mamou'],
 };
 
 /** @deprecated préférer CATALOG_COUNTRIES — conservé pour compat */
@@ -193,6 +195,15 @@ export function countryCodeFromLabelOrCity(raw?: string | null): CatalogCountryC
   ) {
     return 'SN';
   }
+  if (
+    lower.includes('guinee') ||
+    lower.includes('guinea') ||
+    lower.includes('conakry') ||
+    lower.includes('nzerekore') ||
+    lower === 'gn'
+  ) {
+    return 'GN';
+  }
 
   const byLabel = CATALOG_COUNTRIES.find(
     (c) =>
@@ -245,6 +256,13 @@ export const AFRIZONE_WAREHOUSES: Record<CatalogCountryCode, AfrizoneWarehouse[]
       city: 'Thies',
       label: 'Hub Thiès (Route de Dakar)',
       address: 'Entrepôt AfriZone, Route de Dakar, Thiès',
+    },
+  ],
+  GN: [
+    {
+      city: 'Conakry',
+      label: 'Hub Conakry (Kaloum)',
+      address: 'Entrepôt AfriZone, Kaloum, Conakry',
     },
   ],
 };

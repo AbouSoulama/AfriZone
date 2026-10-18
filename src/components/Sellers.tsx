@@ -10,28 +10,30 @@ import {
 import { fetchFeaturedVendors } from '../services/catalog';
 import { useCountry } from '../context/CountryContext';
 import VendorBadges from './vendors/VendorBadges';
+import SectionHeading from './SectionHeading';
 import { countryLabel, type CatalogVendor } from '../types/catalog';
 import { fetchActiveAds } from '../services/subscriptions';
 import { supabase } from '../lib/supabase';
 
 function SellerCard({ seller }: { seller: CatalogVendor }) {
   return (
-    <div className="flex-shrink-0 w-72 bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group">
-      <div className="relative h-28 overflow-hidden bg-gradient-to-r from-[#FF6B00]/80 to-[#00A651]/80">
+    <div className="flex-shrink-0 w-72 bg-white rounded-3xl overflow-hidden hover:-translate-y-1.5 hover:shadow-[0_30px_60px_-24px_rgba(0,0,0,0.6)] transition-all duration-500 group snap-start">
+      <div className="relative h-28 overflow-hidden bg-gradient-to-br from-[#FF8A2B] via-[#F25500] to-[#00A651]">
+        <div className="absolute inset-0 bg-grid-light opacity-60" />
         {seller.shopLogoUrl && (
           <img
             src={seller.shopLogoUrl}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover opacity-30"
+            className="absolute inset-0 w-full h-full object-cover opacity-30 blur-[1px] scale-110 group-hover:scale-125 transition-transform duration-700"
           />
         )}
-        <div className="absolute top-2 left-2 right-2">
+        <div className="absolute top-2.5 left-2.5 right-2.5">
           <VendorBadges vendor={seller} size="sm" />
         </div>
       </div>
 
       <div className="relative px-4 -mt-8">
-        <div className="w-16 h-16 rounded-2xl border-4 border-white overflow-hidden shadow-lg bg-white">
+        <div className="w-16 h-16 rounded-2xl ring-4 ring-white overflow-hidden shadow-xl bg-white">
           {seller.shopLogoUrl ? (
             <img src={seller.shopLogoUrl} alt={seller.shopName} className="w-full h-full object-cover" />
           ) : (
@@ -68,7 +70,7 @@ function SellerCard({ seller }: { seller: CatalogVendor }) {
 
         <Link
           to={`/boutique/${seller.shopSlug}`}
-          className="w-full py-2 bg-[#FF6B00] text-white rounded-lg text-xs font-bold hover:bg-[#E05E00] transition-colors flex items-center justify-center gap-1"
+          className="sheen w-full py-2.5 bg-[#0B0F19] text-white rounded-xl text-xs font-bold group-hover:bg-[#FF6B00] transition-colors flex items-center justify-center gap-1.5"
         >
           <Store size={13} /> Visiter boutique
         </Link>
@@ -155,58 +157,56 @@ export default function Sellers() {
   };
 
   return (
-    <section className="bg-gradient-to-b from-gray-50 to-white py-10">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-extrabold text-[#1F2937]">
-              Vendeurs <span className="text-[#00A651]">vedettes</span>
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Les meilleurs vendeurs vérifiés — {countryName}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => scroll('left')}
-              disabled={!canScrollLeft}
-              className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all ${
-                canScrollLeft
-                  ? 'border-gray-200 hover:border-[#FF6B00] hover:text-[#FF6B00] text-gray-600'
-                  : 'border-gray-100 text-gray-300 cursor-not-allowed'
-              }`}
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button
-              onClick={() => scroll('right')}
-              disabled={!canScrollRight}
-              className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all ${
-                canScrollRight
-                  ? 'border-gray-200 hover:border-[#FF6B00] hover:text-[#FF6B00] text-gray-600'
-                  : 'border-gray-100 text-gray-300 cursor-not-allowed'
-              }`}
-            >
-              <ChevronRight size={18} />
-            </button>
+    <section className="max-w-7xl mx-auto px-4 py-6">
+      <div className="relative overflow-hidden rounded-[2rem] bg-ink px-5 md:px-10 py-12 ring-1 ring-white/10">
+        <div className="absolute -top-32 -right-24 w-[420px] h-[420px] rounded-full bg-[#10C86E]/35 blur-[110px] animate-orb mix-blend-screen" />
+        <div className="absolute -bottom-40 -left-24 w-[420px] h-[420px] rounded-full bg-teal-400/20 blur-[110px] animate-orb mix-blend-screen" style={{ animationDelay: '-8s' }} />
+        <div className="absolute inset-0 bg-grid-light pointer-events-none" />
+
+        <div className="relative flex items-end justify-between gap-4 mb-8">
+          <SectionHeading
+            eyebrow="Boutiques"
+            title="Vendeurs"
+            highlight="vedettes"
+            subtitle={`Les meilleurs vendeurs vérifiés — ${countryName}`}
+            green
+            light
+          />
+          <div className="flex items-center gap-2 shrink-0">
+            {(['left', 'right'] as const).map((dir) => {
+              const enabled = dir === 'left' ? canScrollLeft : canScrollRight;
+              return (
+                <button
+                  key={dir}
+                  onClick={() => scroll(dir)}
+                  disabled={!enabled}
+                  aria-label={dir === 'left' ? 'Précédent' : 'Suivant'}
+                  className={`w-11 h-11 rounded-2xl glass-dark flex items-center justify-center transition-all ${
+                    enabled ? 'text-white hover:bg-white/20' : 'text-white/25 cursor-not-allowed'
+                  }`}
+                >
+                  {dir === 'left' ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {loading ? (
-          <div className="flex gap-5 overflow-hidden">
+          <div className="relative flex gap-5 overflow-hidden">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="w-72 h-64 bg-white rounded-2xl border animate-pulse shrink-0" />
+              <div key={i} className="w-72 h-72 rounded-3xl bg-white/5 animate-pulse shrink-0" />
             ))}
           </div>
         ) : sellers.length === 0 ? (
-          <div className="bg-white border rounded-2xl p-8 text-center text-sm text-gray-500">
+          <div className="relative glass-dark rounded-3xl p-8 text-center text-sm text-white/70">
             Aucun vendeur approuvé pour le moment. Lancez le seed démo ou validez un vendeur.
           </div>
         ) : (
           <div
             ref={scrollRef}
             onScroll={checkScroll}
-            className="flex gap-5 overflow-x-auto scrollbar-hide pb-4 -mx-4 px-4"
+            className="relative flex gap-5 overflow-x-auto scrollbar-hide pb-4 pt-2 -mx-5 px-5 md:-mx-10 md:px-10 snap-x"
           >
             {sellers.map((seller) => (
               <SellerCard key={seller.id} seller={seller} />

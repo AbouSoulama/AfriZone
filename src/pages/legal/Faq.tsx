@@ -11,7 +11,7 @@ const FAQ = [
   },
   {
     q: 'Quels moyens de paiement sont acceptés ?',
-    a: 'Mobile Money (Orange Money, Moov Money, MTN Money) et Wave, selon votre pays. Le paiement est confirmé avant la préparation de la commande.',
+    a: 'Mobile Money selon le pays choisi sur le site : Orange Money (Burkina, Mali, Sénégal, Guinée), Moov Money Burkina, Telecel Money Burkina, Malitel au Mali, MTN Mobile Money en Guinée. Le moyen est choisi au paiement.',
   },
   {
     q: 'Puis-je suivre ma livraison ?',

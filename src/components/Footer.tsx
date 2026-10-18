@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, MapPin, Send, CreditCard, Truck, Shield, Headphones, CheckCircle } from 'lucide-react';
 import { useCountry } from '../context/CountryContext';
+import { ACCEPTED_PAYMENT_NAMES } from '../data/country-payments';
 import { subscribeNewsletter } from '../services/newsletter';
+import { CATALOG_COUNTRIES } from '../types/catalog';
 
 const SocialIcon = ({ path }: { path: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
@@ -78,33 +80,38 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-[#1F2937] text-white">
-      <div className="border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 py-10">
-          <div className="grid md:grid-cols-2 gap-8 items-center">
+    <footer className="relative overflow-hidden bg-[#1F2937] text-white mt-10">
+      <div className="absolute -top-40 left-1/4 w-[520px] h-[520px] rounded-full bg-[#FF8A2B]/[0.08] blur-[130px] mix-blend-screen pointer-events-none" />
+      <div className="absolute -bottom-40 right-0 w-[420px] h-[420px] rounded-full bg-[#10C86E]/20 blur-[120px] mix-blend-screen pointer-events-none" />
+      <div className="relative border-b border-white/[0.07]">
+        <div className="max-w-7xl mx-auto px-4 py-12">
+          <div className="grid md:grid-cols-2 gap-8 items-center glass-dark rounded-3xl p-6 md:p-10">
             <div>
-              <h3 className="text-2xl font-extrabold mb-2">Restez informé</h3>
-              <p className="text-gray-400 text-sm">
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#FFB067] mb-2">Newsletter</p>
+              <h3 className="text-2xl md:text-3xl font-extrabold mb-2">
+                Restez <span className="text-gradient-brand">informé</span>
+              </h3>
+              <p className="text-white/60 text-sm">
                 Recevez nos meilleures offres et nouveautés directement dans votre boîte mail.
               </p>
             </div>
             <form className="space-y-2" onSubmit={onNewsletter}>
               <div className="flex gap-2">
                 <div className="flex-1 relative">
-                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
                   <input
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Votre adresse email"
-                    className="w-full pl-12 pr-4 py-3.5 bg-gray-800 border border-gray-700 rounded-xl text-sm focus:border-[#FF6B00] focus:outline-none text-white placeholder-gray-500"
+                    className="w-full pl-12 pr-4 py-4 bg-white/[0.06] border border-white/10 rounded-2xl text-sm focus:border-[#FF8A2B]/60 focus:outline-none text-white placeholder-white/35"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={busy}
-                  className="px-6 py-3.5 bg-[#FF6B00] hover:bg-[#E05E00] disabled:opacity-60 rounded-xl font-bold text-sm flex items-center gap-2 transition-colors shrink-0"
+                  className="sheen px-6 py-4 bg-[#FF6B00] disabled:opacity-60 rounded-2xl font-bold text-sm flex items-center gap-2 shrink-0"
                 >
                   {busy ? '…' : (
                     <>
@@ -124,8 +131,8 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="relative border-b border-white/[0.07]">
+        <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { icon: Truck, title: 'Livraison rapide', desc: '24-48h' },
@@ -136,12 +143,12 @@ export default function Footer() {
               const Icon = f.icon;
               return (
                 <div key={f.title} className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[#FF6B00]/20 rounded-xl flex items-center justify-center shrink-0">
-                    <Icon size={20} className="text-[#FF6B00]" />
+                  <div className="w-11 h-11 bg-gradient-to-br from-[#FF8A2B] to-[#F25500] rounded-2xl flex items-center justify-center shrink-0 shadow-glow-orange">
+                    <Icon size={19} className="text-white" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold">{f.title}</p>
-                    <p className="text-[11px] text-gray-400">{f.desc}</p>
+                    <p className="text-sm font-bold">{f.title}</p>
+                    <p className="text-[11px] text-white/50">{f.desc}</p>
                   </div>
                 </div>
               );
@@ -150,17 +157,17 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-12">
+      <div className="relative max-w-7xl mx-auto px-4 py-14">
         <div className="grid grid-cols-2 md:grid-cols-6 gap-8">
           <div className="col-span-2">
-            <div className="mb-4">
+            <div className="mb-5">
               <img
                 src="/logo-afrizone.png"
                 alt="AfriZone"
-                className="h-16 w-auto object-contain bg-white rounded-xl p-1.5"
+                className="h-16 w-auto object-contain bg-white rounded-2xl p-2 shadow-[0_10px_30px_-10px_rgba(255,107,0,0.5)]"
               />
             </div>
-            <p className="text-sm text-gray-400 mb-4 leading-relaxed">
+            <p className="text-sm text-white/55 mb-4 leading-relaxed">
               La marketplace ouest-africaine qui connecte acheteurs, vendeurs et livreurs.
             </p>
             <div className="space-y-2 text-sm text-gray-400">
@@ -168,8 +175,9 @@ export default function Footer() {
                 <MapPin size={14} className="text-[#FF6B00] mt-0.5 shrink-0" />
                 <span>
                   Présents au <strong className="text-gray-300">Burkina Faso</strong>, au{' '}
-                  <strong className="text-gray-300">Mali</strong> et au{' '}
-                  <strong className="text-gray-300">Sénégal</strong>
+                  <strong className="text-gray-300">Mali</strong>, au{' '}
+                  <strong className="text-gray-300">Sénégal</strong> et en{' '}
+                  <strong className="text-gray-300">Guinée</strong>
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -182,7 +190,7 @@ export default function Footer() {
                 <a
                   key={i}
                   href="#"
-                  className="w-9 h-9 bg-gray-800 hover:bg-[#FF6B00] rounded-lg flex items-center justify-center transition-colors text-white"
+                  className="w-10 h-10 glass-dark hover:bg-[#FF6B00] hover:-translate-y-0.5 rounded-xl flex items-center justify-center transition-all text-white"
                 >
                   <SocialIcon path={social.path} />
                 </a>
@@ -192,13 +200,13 @@ export default function Footer() {
 
           {Object.entries(footerColumns).map(([title, links]) => (
             <div key={title}>
-              <h4 className="font-bold text-sm mb-4 text-white">{title}</h4>
-              <ul className="space-y-2">
+              <h4 className="font-display font-bold text-sm mb-5 text-white">{title}</h4>
+              <ul className="space-y-2.5">
                 {links.map((link) => (
                   <li key={link.to + link.label}>
                     <Link
                       to={link.to}
-                      className="text-xs text-gray-400 hover:text-[#FF6B00] transition-colors"
+                      className="text-[13px] text-white/50 hover:text-white hover:translate-x-0.5 inline-block transition-all"
                     >
                       {link.label}
                     </Link>
@@ -210,17 +218,13 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="border-t border-gray-700 bg-gray-800/50">
+      <div className="relative border-t border-white/[0.07] bg-black/20">
         <div className="max-w-7xl mx-auto px-4 py-5">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
             <div>
               <p className="text-xs font-bold text-gray-400 mb-2">PAYS DESSERVIS :</p>
               <div className="flex flex-wrap gap-x-4 gap-y-1">
-                {[
-                  { label: 'Burkina Faso', code: 'BF' },
-                  { label: 'Mali', code: 'ML' },
-                  { label: 'Sénégal', code: 'SN' },
-                ].map((p) => (
+                {CATALOG_COUNTRIES.map((p) => (
                   <Link
                     key={p.code}
                     to={`/catalogue?country=${p.code}`}
@@ -234,10 +238,10 @@ export default function Footer() {
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-400">Nous acceptons :</span>
               <div className="flex items-center gap-2">
-                {['Orange Money', 'Moov Money', 'MTN Money', 'Wave'].map((m) => (
+                {ACCEPTED_PAYMENT_NAMES.map((m) => (
                   <div
                     key={m}
-                    className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[10px] font-bold text-gray-300"
+                    className="px-2.5 py-1 glass-dark rounded-lg text-[10px] font-bold text-white/80"
                   >
                     {m}
                   </div>
@@ -248,7 +252,7 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="border-t border-gray-700">
+      <div className="relative border-t border-white/[0.07]">
         <div className="max-w-7xl mx-auto px-4 py-5">
           <div className="flex flex-col md:flex-row items-center justify-between gap-3">
             <p className="text-xs text-gray-500">

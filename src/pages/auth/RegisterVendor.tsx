@@ -50,7 +50,7 @@ const step1Schema = z
 const step2Schema = z
   .object({
     shopName: z.string().min(3, 'Le nom de la boutique doit contenir au moins 3 caractères'),
-    country: z.enum(['SN', 'BF', 'ML']),
+    country: z.enum(['SN', 'BF', 'ML', 'GN']),
     city: z.string().min(2, 'Ville requise'),
     address: z.string().min(5, 'Adresse physique requise'),
     shopCategory: z.string().min(2, 'Catégorie requise'),

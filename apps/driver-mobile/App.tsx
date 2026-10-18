@@ -10,9 +10,16 @@ import { colors } from './src/lib/theme';
 /** Autorise le partage d’écran (Meet / Zoom / WhatsApp) — retire FLAG_SECURE. */
 function AllowScreenShare() {
   useEffect(() => {
-    void ScreenCapture.allowScreenCaptureAsync().catch((e) =>
-      console.warn('[AfriZone] allowScreenCapture', e)
-    );
+    const allow = () => {
+      void ScreenCapture.allowScreenCaptureAsync().catch((e) =>
+        console.warn('[AfriZone] allowScreenCapture', e)
+      );
+    };
+    allow();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') allow();
+    });
+    return () => sub.remove();
   }, []);
   return null;
 }

@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { countryCodeFromLabelOrCity } from '../types/catalog';
-import { isLivePayment, startCheckout } from './payments';
+import { isLivePayment, OPERATOR_COLLECTION_NOT_READY } from './payments';
 
 export type PlanAudience = 'client' | 'vendor';
 export type AdSlot = 'hero' | 'home_banner' | 'featured_vendor';
@@ -212,6 +212,7 @@ export async function startSubscriptionCheckout(input: {
   customerName?: string;
   customerEmail?: string | null;
   country?: string;
+  provider?: string;
 }): Promise<{
   paymentUrl?: string;
   subscriptionId: string;
@@ -226,6 +227,7 @@ export async function startSubscriptionCheckout(input: {
     .maybeSingle();
   if (planErr || !plan) throw new Error(planErr?.message || 'Plan introuvable.');
   if (Number(plan.price_xof) <= 0) throw new Error('Ce plan est gratuit.');
+  if (isLivePayment()) throw new Error(OPERATOR_COLLECTION_NOT_READY);
 
   const months = Math.max(1, input.months ?? 1);
 
@@ -246,32 +248,11 @@ export async function startSubscriptionCheckout(input: {
   const subscriptionId = quote.subscription_id as string;
   const amountXof = Number(quote.total_xof ?? 0);
 
-  if (!isLivePayment()) {
-    const { error: actErr } = await supabase.rpc('activate_my_pending_subscription', {
-      p_subscription_id: subscriptionId,
-    });
-    if (actErr) throw new Error(actErr.message);
-    return { subscriptionId, amountXof, months, mode: 'simulate' };
-  }
-
-  const checkout = await startCheckout({
-    amount: amountXof,
-    phone: input.phone,
-    provider: 'mobile_money',
-    kind: 'subscription',
-    subscriptionId,
-    customerName: input.customerName,
-    customerEmail: input.customerEmail,
-    country: input.country,
+  const { error: actErr } = await supabase.rpc('activate_my_pending_subscription', {
+    p_subscription_id: subscriptionId,
   });
-
-  return {
-    subscriptionId,
-    amountXof,
-    months,
-    paymentUrl: checkout.paymentUrl,
-    mode: 'live',
-  };
+  if (actErr) throw new Error(actErr.message);
+  return { subscriptionId, amountXof, months, mode: 'simulate' };
 }
 
 export async function fetchActiveAds(slot?: AdSlot): Promise<AdPlacement[]> {

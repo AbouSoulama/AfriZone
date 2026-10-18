@@ -75,7 +75,8 @@ export default function LoginScreen() {
           <Text style={styles.label}>Mot de passe</Text>
           <TextInput
             secureTextEntry
-            autoComplete="password"
+            autoComplete="off"
+            importantForAutofill="no"
             placeholder="••••••••"
             placeholderTextColor={colors.muted}
             style={styles.input}

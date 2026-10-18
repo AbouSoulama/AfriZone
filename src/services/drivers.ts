@@ -39,7 +39,7 @@ export interface DriverRegisterInput {
   vehicleType: VehicleType;
   vehiclePlate?: string;
   city: string;
-  country: 'SN' | 'BF' | 'ML';
+  country: 'SN' | 'BF' | 'ML' | 'GN';
   zones: string[];
   licenseNumber?: string;
   idDocumentType: 'cni' | 'passport' | 'permis';

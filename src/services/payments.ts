@@ -1,16 +1,16 @@
 /**
- * Paiements AfriZone
- * - Wave (portefeuille indépendant)
- * - Mobile Money = opérateurs télécoms (Orange, Moov, MTN)
- * Encaissement live via FedaPay (Edge Functions).
+ * Paiements AfriZone — opérateurs télécoms par pays (Orange, Moov, Telecel, Malitel, MTN).
+ * Le choix est enregistré sur la commande. L’encaissement réel exige un contrat marchand
+ * chez chaque opérateur : sans clés API, le mode live refuse le paiement au lieu de le simuler.
  */
+import { paymentMethodLabel } from '../data/country-payments';
 
 import { supabase } from '../lib/supabase';
 
 export type PaymentChannel = 'mobile_money' | 'wave';
 export type MobileMoneyOperator = 'orange_money' | 'moov_money' | 'mtn_money';
-/** Valeur persistée / envoyée à FedaPay (le moyen exact se choisit sur FedaPay) */
-export type MobileMoneyProvider = MobileMoneyOperator | 'wave' | 'mobile_money';
+/** Anciens identifiants. Les nouveaux moyens sont `orange_bf`, `moov_bf`, etc. */
+export type MobileMoneyProvider = MobileMoneyOperator | 'wave' | 'mobile_money' | (string & {});
 
 export interface PaymentProviderOption {
   id: MobileMoneyProvider;
@@ -113,13 +113,6 @@ function paymentMode(): 'simulate' | 'live' {
   return mode === 'live' ? 'live' : 'simulate';
 }
 
-function appOrigin(): string {
-  const fromEnv = (import.meta.env.VITE_APP_URL as string | undefined)?.replace(/\/$/, '');
-  if (fromEnv) return fromEnv;
-  if (typeof window !== 'undefined') return window.location.origin;
-  return '';
-}
-
 async function authHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -148,52 +141,8 @@ export async function startCheckout(input: StartCheckoutInput): Promise<StartChe
     return { mode: 'simulate', transactionId: tx };
   }
 
-  const base = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  if (!base) throw new Error('Configuration Supabase manquante.');
-
-  const res = await fetch(`${base}/functions/v1/fedapay-checkout`, {
-    method: 'POST',
-    headers: await authHeaders(),
-    body: JSON.stringify({
-      action: 'init',
-      amount: input.amount,
-      phone,
-      provider: input.provider,
-      kind: input.kind,
-      orderIds: input.orderIds,
-      parcelId: input.parcelId,
-      subscriptionId: input.subscriptionId,
-      customerName: input.customerName,
-      customerEmail: input.customerEmail,
-      country: input.country,
-      returnUrl: appOrigin(),
-    }),
-  });
-
-  const body = (await res.json().catch(() => ({}))) as {
-    success?: boolean;
-    transactionId?: string;
-    paymentUrl?: string;
-    amount?: number;
-    error?: string;
-    unavailable?: boolean;
-  };
-
-  if (body.unavailable) {
-    throw new Error(
-      'FedaPay n’est pas encore configuré. Ajoutez FEDAPAY_SECRET_KEY (sk_sandbox_…), déployez fedapay-checkout, ou remettez VITE_PAYMENT_MODE=simulate.'
-    );
-  }
-  if (!res.ok || !body.paymentUrl || !body.transactionId) {
-    throw new Error(body.error || 'Impossible d’ouvrir la page de paiement.');
-  }
-
-  return {
-    mode: 'live',
-    transactionId: body.transactionId,
-    paymentUrl: body.paymentUrl,
-    amount: body.amount,
-  };
+  void phone;
+  throw new Error(OPERATOR_COLLECTION_NOT_READY);
 }
 
 export async function checkCheckout(transactionId: string): Promise<{
@@ -221,7 +170,7 @@ export async function checkCheckout(transactionId: string): Promise<{
   };
 }
 
-function makeTxId(provider: MobileMoneyProvider): string {
+function makeTxId(provider: string): string {
   const rand = Math.random().toString(36).slice(2, 10).toUpperCase();
   return `MM-${provider.slice(0, 3).toUpperCase()}-${Date.now()}-${rand}`;
 }
@@ -250,10 +199,12 @@ export async function chargeMobileMoney(
 }
 
 export function providerLabel(id: string): string {
-  if (id === 'wave') return 'Wave';
-  if (id === 'mobile_money') return 'Mobile Money';
-  return MOBILE_MONEY_OPERATORS.find((p) => p.id === id)?.label || 'Mobile Money';
+  return paymentMethodLabel(id);
 }
+
+/** Message affiché quand le site est en mode live sans contrat opérateur branché. */
+export const OPERATOR_COLLECTION_NOT_READY =
+  'Le prélèvement réel n’est pas encore branché. AfriZone enregistre le moyen choisi, mais aucun argent n’est débité tant qu’un contrat marchand n’est pas actif chez cet opérateur (Orange, Moov, Telecel, Malitel ou MTN).';
 
 export function channelFromProvider(provider: MobileMoneyProvider): PaymentChannel {
   return provider === 'wave' ? 'wave' : 'mobile_money';

@@ -27,34 +27,17 @@ serve(async (req) => {
       );
     }
 
-    // TODO: brancher les APIs opérateurs avec les secrets Supabase.
-    // Exemple: Orange Money Web Payment / Wave Checkout.
-    const hasLiveKeys =
-      !!Deno.env.get('ORANGE_MONEY_API_KEY') || !!Deno.env.get('WAVE_API_KEY');
-
-    const transactionId = `MM-LIVE-${provider.slice(0, 3).toUpperCase()}-${Date.now()}`;
-
-    if (!hasLiveKeys) {
-      // Mode "live" sans clés : accepte en stub pour tests d'intégration
-      return new Response(
-        JSON.stringify({
-          success: true,
-          transactionId,
-          message:
-            'Paiement accepté (stub Edge Function — branchez les clés opérateurs pour la prod).',
-        }),
-        { headers: { ...cors, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Placeholder pour appels API réels
+    // Ne jamais confirmer un paiement sans appel réel à l'opérateur.
+    // Chaque pays a son contrat : Orange BF ≠ Orange ML ≠ Orange SN ≠ Orange GN, etc.
+    void provider;
     return new Response(
       JSON.stringify({
-        success: true,
-        transactionId,
-        message: 'Paiement initié auprès de l’opérateur.',
+        success: false,
+        unavailable: true,
+        error:
+          'Prélèvement opérateur non branché. Il faut un contrat marchand (Orange, Moov, Telecel, Malitel ou MTN) et les clés API correspondantes.',
       }),
-      { headers: { ...cors, 'Content-Type': 'application/json' } }
+      { status: 503, headers: { ...cors, 'Content-Type': 'application/json' } }
     );
   } catch (e) {
     return new Response(

@@ -68,64 +68,81 @@ export default function Header() {
   };
 
   return (
-    <header className={`sticky top-0 z-50 bg-white transition-shadow duration-300 ${scrolled ? 'shadow-lg' : 'shadow-sm'}`}>
+    <header
+      className={`sticky top-0 z-50 transition-all duration-500 ${
+        scrolled
+          ? 'bg-white/80 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_10px_40px_-18px_rgba(16,24,40,0.35)] border-b border-black/5'
+          : 'bg-white border-b border-transparent'
+      }`}
+    >
       {/* Top bar */}
-      <div className="bg-[#1F2937] text-white text-xs py-1.5">
+      <div className="bg-[#1F2937] text-white/75 text-[11px] font-medium tracking-wide py-2">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1"><Truck size={12} /> Livraison rapide</span>
-            <span className="hidden sm:flex items-center gap-1"><Shield size={12} /> Paiement sécurisé</span>
+          <div className="flex items-center gap-5">
+            <span className="flex items-center gap-1.5">
+              <Truck size={12} className="text-[#FF8A2B]" /> Livraison suivie
+            </span>
+            <span className="hidden sm:flex items-center gap-1.5">
+              <Shield size={12} className="text-[#1BC46B]" /> Paiement sécurisé
+            </span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-5">
             <Link
               to="/commandes"
-              className="hidden sm:flex items-center gap-1 hover:text-[#FF6B00] transition-colors font-semibold"
+              className="hidden sm:flex items-center gap-1.5 hover:text-white transition-colors"
             >
               <PackageSearch size={12} /> Suivre ma commande
             </Link>
             <Link
               to="/abonnements"
-              className="hidden sm:flex items-center gap-1 hover:text-[#FF6B00] transition-colors font-semibold"
+              className="hidden sm:flex items-center gap-1.5 text-[#FFB067] hover:text-white transition-colors font-semibold"
             >
-              Abonnements
+              <Crown size={12} /> Abonnements
             </Link>
-            <span className="hidden md:flex items-center gap-1"><Headphones size={12} /> Support 24/7</span>
-            <span className="flex items-center gap-1"><CreditCard size={12} /> FCFA</span>
+            <span className="hidden md:flex items-center gap-1.5"><Headphones size={12} /> Support 24/7</span>
+            <span className="flex items-center gap-1.5"><CreditCard size={12} /> FCFA</span>
           </div>
         </div>
       </div>
 
       {/* Main header */}
-      <div className="max-w-7xl mx-auto px-4 py-3">
+      <div className="max-w-7xl mx-auto px-4 py-3.5">
         <div className="flex items-center justify-between gap-4">
           {/* Mobile menu button */}
-          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 hover:bg-gray-100 rounded-lg">
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="lg:hidden p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
+          >
+            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
 
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 shrink-0">
+          <Link to="/" className="flex items-center gap-2 shrink-0 transition-transform hover:scale-[1.03]">
             <img
               src="/logo-afrizone.png"
               alt="AfriZone - Achetez. Vendez. Expédiez."
-              className="h-12 w-auto object-contain"
+              className="h-12 w-auto object-contain drop-shadow-[0_6px_14px_rgba(255,107,0,0.18)]"
             />
           </Link>
 
           {/* Search bar */}
-          <form onSubmit={goSearch} className="hidden md:flex flex-1 max-w-xl relative">
+          <form onSubmit={goSearch} className="hidden md:flex flex-1 max-w-xl relative group">
+            <Search
+              size={18}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#FF6B00] transition-colors"
+            />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Rechercher un produit, une marque, un vendeur..."
-              className="w-full pl-4 pr-12 py-2.5 border-2 border-gray-200 rounded-full focus:border-[#FF6B00] focus:outline-none transition-colors text-sm"
+              className="w-full pl-11 pr-28 py-3 bg-gray-100/80 border border-transparent rounded-2xl focus:bg-white focus:border-[#FF6B00]/40 focus:outline-none text-sm placeholder:text-gray-400"
             />
             <button
               type="submit"
-              className="absolute right-1 top-1/2 -translate-y-1/2 bg-[#FF6B00] text-white p-2 rounded-full hover:bg-[#E05E00] transition-colors"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-[#FF6B00] text-white px-4 py-2 rounded-xl text-xs font-bold"
             >
-              <Search size={18} />
+              Rechercher
             </button>
           </form>
 
@@ -133,14 +150,16 @@ export default function Header() {
           <div className="relative hidden lg:block">
             <button
               onClick={() => setCountryOpen(!countryOpen)}
-              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg hover:border-[#FF6B00] transition-colors text-sm"
+              className="flex items-center gap-2 pl-2 pr-3 py-2 bg-white border border-gray-200/80 rounded-2xl hover:border-[#FF6B00]/40 hover:shadow-md transition-all text-sm"
             >
-              <MapPin size={16} className="text-[#FF6B00]" />
-              <span className="font-medium">{countryName}</span>
-              <ChevronDown size={14} className={`transition-transform ${countryOpen ? 'rotate-180' : ''}`} />
+              <span className="w-7 h-7 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center">
+                <MapPin size={14} className="text-[#FF6B00]" />
+              </span>
+              <span className="font-semibold">{countryName}</span>
+              <ChevronDown size={14} className={`text-gray-400 transition-transform ${countryOpen ? 'rotate-180' : ''}`} />
             </button>
             {countryOpen && (
-              <div className="absolute top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 animate-fade-in">
+              <div className="absolute top-full mt-2 w-52 glass shadow-premium-lg rounded-2xl p-1.5 z-50 animate-fade-in">
                 {countries.map((c) => (
                   <button
                     key={c.code}
@@ -154,7 +173,7 @@ export default function Header() {
                         navigate(`/catalogue?${params.toString()}`);
                       }
                     }}
-                    className={`w-full text-left px-4 py-2 text-sm hover:bg-orange-50 hover:text-[#FF6B00] transition-colors ${country === c.code ? 'text-[#FF6B00] font-semibold bg-orange-50' : ''}`}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm hover:bg-orange-50 hover:text-[#FF6B00] transition-colors ${country === c.code ? 'text-[#FF6B00] font-bold bg-orange-50/80' : 'font-medium'}`}
                   >
                     {c.label}
                   </button>
@@ -167,12 +186,12 @@ export default function Header() {
           {isAuthenticated && <NotificationBell />}
           <Link
             to="/panier"
-            className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="relative w-11 h-11 flex items-center justify-center rounded-2xl bg-white border border-gray-200/80 hover:border-[#FF6B00]/40 hover:shadow-md transition-all"
             title="Panier"
           >
-            <ShoppingCart size={22} className="text-[#1F2937]" />
+            <ShoppingCart size={20} className="text-[#1F2937]" />
             {itemCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-[#FF6B00] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] px-1 bg-[#FF6B00] text-white text-[10px] font-extrabold rounded-full flex items-center justify-center ring-2 ring-white">
                 {itemCount > 99 ? '99+' : itemCount}
               </span>
             )}
@@ -185,9 +204,9 @@ export default function Header() {
                 <div className="relative hidden sm:block">
                   <button
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                    className="flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-2xl bg-white border border-gray-200/80 hover:border-[#FF6B00]/40 hover:shadow-md transition-all"
                   >
-                    <div className="w-8 h-8 rounded-full bg-[#FF6B00] text-white flex items-center justify-center text-sm font-bold overflow-hidden">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#FF8A2B] to-[#F25500] text-white flex items-center justify-center text-sm font-bold overflow-hidden shadow-glow-orange">
                       {user.avatarUrl ? (
                         <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
                       ) : (
@@ -205,7 +224,7 @@ export default function Header() {
                     <ChevronDown size={14} />
                   </button>
                   {userMenuOpen && (
-                    <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
+                    <div className="absolute right-0 top-full mt-2 w-60 glass shadow-premium-lg rounded-2xl p-1.5 z-50 animate-fade-in [&>a]:rounded-xl [&>button]:rounded-xl">
                       <div className="px-4 py-2 border-b border-gray-100">
                         <p className="text-xs text-gray-500 capitalize">
                           {user.role === 'vendeur'
@@ -309,10 +328,10 @@ export default function Header() {
                 </div>
               ) : (
           <div className="hidden sm:flex items-center gap-2">
-            <Link to="/auth/login" className="px-4 py-2 text-sm font-semibold text-[#1F2937] hover:text-[#FF6B00] transition-colors">
+            <Link to="/auth/login" className="px-4 py-2.5 text-sm font-bold text-[#1F2937] rounded-2xl hover:bg-gray-100 transition-colors">
               Connexion
             </Link>
-                  <Link to="/auth/register" className="px-4 py-2 text-sm font-semibold bg-[#00A651] text-white rounded-lg hover:bg-[#008A43] transition-colors shadow-sm">
+                  <Link to="/auth/register" className="px-5 py-2.5 text-sm font-bold bg-[#00A651] text-white rounded-2xl hover:-translate-y-0.5">
               Inscription
             </Link>
           </div>
@@ -341,11 +360,11 @@ export default function Header() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Rechercher..."
-            className="w-full pl-4 pr-12 py-2.5 border-2 border-gray-200 rounded-full focus:border-[#FF6B00] focus:outline-none text-sm"
+            className="w-full pl-4 pr-12 py-3 bg-gray-100/80 border border-transparent rounded-2xl focus:bg-white focus:border-[#FF6B00]/40 focus:outline-none text-sm"
           />
           <button
             type="submit"
-            className="absolute right-1 top-1/2 -translate-y-1/2 bg-[#FF6B00] text-white p-2 rounded-full"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-[#FF6B00] text-white p-2 rounded-xl"
           >
             <Search size={18} />
           </button>
@@ -526,20 +545,31 @@ export default function Header() {
       )}
 
       {/* Navigation */}
-      <nav className="hidden lg:block border-t border-gray-100 bg-white">
+      <nav className="hidden lg:block border-t border-black/[0.04]">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center gap-1">
-            {navItems.map((item, i) => (
-              <Link
-                key={item.label}
-                to={item.to}
-                className={`px-4 py-3 text-sm font-semibold transition-colors hover:text-[#FF6B00] ${
-                  i === 0 ? 'text-[#FF6B00] bg-orange-50' : 'text-[#1F2937]'
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              const [path, query] = item.to.split('?');
+              const active =
+                location.pathname === path &&
+                (query ? location.search === `?${query}` : !location.search || path !== '/catalogue');
+              return (
+                <Link
+                  key={item.label}
+                  to={item.to}
+                  className={`relative px-4 py-3 text-[13px] font-semibold transition-colors hover:text-[#FF6B00] group ${
+                    active ? 'text-[#FF6B00]' : 'text-[#1F2937]/80'
+                  }`}
+                >
+                  {item.label}
+                  <span
+                    className={`absolute left-4 right-4 bottom-0 h-[3px] rounded-full bg-gradient-to-r from-[#FF8A2B] to-[#00A651] transition-all duration-300 origin-left ${
+                      active ? 'scale-x-100 opacity-100' : 'scale-x-0 opacity-0 group-hover:scale-x-100 group-hover:opacity-100'
+                    }`}
+                  />
+                </Link>
+              );
+            })}
           </div>
         </div>
       </nav>

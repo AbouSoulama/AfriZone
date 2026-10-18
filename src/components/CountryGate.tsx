@@ -6,6 +6,7 @@ const FLAG: Record<CatalogCountryCode, string> = {
   SN: '🇸🇳',
   BF: '🇧🇫',
   ML: '🇲🇱',
+  GN: '🇬🇳',
 };
 
 /**

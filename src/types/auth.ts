@@ -74,7 +74,7 @@ export interface VendorRegisterData {
   idDocument: File | null;
   idDocumentType: 'cni' | 'passport';
   shopName: string;
-  country: 'SN' | 'BF' | 'ML';
+  country: 'SN' | 'BF' | 'ML' | 'GN';
   city: string;
   address: string;
   shopCategory: string;
@@ -91,7 +91,7 @@ export interface DriverRegisterData {
   password: string;
   confirmPassword: string;
   city: string;
-  country: 'SN' | 'BF' | 'ML';
+  country: 'SN' | 'BF' | 'ML' | 'GN';
   vehicleType: 'moto' | 'voiture' | 'velo' | 'camionnette';
   vehiclePlate?: string;
   zones: string[];

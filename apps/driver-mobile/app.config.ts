@@ -6,7 +6,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: 'AfriZone Livraison',
     slug: 'afrizone-driver',
-    version: '1.2.2',
+    version: '1.2.3',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
@@ -28,7 +28,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     android: {
       package: 'com.afrizone.driver',
-      versionCode: 13,
+      versionCode: 14,
       adaptiveIcon: {
         backgroundColor: '#1FAE4B',
         foregroundImage: './assets/adaptive-icon.png',

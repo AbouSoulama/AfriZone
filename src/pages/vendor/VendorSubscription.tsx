@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Check, Loader2, Megaphone, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCountry } from '../../context/CountryContext';
+import PaymentMethodPicker from '../../components/PaymentMethodPicker';
 import SubscriptionTermPicker from '../../components/SubscriptionTermPicker';
+import { paymentMethodLabel, paymentMethodsForCountry } from '../../data/country-payments';
 import {
   createAdPlacement,
   fetchActiveSubscription,
@@ -55,6 +57,7 @@ export default function VendorSubscriptionPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState('');
 
   const [adTitle, setAdTitle] = useState('');
   const [adSubtitle, setAdSubtitle] = useState('');
@@ -102,6 +105,13 @@ export default function VendorSubscriptionPage() {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    const methods = paymentMethodsForCountry(country);
+    setPaymentMethod((current) =>
+      methods.some((m) => m.id === current) ? current : methods[0]?.id || ''
+    );
+  }, [country]);
+
   const subscribe = async (plan: SubscriptionPlan) => {
     if (!user || plan.priceXof <= 0) return;
     setBusyId(plan.id);
@@ -116,13 +126,10 @@ export default function VendorSubscriptionPage() {
         customerName: user.fullName,
         customerEmail: user.email,
         country: country || user.vendor?.country || 'BF',
+        provider: paymentMethod,
       });
-      if (res.paymentUrl) {
-        window.location.assign(res.paymentUrl);
-        return;
-      }
       setOkMsg(
-        `Plan ${plan.name} activé pour ${res.months} mois — ${formatXof(res.amountXof)} (simulation).`
+        `Plan ${plan.name} activé pour ${res.months} mois — ${formatXof(res.amountXof)} via ${paymentMethodLabel(paymentMethod)} (mode test, aucun prélèvement).`
       );
       await reload();
     } catch (e) {
@@ -243,6 +250,13 @@ export default function VendorSubscriptionPage() {
             Remise d’engagement à partir de 12 mois : −10 % sur 1 an, −15 % sur 2 ans, −25 %
             sur 4 ans. Le tarif est bloqué pendant toute la durée souscrite.
           </p>
+          <div className="mt-5">
+            <PaymentMethodPicker
+              country={country}
+              value={paymentMethod}
+              onChange={setPaymentMethod}
+            />
+          </div>
         </div>
       )}
 

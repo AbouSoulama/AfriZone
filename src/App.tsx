@@ -88,7 +88,8 @@ function BackToTop() {
   return (
     <button
       onClick={handleScroll}
-      className="fixed bottom-6 right-[13.5rem] z-50 w-12 h-12 bg-white text-[#FF6B00] border border-gray-200 rounded-full shadow-xl hover:bg-gray-50 flex items-center justify-center transition-all hover:-translate-y-1 max-[480px]:hidden"
+      aria-label="Retour en haut"
+      className="fixed bottom-6 right-[13.5rem] z-50 w-12 h-12 glass text-[#FF6B00] rounded-2xl shadow-premium-lg flex items-center justify-center transition-all hover:-translate-y-1 hover:text-white hover:bg-[#FF6B00] max-[480px]:hidden"
     >
       <svg
         width="20"

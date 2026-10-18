@@ -6,9 +6,11 @@ import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { formatPrice } from '../services/catalog';
-import { placeOrders } from '../services/orders';
+import { placeOrders, type PaymentMethod } from '../services/orders';
 import { fetchDefaultAddress, fetchMyAddresses, type AddressView } from '../services/account';
-import { isFedaPaySandbox, isLivePayment, startCheckout } from '../services/payments';
+import PaymentMethodPicker from '../components/PaymentMethodPicker';
+import { paymentMethodById, paymentMethodLabel, paymentMethodsForCountry } from '../data/country-payments';
+import { isLivePayment, OPERATOR_COLLECTION_NOT_READY } from '../services/payments';
 import { previewClubShippingDiscount } from '../services/subscriptions';
 import {
   CATALOG_COUNTRIES,
@@ -30,6 +32,8 @@ export default function CheckoutPage() {
   const [shipCountry, setShipCountry] = useState<CatalogCountryCode>(siteCountry || 'SN');
   const [city, setCity] = useState(() => capitalForCountry(siteCountry || 'SN'));
   const [phone, setPhone] = useState(user?.phone || '');
+  const [payPhone, setPayPhone] = useState(user?.phone || '');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [notes, setNotes] = useState('');
   const [shippingLat, setShippingLat] = useState<number | null>(null);
   const [shippingLng, setShippingLng] = useState<number | null>(null);
@@ -41,6 +45,13 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [doneIds, setDoneIds] = useState<string[] | null>(null);
   const [clubDiscount, setClubDiscount] = useState(0);
+
+  useEffect(() => {
+    const methods = paymentMethodsForCountry(siteCountry);
+    setPaymentMethod((current) =>
+      methods.some((m) => m.id === current) ? current : methods[0]?.id || ''
+    );
+  }, [siteCountry]);
 
   useEffect(() => {
     if (!user) return;
@@ -197,8 +208,8 @@ export default function CheckoutPage() {
             <p className="text-gray-500 text-sm mb-6">
               {doneIds.length > 1
                 ? `${doneIds.length} commandes créées (un ticket par vendeur).`
-                : 'Votre commande a été payée et confirmée.'}{' '}
-              Paiement via FedaPay.
+                : 'Votre commande est confirmée en mode test.'}{' '}
+              Moyen enregistré : {paymentMethodLabel(paymentMethod)}. Aucun argent n’a été débité.
             </p>
             <div className="flex flex-col gap-2">
               <button
@@ -224,7 +235,12 @@ export default function CheckoutPage() {
     setLoading(true);
     setError(null);
     try {
-      const live = isLivePayment();
+      if (isLivePayment()) throw new Error(OPERATOR_COLLECTION_NOT_READY);
+      if (!paymentMethod) throw new Error('Choisissez un moyen de paiement.');
+      const paidWith = payPhone.trim() || phone.trim();
+      if (paidWith.replace(/\D/g, '').length < 8) {
+        throw new Error('Indiquez le numéro Mobile Money utilisé pour payer.');
+      }
       const ids = await placeOrders(user.id, {
         shippingAddress: address,
         shippingCity: city,
@@ -233,30 +249,10 @@ export default function CheckoutPage() {
         shippingLat,
         shippingLng,
         notes,
-        paymentMethod: 'mobile_money',
-        paymentPhone: phone,
-        markPaid: !live,
+        paymentMethod: paymentMethod as PaymentMethod,
+        paymentPhone: paidWith,
+        markPaid: true,
       });
-
-      if (live) {
-        const shipCut = Math.min(clubDiscount, summary?.shippingEstimate ?? 0);
-        const payAmount = Math.max(0, (summary?.total ?? 0) - shipCut);
-        const checkout = await startCheckout({
-          amount: payAmount,
-          phone,
-          provider: 'mobile_money',
-          kind: 'order',
-          orderIds: ids,
-          customerName: user.fullName,
-          customerEmail: user.email,
-          country: shipCountry,
-        });
-        if (checkout.paymentUrl) {
-          window.location.assign(checkout.paymentUrl);
-          return;
-        }
-        throw new Error('Lien de paiement FedaPay manquant.');
-      }
 
       await refreshCart();
       setDoneIds(ids);
@@ -441,33 +437,28 @@ export default function CheckoutPage() {
               />
             </div>
 
-            <div className="rounded-2xl border border-[#FF6B00]/30 bg-orange-50/60 p-4">
-              <h2 className="font-extrabold mb-1">Paiement sécurisé</h2>
+            <div className="rounded-2xl border border-[#FF6B00]/30 bg-orange-50/60 p-4 space-y-3">
+              <h2 className="font-extrabold">Paiement</h2>
+              <PaymentMethodPicker
+                country={siteCountry}
+                value={paymentMethod}
+                onChange={setPaymentMethod}
+              />
+              <div>
+                <label className="block text-sm font-bold mb-2">
+                  Numéro {paymentMethodLabel(paymentMethod)}
+                </label>
+                <input
+                  value={payPhone}
+                  onChange={(e) => setPayPhone(e.target.value)}
+                  placeholder={`${paymentMethodById(paymentMethod)?.dial || ''} …`}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none bg-white"
+                />
+              </div>
               <p className="text-sm text-gray-600 leading-relaxed">
-                {isLivePayment()
-                  ? 'Après validation, vous serez redirigé vers FedaPay pour choisir Mobile Money, Wave ou un autre moyen disponible et confirmer le paiement.'
-                  : 'Mode simulation : la commande sera confirmée sans prélèvement réel.'}
+                Mode test : la commande est confirmée et le moyen est enregistré, sans prélèvement
+                sur le téléphone.
               </p>
-              {isLivePayment() && isFedaPaySandbox() && (
-                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 leading-relaxed">
-                  <p className="font-bold mb-1">Mode test FedaPay (sandbox)</p>
-                  <ol className="list-decimal pl-4 space-y-1">
-                    <li>
-                      Choisissez <strong>Momo Test</strong> (pas Orange/Moov CI).
-                    </li>
-                    <li>
-                      Dans le champ téléphone, passez le drapeau en <strong>Bénin (+229)</strong> — pas Burkina (+226).
-                    </li>
-                    <li>
-                      Numéro succès : <strong>64000001</strong> ou <strong>66000001</strong>.
-                    </li>
-                    <li>
-                      Autre option : payer par <strong>carte</strong> Visa test{' '}
-                      <strong>4111 1111 1111 1111</strong> (date future + CVC quelconque).
-                    </li>
-                  </ol>
-                </div>
-              )}
             </div>
 
             {error && (
@@ -540,11 +531,7 @@ export default function CheckoutPage() {
               disabled={loading}
               className="w-full py-3.5 bg-[#00A651] hover:bg-[#008A43] disabled:bg-gray-300 text-white rounded-xl font-bold"
             >
-              {loading
-                ? isLivePayment()
-                  ? 'Ouverture de FedaPay...'
-                  : 'Paiement en cours...'
-                : `Payer ${formatPrice(summary?.total ?? 0)}`}
+              {loading ? 'Paiement en cours...' : `Payer ${formatPrice(summary?.total ?? 0)}`}
             </button>
           </aside>
         </form>

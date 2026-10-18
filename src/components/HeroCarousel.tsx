@@ -4,25 +4,34 @@ import {
   ChevronLeft,
   ChevronRight,
   ShoppingBag,
-  Gift,
+  Package,
   Zap,
   Shield,
   Headphones,
   RefreshCw,
   Megaphone,
+  MapPin,
+  CheckCircle2,
+  Truck,
 } from 'lucide-react';
 import { fetchActiveAds } from '../services/subscriptions';
 import { supabase } from '../lib/supabase';
 
+type Glow = { a: string; b: string };
+
 type Slide = {
   id: string | number;
+  kind: 'brand' | 'parcel' | 'ad';
   title: string;
+  highlight?: string;
   subtitle: string;
   description: string;
   cta: string;
   to: string;
-  bg: string;
-  accent: string;
+  secondaryCta?: { label: string; to: string };
+  glow: Glow;
+  /** orange = fond dégradé d’origine, ink = fond sombre */
+  surface?: 'orange' | 'ink';
   icon: typeof ShoppingBag;
   badge: string;
   imageUrl?: string | null;
@@ -32,48 +41,107 @@ type Slide = {
 const PLATFORM_SLIDES: Slide[] = [
   {
     id: 'brand',
+    kind: 'brand',
     title: 'Bienvenue sur AfriZone',
     subtitle: 'Marketplace ouest-africaine',
+    surface: 'orange',
     description:
-      'Achetez, vendez et expédiez au Burkina Faso, au Mali et au Sénégal — vendeurs locaux, livraison suivie.',
+      'Achetez, vendez et expédiez au Burkina Faso, au Mali, au Sénégal et en Guinée — vendeurs locaux, livraison suivie.',
     cta: 'Découvrir le catalogue',
     to: '/catalogue',
-    bg: 'from-[#FF6B00] via-[#FF8533] to-[#FF6B00]',
-    accent: '#00A651',
+    glow: { a: 'rgba(255,128,32,0.6)', b: 'rgba(16,200,110,0.4)' },
     icon: ShoppingBag,
     badge: 'AFRIZONE',
   },
   {
     id: 'colis',
-    title: 'Envoi de Colis',
+    kind: 'parcel',
+    title: 'Envoyez vos colis',
+    highlight: 'en toute confiance',
     subtitle: 'Entre nos villes partenaires',
     description:
-      'Expédiez vos colis en toute sécurité avec suivi — Ouagadougou, Bamako, Dakar et plus.',
+      'Enlèvement à votre adresse, GPS au départ et à l’arrivée, livraison validée par un code de remise.',
     cta: 'Envoyer un colis',
     to: '/colis',
-    bg: 'from-[#1F2937] via-[#374151] to-[#1F2937]',
-    accent: '#FF6B00',
-    icon: Gift,
+    secondaryCta: { label: 'Suivre un colis', to: '/suivi' },
+    glow: { a: 'rgba(0,166,81,0.5)', b: 'rgba(255,107,0,0.35)' },
+    icon: Package,
     badge: 'SERVICE',
   },
 ];
 
-const AD_BGS = [
-  'from-[#064E3B] via-[#047857] to-[#065F46]',
-  'from-[#7C2D12] via-[#C2410C] to-[#9A3412]',
-  'from-[#1E3A8A] via-[#2563EB] to-[#1D4ED8]',
+const AD_GLOWS: Glow[] = [
+  { a: 'rgba(16,185,129,0.5)', b: 'rgba(255,107,0,0.3)' },
+  { a: 'rgba(249,115,22,0.55)', b: 'rgba(236,72,153,0.3)' },
+  { a: 'rgba(59,130,246,0.5)', b: 'rgba(0,166,81,0.3)' },
 ];
 
 const features = [
-  { icon: Zap, text: 'Livraison rapide', color: '#FF6B00' },
-  { icon: Shield, text: 'Paiement sécurisé', color: '#00A651' },
-  { icon: Headphones, text: 'Support 24/7', color: '#00A651' },
-  { icon: RefreshCw, text: 'Retours faciles', color: '#FF6B00' },
+  { icon: Zap, text: 'Livraison rapide', sub: 'Suivi GPS en direct', tint: 'from-orange-400 to-[#F25500]' },
+  { icon: Shield, text: 'Paiement sécurisé', sub: 'Orange · Moov · Telecel · MTN', tint: 'from-emerald-400 to-[#00A651]' },
+  { icon: Headphones, text: 'Support 24/7', sub: 'Assistant & contact', tint: 'from-sky-400 to-indigo-500' },
+  { icon: RefreshCw, text: 'Retours faciles', sub: 'Vendeurs vérifiés', tint: 'from-amber-300 to-orange-500' },
 ];
+
+function BrandVisual() {
+  return (
+    <div className="w-52 h-52 md:w-64 md:h-64 rounded-full bg-white/15 flex items-center justify-center">
+      <ShoppingBag size={112} strokeWidth={1.25} className="text-white" />
+    </div>
+  );
+}
+
+function ParcelVisual() {
+  return (
+    <div className="relative w-[360px] h-[340px]">
+      <div className="absolute inset-8 rounded-[2.5rem] bg-gradient-to-br from-emerald-400 to-[#00A651] blur-3xl opacity-35" />
+      <div className="absolute inset-x-4 top-6 glass-dark rounded-3xl p-5 shadow-2xl animate-float">
+        <div className="flex items-center justify-between">
+          <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Exemple de suivi</p>
+          <span className="text-[10px] font-bold text-emerald-300 bg-emerald-400/15 px-2 py-0.5 rounded-full">
+            En route
+          </span>
+        </div>
+        <p className="mt-1 text-white font-extrabold font-display text-lg">AZ-BF-2481</p>
+        <div className="mt-4 space-y-3">
+          {[
+            { label: 'Ouagadougou', done: true },
+            { label: 'En transit', done: true },
+            { label: 'Bobo-Dioulasso', done: false },
+          ].map((step, i) => (
+            <div key={step.label} className="flex items-center gap-3">
+              <span
+                className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                  step.done
+                    ? 'bg-gradient-to-br from-emerald-400 to-[#00A651]'
+                    : 'border-2 border-dashed border-white/30'
+                }`}
+              >
+                {step.done ? <CheckCircle2 size={13} className="text-white" /> : null}
+              </span>
+              <span className={`text-sm ${step.done ? 'text-white font-semibold' : 'text-white/50'}`}>
+                {step.label}
+              </span>
+              {i === 1 && <Truck size={16} className="ml-auto text-[#FFB067]" />}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div
+        className="absolute right-2 bottom-2 glass-dark rounded-2xl px-4 py-3 shadow-2xl animate-float flex items-center gap-2"
+        style={{ animationDelay: '1.5s' }}
+      >
+        <MapPin size={16} className="text-[#FFB067]" />
+        <span className="text-white text-xs font-bold">GPS départ & arrivée</span>
+      </div>
+    </div>
+  );
+}
 
 export default function HeroCarousel() {
   const [adSlides, setAdSlides] = useState<Slide[]>([]);
   const [current, setCurrent] = useState(0);
+  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,6 +175,7 @@ export default function HeroCarousel() {
               (vendor?.shopSlug ? `/boutique/${vendor.shopSlug}` : '/catalogue');
             return {
               id: ad.id,
+              kind: 'ad' as const,
               title: ad.title,
               subtitle: ad.subtitle || vendor?.shopName || 'Offre partenaire',
               description:
@@ -116,8 +185,7 @@ export default function HeroCarousel() {
                   : 'Publicité vendeur AfriZone Business.'),
               cta: vendor ? 'Voir la boutique' : 'Découvrir',
               to: link,
-              bg: AD_BGS[i % AD_BGS.length],
-              accent: '#FF6B00',
+              glow: AD_GLOWS[i % AD_GLOWS.length],
               icon: Megaphone,
               badge: 'SPONSORISÉ',
               imageUrl: ad.imageUrl || vendor?.logo || null,
@@ -134,128 +202,210 @@ export default function HeroCarousel() {
   }, []);
 
   const slides = useMemo(() => {
-    // Pubs Business en premier (réelles), puis slides plateforme
-    if (adSlides.length) return [...adSlides, ...PLATFORM_SLIDES];
-    return PLATFORM_SLIDES;
+    const [welcome, ...rest] = PLATFORM_SLIDES;
+    return [welcome, ...adSlides, ...rest];
   }, [adSlides]);
 
   useEffect(() => {
     setCurrent(0);
+  }, [slides.length]);
+
+  useEffect(() => {
+    if (paused) return;
     const timer = setInterval(() => {
       setCurrent((c) => (c + 1) % slides.length);
-    }, 5500);
+    }, 6500);
     return () => clearInterval(timer);
-  }, [slides.length]);
+  }, [slides.length, paused]);
 
   const next = () => setCurrent((c) => (c + 1) % slides.length);
   const prev = () => setCurrent((c) => (c - 1 + slides.length) % slides.length);
 
   return (
     <div className="max-w-7xl mx-auto px-4 mt-6">
-      <div className="relative rounded-2xl overflow-hidden shadow-2xl h-[340px] md:h-[420px]">
+      <div
+        className="relative rounded-3xl overflow-hidden shadow-[0_30px_60px_-28px_rgba(255,107,0,0.45)] h-[340px] md:h-[420px] ring-1 ring-black/10"
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+      >
         {slides.map((slide, i) => {
           const Icon = slide.icon;
+          const active = i === current;
+          const orange = slide.surface === 'orange';
+          const welcome = slide.kind === 'brand';
           return (
             <div
               key={slide.id}
-              className={`absolute inset-0 bg-gradient-to-br ${slide.bg} transition-all duration-700 ${
-                i === current ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
-              }`}
+              className={`absolute inset-0 transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                orange
+                  ? 'bg-gradient-to-br from-[#FF6B00] via-[#FF8533] to-[#FF6B00]'
+                  : 'bg-ink'
+              } ${active ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.04] pointer-events-none'}`}
             >
+              {!welcome && (
+                <>
+                  <div className="absolute inset-0 bg-grid-light pointer-events-none" />
+                  <div
+                    className="absolute -top-40 -left-32 w-[560px] h-[560px] rounded-full blur-[110px] animate-orb mix-blend-screen"
+                    style={{ background: slide.glow.a }}
+                  />
+                  <div
+                    className="absolute -bottom-48 -right-24 w-[520px] h-[520px] rounded-full blur-[120px] animate-orb mix-blend-screen"
+                    style={{ background: slide.glow.b, animationDelay: '-6s' }}
+                  />
+                </>
+              )}
+
               {slide.imageUrl && (
                 <>
                   <img
                     src={slide.imageUrl}
                     alt=""
-                    className="absolute inset-0 w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover opacity-35 scale-110 blur-[2px]"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/55 to-black/30" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#0B0F19] via-[#0B0F19]/80 to-[#0B0F19]/30" />
                 </>
               )}
-              {!slide.imageUrl && (
-                <div className="absolute inset-0 overflow-hidden">
-                  <div className="absolute -top-20 -right-20 w-72 h-72 bg-white/10 rounded-full blur-3xl" />
-                  <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-white/10 rounded-full blur-3xl" />
-                </div>
-              )}
 
-              <div className="relative z-10 h-full flex items-center max-w-7xl mx-auto px-8 md:px-16">
-                <div className="flex-1 text-white max-w-xl">
-                  <span className="inline-block px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold tracking-wider mb-3">
+              <div className="relative z-10 h-full flex items-center px-7 md:px-16">
+                <div className={`flex-1 text-white max-w-2xl ${active ? 'animate-rise' : ''}`}>
+                  <span
+                    className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold tracking-[0.16em] mb-3 ${
+                      welcome ? 'bg-white/20' : 'glass-dark'
+                    }`}
+                  >
+                    {!welcome && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF8A2B] shadow-[0_0_12px_#FF8A2B]" />
+                    )}
                     {slide.badge}
                   </span>
-                  <h2 className="text-3xl md:text-5xl font-extrabold mb-2 leading-tight">
+                  <h2
+                    className={`font-extrabold leading-[1.05] tracking-tight ${
+                      welcome ? 'text-3xl md:text-5xl' : 'text-4xl md:text-6xl'
+                    }`}
+                  >
                     {slide.title}
+                    {slide.highlight && (
+                      <>
+                        <br />
+                        <span className="text-gradient-brand">{slide.highlight}</span>
+                      </>
+                    )}
                   </h2>
-                  <p className="text-lg md:text-xl font-semibold mb-3 opacity-90">{slide.subtitle}</p>
-                  <p className="text-sm md:text-base opacity-80 mb-6 leading-relaxed">
+                  <p
+                    className={
+                      welcome
+                        ? 'mt-2 text-lg md:text-xl font-semibold text-white/95'
+                        : 'mt-4 text-sm md:text-base font-semibold text-white/60 uppercase tracking-[0.18em]'
+                    }
+                  >
+                    {slide.subtitle}
+                  </p>
+                  <p
+                    className={`leading-relaxed max-w-xl ${
+                      welcome
+                        ? 'mt-2 text-sm md:text-base text-white/85'
+                        : 'mt-3 text-base md:text-lg text-white/75'
+                    }`}
+                  >
                     {slide.description}
                   </p>
-                  <Link
-                    to={slide.to}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-white rounded-full font-bold text-sm shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
-                    style={{ color: slide.accent }}
-                  >
-                    {slide.cta}
-                    <ChevronRight size={16} />
-                  </Link>
+                  <div className={`flex flex-wrap items-center gap-3 ${welcome ? 'mt-6' : 'mt-8'}`}>
+                    <Link
+                      to={slide.to}
+                      className={
+                        orange
+                          ? 'inline-flex items-center gap-2 px-7 py-3.5 bg-white text-[#00A651] rounded-full font-bold text-sm shadow-lg hover:-translate-y-0.5'
+                          : 'sheen inline-flex items-center gap-2 px-7 py-3.5 bg-[#FF6B00] text-white rounded-2xl font-bold text-sm hover:-translate-y-0.5'
+                      }
+                    >
+                      {slide.cta}
+                      <ChevronRight size={17} />
+                    </Link>
+                    {slide.secondaryCta && (
+                      <Link
+                        to={slide.secondaryCta.to}
+                        className="inline-flex items-center gap-2 px-6 py-3.5 glass-dark text-white rounded-2xl font-bold text-sm hover:bg-white/15 transition-colors"
+                      >
+                        {slide.secondaryCta.label}
+                      </Link>
+                    )}
+                  </div>
                 </div>
-                <div className="hidden md:flex flex-shrink-0 ml-8">
-                  {slide.imageUrl ? (
-                    <div className="w-52 h-52 rounded-3xl overflow-hidden border-4 border-white/30 shadow-2xl bg-white/10">
-                      <img
-                        src={slide.imageUrl}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-52 h-52 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                      <Icon size={100} className="text-white drop-shadow-lg" />
-                    </div>
-                  )}
+
+                <div className={`flex-shrink-0 ml-6 ${welcome ? 'hidden md:flex' : 'hidden lg:flex'}`}>
+                  {slide.kind === 'brand' && <BrandVisual />}
+                  {slide.kind === 'parcel' && <ParcelVisual />}
+                  {slide.kind === 'ad' &&
+                    (slide.imageUrl ? (
+                      <div className="relative">
+                        <div className="absolute -inset-6 rounded-[2.5rem] bg-gradient-to-br from-[#FF8A2B] to-[#00A651] blur-3xl opacity-40" />
+                        <div className="relative w-72 h-72 rounded-[2rem] overflow-hidden ring-1 ring-white/20 shadow-2xl rotate-3 animate-float">
+                          <img src={slide.imageUrl} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-64 h-64 glass-dark rounded-full flex items-center justify-center">
+                        <Icon size={96} className="text-white drop-shadow-2xl" />
+                      </div>
+                    ))}
                 </div>
               </div>
             </div>
           );
         })}
 
-        <button
-          onClick={prev}
-          className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/20 backdrop-blur-sm hover:bg-white/40 rounded-full flex items-center justify-center text-white transition-all z-20"
-        >
-          <ChevronLeft size={22} />
-        </button>
-        <button
-          onClick={next}
-          className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/20 backdrop-blur-sm hover:bg-white/40 rounded-full flex items-center justify-center text-white transition-all z-20"
-        >
-          <ChevronRight size={22} />
-        </button>
-
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-20">
-          {slides.map((_, i) => (
+        <div className="absolute bottom-6 left-7 md:left-16 right-7 md:right-16 z-20 flex items-center justify-between">
+          <div className="flex gap-2">
+            {slides.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrent(i)}
+                aria-label={`Diapositive ${i + 1}`}
+                className={`h-1.5 rounded-full transition-all duration-500 ${
+                  i === current
+                    ? 'w-10 bg-gradient-to-r from-[#FF8A2B] to-[#FFB067] shadow-[0_0_14px_rgba(255,138,43,0.8)]'
+                    : 'w-3 bg-white/30 hover:bg-white/60'
+                }`}
+              />
+            ))}
+          </div>
+          <div className="flex gap-2">
             <button
-              key={i}
-              onClick={() => setCurrent(i)}
-              className={`h-2 rounded-full transition-all ${
-                i === current ? 'w-8 bg-white' : 'w-2 bg-white/50 hover:bg-white/70'
-              }`}
-            />
-          ))}
+              onClick={prev}
+              aria-label="Précédent"
+              className="w-11 h-11 glass-dark hover:bg-white/20 rounded-2xl flex items-center justify-center text-white transition-colors"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <button
+              onClick={next}
+              aria-label="Suivant"
+              className="w-11 h-11 glass-dark hover:bg-white/20 rounded-2xl flex items-center justify-center text-white transition-colors"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-        {features.map((item, i) => {
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mt-5">
+        {features.map((item) => {
           const Icon = item.icon;
           return (
             <div
-              key={i}
-              className="flex items-center gap-2 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition-shadow"
+              key={item.text}
+              className="group flex items-center gap-3 bg-white rounded-2xl px-4 py-3.5 border border-black/[0.04] hover:-translate-y-0.5 hover:shadow-premium-lg transition-all duration-300"
             >
-              <Icon size={20} style={{ color: item.color }} />
-              <span className="text-xs font-semibold text-[#1F2937]">{item.text}</span>
+              <span
+                className={`w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br ${item.tint} flex items-center justify-center shadow-lg transition-transform group-hover:scale-110 group-hover:-rotate-6`}
+              >
+                <Icon size={18} className="text-white" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-[#1F2937] truncate">{item.text}</p>
+                <p className="text-[11px] text-gray-500 truncate">{item.sub}</p>
+              </div>
             </div>
           );
         })}

@@ -11,7 +11,15 @@ export type PaymentMethod =
   | 'orange_money'
   | 'wave'
   | 'moov_money'
-  | 'mtn_money';
+  | 'mtn_money'
+  | 'orange_bf'
+  | 'moov_bf'
+  | 'telecel_bf'
+  | 'orange_ml'
+  | 'malitel_ml'
+  | 'orange_sn'
+  | 'orange_gn'
+  | 'mtn_gn';
 export type OrderStatus =
   | 'pending'
   | 'confirmed'
@@ -98,6 +106,14 @@ export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   wave: 'Wave',
   moov_money: 'Moov Money',
   mtn_money: 'MTN Money',
+  orange_bf: 'Orange Money Burkina',
+  moov_bf: 'Moov Money Burkina',
+  telecel_bf: 'Telecel Money Burkina',
+  orange_ml: 'Orange Money Mali',
+  malitel_ml: 'Malitel Money',
+  orange_sn: 'Orange Money Sénégal',
+  orange_gn: 'Orange Money Guinée',
+  mtn_gn: 'MTN Mobile Money Guinée',
 };
 
 export async function placeOrders(
