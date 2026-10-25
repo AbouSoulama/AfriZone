@@ -5,6 +5,7 @@ import { useCountry } from '../context/CountryContext';
 import { ACCEPTED_PAYMENT_NAMES } from '../data/country-payments';
 import { subscribeNewsletter } from '../services/newsletter';
 import { CATALOG_COUNTRIES } from '../types/catalog';
+import BrandLogo from './BrandLogo';
 
 const SocialIcon = ({ path }: { path: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
@@ -161,11 +162,7 @@ export default function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-6 gap-8">
           <div className="col-span-2">
             <div className="mb-5">
-              <img
-                src="/logo-afrizone.png"
-                alt="AfriZone"
-                className="h-16 w-auto object-contain bg-white rounded-2xl p-2 shadow-[0_10px_30px_-10px_rgba(255,107,0,0.5)]"
-              />
+              <BrandLogo size="lg" onDark className="h-16" />
             </div>
             <p className="text-sm text-white/55 mb-4 leading-relaxed">
               La marketplace ouest-africaine qui connecte acheteurs, vendeurs et livreurs.

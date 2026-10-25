@@ -4,6 +4,7 @@ import { Search, ShoppingCart, MapPin, User, Menu, X, ChevronDown, Truck, Shield
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useCountry } from '../context/CountryContext';
+import BrandLogo from './BrandLogo';
 import NotificationBell from './NotificationBell';
 import { fetchActiveSubscription } from '../services/subscriptions';
 
@@ -116,14 +117,7 @@ export default function Header() {
             {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
 
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 shrink-0 transition-transform hover:scale-[1.03]">
-            <img
-              src="/logo-afrizone.png"
-              alt="AfriZone - Achetez. Vendez. Expédiez."
-              className="h-12 w-auto object-contain drop-shadow-[0_6px_14px_rgba(255,107,0,0.18)]"
-            />
-          </Link>
+          <BrandLogo size="md" />
 
           {/* Search bar */}
           <form onSubmit={goSearch} className="hidden md:flex flex-1 max-w-xl relative group">

@@ -1,6 +1,7 @@
 import { MapPin } from 'lucide-react';
 import { useCountry } from '../context/CountryContext';
 import type { CatalogCountryCode } from '../types/catalog';
+import BrandLogo from './BrandLogo';
 
 const FLAG: Record<CatalogCountryCode, string> = {
   SN: '🇸🇳',
@@ -22,11 +23,9 @@ export default function CountryGate() {
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0f172a]/75 backdrop-blur-sm p-4">
       <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl overflow-hidden animate-fade-in">
         <div className="bg-gradient-to-br from-[#00A651] to-[#008A43] px-6 py-8 text-white text-center">
-          <img
-            src="/logo-afrizone.png"
-            alt="AfriZone"
-            className="h-14 mx-auto mb-4 object-contain bg-white/95 rounded-2xl p-1.5"
-          />
+          <div className="mb-4 flex justify-center">
+            <BrandLogo to={null} size="lg" onDark className="h-14" />
+          </div>
           <h1 className="text-2xl font-extrabold tracking-tight">Bienvenue sur AfriZone</h1>
           <p className="mt-2 text-sm text-white/90 leading-relaxed">
             Une marketplace pour plusieurs pays. Choisissez votre pays pour voir les bons

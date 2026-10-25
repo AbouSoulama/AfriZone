@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCountry } from '../../context/CountryContext';
+import BrandLogo from '../../components/BrandLogo';
 import {
   CITIES_BY_COUNTRY,
   capitalForCountry,
@@ -148,9 +149,9 @@ export default function RegisterClient() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
-          <Link to="/">
-            <img src="/logo-afrizone.png" alt="AfriZone" className="h-16 w-auto mx-auto" />
-          </Link>
+          <div className="flex justify-center">
+            <BrandLogo size="lg" className="h-16" />
+          </div>
           <h1 className="text-2xl font-extrabold text-[#1F2937] mt-3">Créer un compte Client</h1>
           <p className="text-gray-500 text-sm mt-1">Accédez aux meilleures offres africaines</p>
           <p className="text-xs mt-2">

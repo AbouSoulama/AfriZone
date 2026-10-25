@@ -16,6 +16,7 @@ import {
   Crown,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import BrandLogo from '../../components/BrandLogo';
 import {
   AdminCountryProvider,
   useAdminCountry,
@@ -75,11 +76,7 @@ function AdminShell() {
       <aside className="hidden md:flex w-64 flex-col bg-[#1F2937] text-white">
         <div className="p-5 border-b border-gray-700">
           <div className="flex items-center gap-3">
-            <img
-              src="/logo-afrizone.png"
-              alt="AfriZone"
-              className="h-10 w-10 object-contain bg-white rounded-xl p-1"
-            />
+            <BrandLogo to={null} size="sm" onDark className="h-10" />
             <div>
               <span className="font-extrabold block leading-tight">Admin AfriZone</span>
               <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[140px]">
@@ -126,11 +123,7 @@ function AdminShell() {
 
       <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
         <div className="md:hidden mb-4 flex items-center gap-3">
-          <img
-            src="/logo-afrizone.png"
-            alt="AfriZone"
-            className="h-9 w-9 object-contain bg-white rounded-lg p-0.5 border"
-          />
+          <BrandLogo to={null} size="sm" className="h-9" />
           <div>
             <p className="font-extrabold text-sm">Admin AfriZone</p>
             <p className="text-xs text-gray-500">

@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Lock, Eye, EyeOff, ArrowRight, Smartphone, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import BrandLogo from '../../components/BrandLogo';
 
 const loginSchema = z.object({
   identifier: z.string().min(3, 'Email ou téléphone requis'),
@@ -56,9 +57,9 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link to="/">
-            <img src="/logo-afrizone.png" alt="AfriZone" className="h-20 w-auto mx-auto" />
-          </Link>
+          <div className="flex justify-center">
+            <BrandLogo size="xl" className="h-20" />
+          </div>
           <h1 className="text-2xl font-extrabold text-[#1F2937] mt-4">Connexion</h1>
           <p className="text-gray-500 text-sm mt-1">Accédez à votre compte AfriZone</p>
         </div>

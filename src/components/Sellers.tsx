@@ -158,7 +158,7 @@ export default function Sellers() {
 
   return (
     <section className="max-w-7xl mx-auto px-4 py-6">
-      <div className="relative overflow-hidden rounded-[2rem] bg-ink px-5 md:px-10 py-12 ring-1 ring-white/10">
+      <div className="relative overflow-hidden rounded-[2rem] bg-ink px-6 md:px-12 py-12 ring-1 ring-white/10">
         <div className="absolute -top-32 -right-24 w-[420px] h-[420px] rounded-full bg-[#10C86E]/35 blur-[110px] animate-orb mix-blend-screen" />
         <div className="absolute -bottom-40 -left-24 w-[420px] h-[420px] rounded-full bg-teal-400/20 blur-[110px] animate-orb mix-blend-screen" style={{ animationDelay: '-8s' }} />
         <div className="absolute inset-0 bg-grid-light pointer-events-none" />
@@ -206,7 +206,7 @@ export default function Sellers() {
           <div
             ref={scrollRef}
             onScroll={checkScroll}
-            className="relative flex gap-5 overflow-x-auto scrollbar-hide pb-4 pt-2 -mx-5 px-5 md:-mx-10 md:px-10 snap-x"
+            className="relative flex gap-5 overflow-x-auto scrollbar-hide pb-4 pt-2 snap-x"
           >
             {sellers.map((seller) => (
               <SellerCard key={seller.id} seller={seller} />

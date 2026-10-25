@@ -10,7 +10,7 @@ import { placeOrders, type PaymentMethod } from '../services/orders';
 import { fetchDefaultAddress, fetchMyAddresses, type AddressView } from '../services/account';
 import PaymentMethodPicker from '../components/PaymentMethodPicker';
 import { paymentMethodById, paymentMethodLabel, paymentMethodsForCountry } from '../data/country-payments';
-import { isLivePayment, OPERATOR_COLLECTION_NOT_READY } from '../services/payments';
+import { isPaymentTestMode, startCheckout, TEST_PAYMENT_HINT } from '../services/payments';
 import { previewClubShippingDiscount } from '../services/subscriptions';
 import {
   CATALOG_COUNTRIES,
@@ -45,6 +45,7 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [doneIds, setDoneIds] = useState<string[] | null>(null);
   const [clubDiscount, setClubDiscount] = useState(0);
+  const [lastTx, setLastTx] = useState<string | null>(null);
 
   useEffect(() => {
     const methods = paymentMethodsForCountry(siteCountry);
@@ -70,6 +71,7 @@ export default function CheckoutPage() {
           setShipCountry(code);
           setCity(def.city || capitalForCountry(code));
           setPhone(def.phone);
+          setPayPhone(def.phone);
           if (def.lat != null && def.lng != null) {
             setShippingLat(def.lat);
             setShippingLng(def.lng);
@@ -98,6 +100,7 @@ export default function CheckoutPage() {
     setShipCountry(code);
     setCity(a.city || capitalForCountry(code));
     setPhone(a.phone);
+    setPayPhone(a.phone);
     if (a.lat != null && a.lng != null) {
       setShippingLat(a.lat);
       setShippingLng(a.lng);
@@ -208,8 +211,10 @@ export default function CheckoutPage() {
             <p className="text-gray-500 text-sm mb-6">
               {doneIds.length > 1
                 ? `${doneIds.length} commandes créées (un ticket par vendeur).`
-                : 'Votre commande est confirmée en mode test.'}{' '}
-              Moyen enregistré : {paymentMethodLabel(paymentMethod)}. Aucun argent n’a été débité.
+                : 'Votre commande est payée et confirmée.'}{' '}
+              Moyen : {paymentMethodLabel(paymentMethod)}
+              {lastTx ? ` · réf. ${lastTx}` : ''}.
+              {isPaymentTestMode() ? ' Mode test — aucun débit réel.' : ''}
             </p>
             <div className="flex flex-col gap-2">
               <button
@@ -235,12 +240,22 @@ export default function CheckoutPage() {
     setLoading(true);
     setError(null);
     try {
-      if (isLivePayment()) throw new Error(OPERATOR_COLLECTION_NOT_READY);
       if (!paymentMethod) throw new Error('Choisissez un moyen de paiement.');
       const paidWith = payPhone.trim() || phone.trim();
       if (paidWith.replace(/\D/g, '').length < 8) {
         throw new Error('Indiquez le numéro Mobile Money utilisé pour payer.');
       }
+      const shipCut = Math.min(clubDiscount, summary?.shippingEstimate ?? 0);
+      const payAmount = Math.max(0, (summary?.total ?? 0) - shipCut);
+      const checkout = await startCheckout({
+        amount: payAmount,
+        phone: paidWith,
+        provider: paymentMethod,
+        kind: 'order',
+        customerName: user.fullName,
+        customerEmail: user.email,
+        country: siteCountry,
+      });
       const ids = await placeOrders(user.id, {
         shippingAddress: address,
         shippingCity: city,
@@ -251,9 +266,11 @@ export default function CheckoutPage() {
         notes,
         paymentMethod: paymentMethod as PaymentMethod,
         paymentPhone: paidWith,
+        paymentTransactionId: checkout.transactionId,
         markPaid: true,
       });
 
+      setLastTx(checkout.transactionId);
       await refreshCart();
       setDoneIds(ids);
     } catch (err) {
@@ -455,10 +472,15 @@ export default function CheckoutPage() {
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none bg-white"
                 />
               </div>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Mode test : la commande est confirmée et le moyen est enregistré, sans prélèvement
-                sur le téléphone.
-              </p>
+              {isPaymentTestMode() ? (
+                <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+                  {TEST_PAYMENT_HINT}
+                </p>
+              ) : (
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Vous allez recevoir une demande de confirmation sur votre téléphone.
+                </p>
+              )}
             </div>
 
             {error && (
@@ -531,7 +553,13 @@ export default function CheckoutPage() {
               disabled={loading}
               className="w-full py-3.5 bg-[#00A651] hover:bg-[#008A43] disabled:bg-gray-300 text-white rounded-xl font-bold"
             >
-              {loading ? 'Paiement en cours...' : `Payer ${formatPrice(summary?.total ?? 0)}`}
+              {loading
+                ? isPaymentTestMode()
+                  ? 'Simulation du paiement...'
+                  : 'Paiement en cours...'
+                : isPaymentTestMode()
+                  ? `Tester le paiement · ${formatPrice(summary?.total ?? 0)}`
+                  : `Payer ${formatPrice(summary?.total ?? 0)}`}
             </button>
           </aside>
         </form>

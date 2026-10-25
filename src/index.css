@@ -90,9 +90,42 @@
   50% { transform: translateY(-5px); }
 }
 
+@keyframes welcome-pan {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes welcome-ring {
+  0% { transform: scale(0.85); opacity: 0.55; }
+  70% { opacity: 0.12; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+@keyframes welcome-bag {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-14px) rotate(3deg); }
+}
+
+@keyframes welcome-spark {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 0.35; }
+  50% { transform: translateY(-18px) scale(1.25); opacity: 0.9; }
+}
+
+@keyframes welcome-sweep {
+  0% { transform: translateX(-130%) rotate(12deg); opacity: 0; }
+  20% { opacity: 0.35; }
+  100% { transform: translateX(160%) rotate(12deg); opacity: 0; }
+}
+
+@keyframes rise-stagger {
+  from { opacity: 0; transform: translateY(22px); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
 .animate-slide-in { animation: slideIn 0.5s ease-out forwards; }
 .animate-fade-in { animation: fadeIn 0.6s ease-out forwards; }
 .animate-rise { animation: rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-rise-stagger { animation: rise-stagger 0.75s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-shimmer {
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
@@ -103,6 +136,14 @@
 .animate-marquee { animation: marquee 30s linear infinite; }
 .animate-zoni-ring { animation: zoni-ring 1.8s ease-out infinite; }
 .animate-zoni-bob { animation: zoni-bob 2.4s ease-in-out infinite; }
+.animate-welcome-pan {
+  background-size: 200% 200%;
+  animation: welcome-pan 10s ease-in-out infinite;
+}
+.animate-welcome-ring { animation: welcome-ring 3.2s ease-out infinite; }
+.animate-welcome-bag { animation: welcome-bag 4.5s ease-in-out infinite; }
+.animate-welcome-spark { animation: welcome-spark 3.8s ease-in-out infinite; }
+.animate-welcome-sweep { animation: welcome-sweep 7s ease-in-out infinite; }
 
 /* ─── Base ─────────────────────────────────────────────────── */
 

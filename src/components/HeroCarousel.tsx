@@ -85,8 +85,38 @@ const features = [
 
 function BrandVisual() {
   return (
-    <div className="w-52 h-52 md:w-64 md:h-64 rounded-full bg-white/15 flex items-center justify-center">
-      <ShoppingBag size={112} strokeWidth={1.25} className="text-white" />
+    <div className="relative w-56 h-56 md:w-72 md:h-72 flex items-center justify-center">
+      <div className="absolute inset-6 rounded-full bg-white/20 blur-2xl animate-pulse-soft" />
+      <div className="absolute inset-0 rounded-full border border-white/25 animate-welcome-ring" />
+      <div
+        className="absolute inset-3 rounded-full border border-white/20 animate-welcome-ring"
+        style={{ animationDelay: '1.1s' }}
+      />
+      <div
+        className="absolute inset-8 rounded-full border border-white/15 animate-welcome-ring"
+        style={{ animationDelay: '2.1s' }}
+      />
+      <div className="relative w-44 h-44 md:w-52 md:h-52 rounded-full bg-white/18 backdrop-blur-[2px] flex items-center justify-center shadow-[0_20px_50px_-20px_rgba(0,0,0,0.35)] animate-welcome-bag">
+        <ShoppingBag size={104} strokeWidth={1.25} className="text-white drop-shadow-lg" />
+      </div>
+      {[
+        { top: '8%', left: '12%', delay: '0s' },
+        { top: '18%', right: '8%', delay: '0.8s' },
+        { bottom: '16%', left: '6%', delay: '1.5s' },
+        { bottom: '10%', right: '14%', delay: '2.2s' },
+      ].map((spark, i) => (
+        <span
+          key={i}
+          className="absolute w-2 h-2 rounded-full bg-white/80 shadow-[0_0_12px_rgba(255,255,255,0.9)] animate-welcome-spark"
+          style={{
+            top: spark.top,
+            left: spark.left,
+            right: spark.right,
+            bottom: spark.bottom,
+            animationDelay: spark.delay,
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -224,7 +254,7 @@ export default function HeroCarousel() {
   return (
     <div className="max-w-7xl mx-auto px-4 mt-6">
       <div
-        className="relative rounded-3xl overflow-hidden shadow-[0_30px_60px_-28px_rgba(255,107,0,0.45)] h-[340px] md:h-[420px] ring-1 ring-black/10"
+        className="relative rounded-3xl overflow-hidden shadow-[0_30px_60px_-28px_rgba(255,107,0,0.45)] min-h-[420px] h-[440px] md:min-h-0 md:h-[420px] ring-1 ring-black/10"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
@@ -238,10 +268,23 @@ export default function HeroCarousel() {
               key={slide.id}
               className={`absolute inset-0 transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                 orange
-                  ? 'bg-gradient-to-br from-[#FF6B00] via-[#FF8533] to-[#FF6B00]'
+                  ? 'bg-gradient-to-br from-[#FF6B00] via-[#FF8533] to-[#FF6B00] animate-welcome-pan'
                   : 'bg-ink'
               } ${active ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.04] pointer-events-none'}`}
             >
+              {welcome && (
+                <>
+                  <div className="absolute -top-28 -left-20 w-[420px] h-[420px] rounded-full bg-white/25 blur-[90px] animate-orb" />
+                  <div
+                    className="absolute -bottom-32 -right-16 w-[380px] h-[380px] rounded-full bg-[#FFE0B8]/35 blur-[100px] animate-orb"
+                    style={{ animationDelay: '-7s' }}
+                  />
+                  <div
+                    className="absolute top-1/3 left-1/2 w-72 h-72 -translate-x-1/2 rounded-full bg-white/10 blur-[80px] animate-pulse-soft"
+                  />
+                  <div className="absolute inset-y-0 w-40 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-welcome-sweep pointer-events-none z-0" />
+                </>
+              )}
               {!welcome && (
                 <>
                   <div className="absolute inset-0 bg-grid-light pointer-events-none" />
@@ -267,22 +310,26 @@ export default function HeroCarousel() {
                 </>
               )}
 
-              <div className="relative z-10 h-full flex items-center px-7 md:px-16">
-                <div className={`flex-1 text-white max-w-2xl ${active ? 'animate-rise' : ''}`}>
+              <div className="relative z-10 h-full flex items-start md:items-center px-5 sm:px-7 md:px-16 pt-7 pb-[4.75rem] md:pt-0 md:pb-12">
+                <div className={`flex-1 text-white max-w-2xl min-w-0 ${active && !welcome ? 'animate-rise' : ''}`}>
                   <span
                     className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold tracking-[0.16em] mb-3 ${
                       welcome ? 'bg-white/20' : 'glass-dark'
-                    }`}
+                    } ${active && welcome ? 'animate-rise-stagger' : ''}`}
+                    style={active && welcome ? { animationDelay: '60ms' } : undefined}
                   >
-                    {!welcome && (
+                    {welcome ? (
+                      <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)] animate-pulse-soft" />
+                    ) : (
                       <span className="w-1.5 h-1.5 rounded-full bg-[#FF8A2B] shadow-[0_0_12px_#FF8A2B]" />
                     )}
                     {slide.badge}
                   </span>
                   <h2
                     className={`font-extrabold leading-[1.05] tracking-tight ${
-                      welcome ? 'text-3xl md:text-5xl' : 'text-4xl md:text-6xl'
-                    }`}
+                      welcome ? 'text-[1.7rem] sm:text-3xl md:text-5xl' : 'text-3xl md:text-6xl'
+                    } ${active && welcome ? 'animate-rise-stagger' : ''}`}
+                    style={active && welcome ? { animationDelay: '140ms' } : undefined}
                   >
                     {slide.title}
                     {slide.highlight && (
@@ -293,34 +340,41 @@ export default function HeroCarousel() {
                     )}
                   </h2>
                   <p
-                    className={
+                    className={`${
                       welcome
-                        ? 'mt-2 text-lg md:text-xl font-semibold text-white/95'
+                        ? 'mt-2 text-base sm:text-lg md:text-xl font-semibold text-white/95'
                         : 'mt-4 text-sm md:text-base font-semibold text-white/60 uppercase tracking-[0.18em]'
-                    }
+                    } ${active && welcome ? 'animate-rise-stagger' : ''}`}
+                    style={active && welcome ? { animationDelay: '240ms' } : undefined}
                   >
                     {slide.subtitle}
                   </p>
                   <p
                     className={`leading-relaxed max-w-xl ${
                       welcome
-                        ? 'mt-2 text-sm md:text-base text-white/85'
+                        ? 'mt-2 text-sm md:text-base text-white/85 pr-2'
                         : 'mt-3 text-base md:text-lg text-white/75'
-                    }`}
+                    } ${active && welcome ? 'animate-rise-stagger' : ''}`}
+                    style={active && welcome ? { animationDelay: '340ms' } : undefined}
                   >
                     {slide.description}
                   </p>
-                  <div className={`flex flex-wrap items-center gap-3 ${welcome ? 'mt-6' : 'mt-8'}`}>
+                  <div
+                    className={`flex flex-wrap items-center gap-3 w-full ${welcome ? 'mt-5 md:mt-6' : 'mt-8'} ${
+                      active && welcome ? 'animate-rise-stagger' : ''
+                    }`}
+                    style={active && welcome ? { animationDelay: '460ms' } : undefined}
+                  >
                     <Link
                       to={slide.to}
                       className={
                         orange
-                          ? 'inline-flex items-center gap-2 px-7 py-3.5 bg-white text-[#00A651] rounded-full font-bold text-sm shadow-lg hover:-translate-y-0.5'
+                          ? 'sheen inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 sm:px-7 py-3.5 bg-white text-[#00A651] rounded-full font-bold text-sm shadow-lg hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-12px_rgba(0,0,0,0.35)] transition-all'
                           : 'sheen inline-flex items-center gap-2 px-7 py-3.5 bg-[#FF6B00] text-white rounded-2xl font-bold text-sm hover:-translate-y-0.5'
                       }
                     >
                       {slide.cta}
-                      <ChevronRight size={17} />
+                      <ChevronRight size={17} className={welcome ? 'animate-zoni-bob' : undefined} />
                     </Link>
                     {slide.secondaryCta && (
                       <Link
@@ -333,7 +387,12 @@ export default function HeroCarousel() {
                   </div>
                 </div>
 
-                <div className={`flex-shrink-0 ml-6 ${welcome ? 'hidden md:flex' : 'hidden lg:flex'}`}>
+                <div
+                  className={`flex-shrink-0 ml-6 ${welcome ? 'hidden md:flex' : 'hidden lg:flex'} ${
+                    active && welcome ? 'animate-rise-stagger' : ''
+                  }`}
+                  style={active && welcome ? { animationDelay: '280ms' } : undefined}
+                >
                   {slide.kind === 'brand' && <BrandVisual />}
                   {slide.kind === 'parcel' && <ParcelVisual />}
                   {slide.kind === 'ad' &&
@@ -355,8 +414,8 @@ export default function HeroCarousel() {
           );
         })}
 
-        <div className="absolute bottom-6 left-7 md:left-16 right-7 md:right-16 z-20 flex items-center justify-between">
-          <div className="flex gap-2">
+        <div className="absolute bottom-4 left-5 right-5 sm:left-7 sm:right-7 md:bottom-6 md:left-16 md:right-16 z-20 flex items-center justify-between gap-3 pointer-events-none">
+          <div className="flex gap-2 pointer-events-auto">
             {slides.map((_, i) => (
               <button
                 key={i}
@@ -370,20 +429,20 @@ export default function HeroCarousel() {
               />
             ))}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 pointer-events-auto">
             <button
               onClick={prev}
               aria-label="Précédent"
-              className="w-11 h-11 glass-dark hover:bg-white/20 rounded-2xl flex items-center justify-center text-white transition-colors"
+              className="w-9 h-9 md:w-11 md:h-11 glass-dark hover:bg-white/20 rounded-xl md:rounded-2xl flex items-center justify-center text-white transition-colors"
             >
-              <ChevronLeft size={20} />
+              <ChevronLeft size={18} />
             </button>
             <button
               onClick={next}
               aria-label="Suivant"
-              className="w-11 h-11 glass-dark hover:bg-white/20 rounded-2xl flex items-center justify-center text-white transition-colors"
+              className="w-9 h-9 md:w-11 md:h-11 glass-dark hover:bg-white/20 rounded-xl md:rounded-2xl flex items-center justify-center text-white transition-colors"
             >
-              <ChevronRight size={20} />
+              <ChevronRight size={18} />
             </button>
           </div>
         </div>

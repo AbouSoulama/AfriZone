@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, Bike, ShoppingBag, Store } from 'lucide-react';
+import BrandLogo from '../../components/BrandLogo';
 
 const roles = [
   {
@@ -39,9 +40,9 @@ export default function RegisterChoicePage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 flex items-center justify-center p-4">
       <div className="w-full max-w-3xl">
         <div className="text-center mb-8">
-          <Link to="/">
-            <img src="/logo-afrizone.png" alt="AfriZone" className="h-16 w-auto mx-auto" />
-          </Link>
+          <div className="flex justify-center">
+            <BrandLogo size="lg" className="h-16" />
+          </div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-[#1F2937] mt-4">
             Créer un compte
           </h1>

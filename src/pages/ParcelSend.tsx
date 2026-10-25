@@ -18,7 +18,7 @@ import {
 } from '../services/parcels';
 import PaymentMethodPicker from '../components/PaymentMethodPicker';
 import { paymentMethodById, paymentMethodLabel, paymentMethodsForCountry } from '../data/country-payments';
-import { isLivePayment, OPERATOR_COLLECTION_NOT_READY } from '../services/payments';
+import { isPaymentTestMode, startCheckout, TEST_PAYMENT_HINT } from '../services/payments';
 import { countryCodeFromLabelOrCity, countryLabel } from '../types/catalog';
 
 type GpsTarget = 'pickup' | 'delivery';
@@ -34,6 +34,7 @@ export default function ParcelSendPage() {
   const [senderPhone, setSenderPhone] = useState(user?.phone || '');
   const [payPhone, setPayPhone] = useState(user?.phone || '');
   const [paymentMethod, setPaymentMethod] = useState('');
+  const [lastTx, setLastTx] = useState<string | null>(null);
   const [pickupAddress, setPickupAddress] = useState('');
   const [pickupCity, setPickupCity] = useState(defaultCity);
   const [pickupLat, setPickupLat] = useState<number | null>(null);
@@ -79,6 +80,7 @@ export default function ParcelSendPage() {
     const countryCities = citiesForParcelCountry(siteCountry);
     setSenderName(user.fullName || '');
     setSenderPhone(user.phone || '');
+    setPayPhone(user.phone || '');
     const userCityCountry = countryCodeFromLabelOrCity(user.city);
     if (user.city && userCityCountry === siteCountry && countryCities.includes(user.city)) {
       setPickupCity(user.city);
@@ -88,6 +90,7 @@ export default function ParcelSendPage() {
         if (!def) return;
         setSenderName(def.fullName);
         setSenderPhone(def.phone);
+        setPayPhone(def.phone);
         setPickupAddress(def.address);
         const defCountry = countryCodeFromLabelOrCity(def.city);
         if (defCountry === siteCountry && countryCities.includes(def.city)) {
@@ -229,8 +232,9 @@ export default function ParcelSendPage() {
             <CheckCircle size={48} className="mx-auto text-[#00A651] mb-4" />
             <h1 className="text-2xl font-extrabold mb-2">Colis enregistré</h1>
             <p className="text-gray-500 text-sm mb-2">
-              Envoi confirmé en mode test via {paymentMethodLabel(paymentMethod)}. Aucun argent n’a
-              été débité.
+              Envoi payé via {paymentMethodLabel(paymentMethod)}
+              {lastTx ? ` · réf. ${lastTx}` : ''}.
+              {isPaymentTestMode() ? ' Mode test — aucun débit réel.' : ''}
             </p>
             <p className="font-mono font-bold text-[#FF6B00] text-lg mb-6">{tracking}</p>
             <div className="flex flex-col gap-2">
@@ -260,12 +264,20 @@ export default function ParcelSendPage() {
     setLoading(true);
     setError(null);
     try {
-      if (isLivePayment()) throw new Error(OPERATOR_COLLECTION_NOT_READY);
       if (!paymentMethod) throw new Error('Choisissez un moyen de paiement.');
       const paidWith = payPhone.trim() || senderPhone.trim();
       if (paidWith.replace(/\D/g, '').length < 8) {
         throw new Error('Indiquez le numéro Mobile Money utilisé pour payer.');
       }
+      const checkout = await startCheckout({
+        amount: quote.totalXof,
+        phone: paidWith,
+        provider: paymentMethod,
+        kind: 'parcel',
+        customerName: senderName || user.fullName,
+        customerEmail: user.email,
+        country: siteCountry,
+      });
       const parcel = await createParcel(user.id, {
         senderName,
         senderPhone,
@@ -285,9 +297,11 @@ export default function ParcelSendPage() {
         specialInstructions,
         paymentPhone: paidWith,
         paymentMethod,
+        paymentTransactionId: checkout.transactionId,
         markPaid: true,
       });
 
+      setLastTx(checkout.transactionId);
       setDoneId(parcel.id);
       setTracking(parcel.trackingNumber);
     } catch (err) {
@@ -598,9 +612,15 @@ export default function ParcelSendPage() {
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none bg-white"
                   />
                 </div>
-                <p className="text-sm text-gray-600 leading-relaxed">
-                  Mode test : l’envoi est confirmé et le moyen est enregistré, sans prélèvement.
-                </p>
+                {isPaymentTestMode() ? (
+                  <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+                    {TEST_PAYMENT_HINT}
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    Vous allez recevoir une demande de confirmation sur votre téléphone.
+                  </p>
+                )}
               </div>
               {geoHint && (
                 <p className="text-xs text-gray-600 bg-gray-50 border rounded-xl px-3 py-2">{geoHint}</p>
@@ -654,7 +674,13 @@ export default function ParcelSendPage() {
               disabled={loading}
               className="w-full py-3.5 bg-[#00A651] hover:bg-[#008A43] disabled:bg-gray-300 text-white rounded-xl font-bold"
             >
-              {loading ? 'Paiement...' : `Payer ${formatPrice(quote.totalXof)}`}
+              {loading
+                ? isPaymentTestMode()
+                  ? 'Simulation du paiement...'
+                  : 'Paiement...'
+                : isPaymentTestMode()
+                  ? `Tester le paiement · ${formatPrice(quote.totalXof)}`
+                  : `Payer ${formatPrice(quote.totalXof)}`}
             </button>
           </aside>
         </form>

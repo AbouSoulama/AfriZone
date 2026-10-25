@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Lock, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import BrandLogo from '../../components/BrandLogo';
 
 const schema = z
   .object({
@@ -49,9 +50,9 @@ export default function ResetPassword() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link to="/">
-            <img src="/logo-afrizone.png" alt="AfriZone" className="h-16 w-auto mx-auto" />
-          </Link>
+          <div className="flex justify-center">
+            <BrandLogo size="lg" className="h-16" />
+          </div>
           <h1 className="text-2xl font-extrabold text-[#1F2937] mt-4">Nouveau mot de passe</h1>
         </div>
 

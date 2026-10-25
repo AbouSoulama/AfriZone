@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { countryCodeFromLabelOrCity } from '../types/catalog';
-import { isLivePayment, OPERATOR_COLLECTION_NOT_READY } from './payments';
+import { isLivePayment, startCheckout } from './payments';
 
 export type PlanAudience = 'client' | 'vendor';
 export type AdSlot = 'hero' | 'home_banner' | 'featured_vendor';
@@ -227,9 +227,9 @@ export async function startSubscriptionCheckout(input: {
     .maybeSingle();
   if (planErr || !plan) throw new Error(planErr?.message || 'Plan introuvable.');
   if (Number(plan.price_xof) <= 0) throw new Error('Ce plan est gratuit.');
-  if (isLivePayment()) throw new Error(OPERATOR_COLLECTION_NOT_READY);
 
   const months = Math.max(1, input.months ?? 1);
+  const phone = (input.phone || '').trim();
 
   // Le montant est calculé côté serveur (barème `subscription_terms`).
   const { data: created, error: createErr } = await supabase.rpc('create_my_subscription', {
@@ -247,6 +247,43 @@ export async function startSubscriptionCheckout(input: {
   const quote = created as Record<string, unknown>;
   const subscriptionId = quote.subscription_id as string;
   const amountXof = Number(quote.total_xof ?? 0);
+
+  if (isLivePayment()) {
+    if (!phone || phone.replace(/\D/g, '').length < 8) {
+      throw new Error('Indiquez un numéro Mobile Money pour payer.');
+    }
+    const checkout = await startCheckout({
+      amount: amountXof,
+      phone,
+      provider: input.provider || 'mobile_money',
+      kind: 'subscription',
+      subscriptionId,
+      customerName: input.customerName,
+      customerEmail: input.customerEmail,
+      country: input.country,
+    });
+    return {
+      subscriptionId,
+      amountXof,
+      months,
+      paymentUrl: checkout.paymentUrl,
+      mode: 'live',
+    };
+  }
+
+  // Mode test : simule le paiement puis active l’abonnement.
+  if (phone && phone.replace(/\D/g, '').length >= 8) {
+    await startCheckout({
+      amount: amountXof,
+      phone,
+      provider: input.provider || 'mobile_money',
+      kind: 'subscription',
+      subscriptionId,
+      customerName: input.customerName,
+      customerEmail: input.customerEmail,
+      country: input.country,
+    });
+  }
 
   const { error: actErr } = await supabase.rpc('activate_my_pending_subscription', {
     p_subscription_id: subscriptionId,

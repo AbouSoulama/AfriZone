@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import BrandLogo from '../../components/BrandLogo';
 
 const nav = [
   { to: '/vendeur', end: true, label: 'Tableau de bord', icon: LayoutDashboard },
@@ -27,9 +28,7 @@ export default function VendorLayout() {
     <div className="min-h-screen bg-gray-50 flex">
       <aside className="hidden md:flex w-64 flex-col bg-[#1F2937] text-white">
         <div className="p-5 border-b border-gray-700">
-          <Link to="/" className="flex items-center gap-2">
-            <img src="/logo-afrizone.png" alt="AfriZone" className="h-10 bg-white rounded-lg p-1" />
-          </Link>
+          <BrandLogo size="sm" onDark className="h-10" />
           <p className="mt-3 text-xs text-gray-400">Espace vendeur</p>
           <p className="font-bold truncate">{user?.vendor?.shopName || user?.fullName}</p>
           {user?.vendor?.vendorCode && (

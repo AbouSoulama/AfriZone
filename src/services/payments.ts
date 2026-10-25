@@ -1,7 +1,10 @@
 /**
  * Paiements AfriZone — opérateurs télécoms par pays (Orange, Moov, Telecel, Malitel, MTN).
- * Le choix est enregistré sur la commande. L’encaissement réel exige un contrat marchand
- * chez chaque opérateur : sans clés API, le mode live refuse le paiement au lieu de le simuler.
+ *
+ * Mode test (défaut tant que les contrats marchands ne sont pas branchés) :
+ *   simule un paiement réussi, enregistre le moyen + une référence, sans débit réel.
+ * Mode live : uniquement quand VITE_PAYMENT_MODE=live ET VITE_OPERATORS_LIVE=1
+ *   (après branchement des APIs opérateurs).
  */
 import { paymentMethodLabel } from '../data/country-payments';
 
@@ -75,7 +78,7 @@ export interface ChargeMobileMoneyResult {
 export interface StartCheckoutInput {
   amount: number;
   phone: string;
-  provider: MobileMoneyProvider;
+  provider: string;
   kind: 'order' | 'parcel' | 'subscription';
   orderIds?: string[];
   parcelId?: string;
@@ -92,56 +95,57 @@ export interface StartCheckoutResult {
   amount?: number;
 }
 
-export function isLivePayment(): boolean {
-  return paymentMode() === 'live';
-}
-
-/** Sandbox FedaPay (clés sk_sandbox) — affichage des consignes de test côté UI. */
-export function isFedaPaySandbox(): boolean {
-  const env = (import.meta.env.VITE_FEDAPAY_ENV as string | undefined)?.toLowerCase();
-  if (env === 'live') return false;
-  if (env === 'sandbox') return true;
-  // Défaut : localhost / mode live sans VITE_FEDAPAY_ENV = sandbox
-  if (typeof window !== 'undefined' && /localhost|127\.0\.0\.1/.test(window.location.hostname)) {
-    return true;
-  }
-  return env !== 'live';
+/**
+ * Les APIs opérateurs ne sont pas encore branchées.
+ * Tant que VITE_OPERATORS_LIVE n’est pas à « 1 », on reste en mode test
+ * même si VITE_PAYMENT_MODE=live (évite de bloquer les essais).
+ */
+export function areOperatorPaymentsReady(): boolean {
+  const flag = (import.meta.env.VITE_OPERATORS_LIVE as string | undefined)?.toLowerCase();
+  return flag === '1' || flag === 'true' || flag === 'yes';
 }
 
 function paymentMode(): 'simulate' | 'live' {
   const mode = (import.meta.env.VITE_PAYMENT_MODE as string | undefined)?.toLowerCase();
-  return mode === 'live' ? 'live' : 'simulate';
+  if (mode === 'live' && areOperatorPaymentsReady()) return 'live';
+  return 'simulate';
 }
 
-async function authHeaders(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-  if (!token || !anon) throw new Error('Connectez-vous pour payer.');
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`,
-    apikey: anon,
-  };
+/** true uniquement quand le débit réel est effectivement actif. */
+export function isLivePayment(): boolean {
+  return paymentMode() === 'live';
+}
+
+/** true tant que les contrats marchands ne sont pas branchés. */
+export function isPaymentTestMode(): boolean {
+  return !isLivePayment();
+}
+
+/** @deprecated FedaPay retiré — toujours false. */
+export function isFedaPaySandbox(): boolean {
+  return false;
 }
 
 export async function startCheckout(input: StartCheckoutInput): Promise<StartCheckoutResult> {
   const phone = input.phone.trim();
-  // Sur FedaPay le client choisit le moyen ; le téléphone sert surtout de contact client.
-  if (paymentMode() !== 'live' && (!phone || phone.replace(/\D/g, '').length < 8)) {
-    throw new Error('Numéro de paiement invalide.');
+  if (!phone || phone.replace(/\D/g, '').length < 8) {
+    throw new Error('Numéro de paiement invalide (au moins 8 chiffres).');
   }
   if (!input.amount || input.amount <= 0) {
     throw new Error('Montant de paiement invalide.');
   }
-
-  if (paymentMode() !== 'live') {
-    const tx = makeTxId(input.provider);
-    await new Promise((r) => setTimeout(r, 400));
-    return { mode: 'simulate', transactionId: tx };
+  if (!input.provider) {
+    throw new Error('Choisissez un moyen de paiement.');
   }
 
-  void phone;
+  if (paymentMode() !== 'live') {
+    // Mode test : petite latence pour simuler la confirmation opérateur.
+    const tx = makeTxId(input.provider);
+    await new Promise((r) => setTimeout(r, 700));
+    return { mode: 'simulate', transactionId: tx, amount: input.amount };
+  }
+
+  // Live réel : à brancher opérateur par opérateur.
   throw new Error(OPERATOR_COLLECTION_NOT_READY);
 }
 
@@ -154,12 +158,26 @@ export async function checkCheckout(transactionId: string): Promise<{
   orderIds?: string[];
   parcelId?: string | null;
 }> {
+  // En mode test, les paiements sont confirmés immédiatement côté client.
+  if (isPaymentTestMode() && transactionId.startsWith('MM-')) {
+    return { status: 'paid', providerStatus: 'approved' };
+  }
+
   const base = import.meta.env.VITE_SUPABASE_URL as string | undefined;
   if (!base) throw new Error('Configuration Supabase manquante.');
 
-  const res = await fetch(`${base}/functions/v1/fedapay-checkout`, {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  if (!token || !anon) throw new Error('Connectez-vous pour payer.');
+
+  const res = await fetch(`${base}/functions/v1/mobile-money`, {
     method: 'POST',
-    headers: await authHeaders(),
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      apikey: anon,
+    },
     body: JSON.stringify({ action: 'check', transactionId }),
   });
   const body = await res.json().catch(() => ({}));
@@ -171,30 +189,30 @@ export async function checkCheckout(transactionId: string): Promise<{
 }
 
 function makeTxId(provider: string): string {
+  const slug = provider.replace(/[^a-z0-9]/gi, '').slice(0, 6).toUpperCase() || 'MM';
   const rand = Math.random().toString(36).slice(2, 10).toUpperCase();
-  return `MM-${provider.slice(0, 3).toUpperCase()}-${Date.now()}-${rand}`;
+  return `MM-${slug}-${Date.now()}-${rand}`;
 }
 
-/** Simulation locale uniquement. Le parcours live passe par startCheckout → FedaPay. */
+/** Simulation locale (équivalent de startCheckout en mode test). */
 export async function chargeMobileMoney(
   input: ChargeMobileMoneyInput
 ): Promise<ChargeMobileMoneyResult> {
-  const phone = input.phone.trim();
-  if (!phone || phone.replace(/\D/g, '').length < 8) {
-    throw new Error('Numéro de paiement invalide.');
-  }
-  if (!input.amount || input.amount <= 0) {
-    throw new Error('Montant de paiement invalide.');
-  }
-
-  await new Promise((r) => setTimeout(r, 500));
-  const tx = makeTxId(input.provider);
+  const result = await startCheckout({
+    amount: input.amount,
+    phone: input.phone,
+    provider: input.provider,
+    kind: 'order',
+  });
   return {
     success: true,
-    transactionId: tx,
+    transactionId: result.transactionId,
     provider: input.provider,
-    mode: 'simulate',
-    message: `Paiement simulé confirmé (${tx}).`,
+    mode: result.mode,
+    message:
+      result.mode === 'simulate'
+        ? `Paiement test confirmé (${result.transactionId}). Aucun débit réel.`
+        : `Paiement initié (${result.transactionId}).`,
   };
 }
 
@@ -202,9 +220,11 @@ export function providerLabel(id: string): string {
   return paymentMethodLabel(id);
 }
 
-/** Message affiché quand le site est en mode live sans contrat opérateur branché. */
 export const OPERATOR_COLLECTION_NOT_READY =
-  'Le prélèvement réel n’est pas encore branché. AfriZone enregistre le moyen choisi, mais aucun argent n’est débité tant qu’un contrat marchand n’est pas actif chez cet opérateur (Orange, Moov, Telecel, Malitel ou MTN).';
+  'Le prélèvement réel n’est pas encore branché. Passez en mode test (VITE_PAYMENT_MODE=simulate) ou activez VITE_OPERATORS_LIVE=1 après les contrats marchands.';
+
+export const TEST_PAYMENT_HINT =
+  'Mode test actif : aucun argent n’est débité. Choisissez un opérateur, un numéro, puis validez pour simuler un paiement réussi.';
 
 export function channelFromProvider(provider: MobileMoneyProvider): PaymentChannel {
   return provider === 'wave' ? 'wave' : 'mobile_money';
