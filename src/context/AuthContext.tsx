@@ -11,9 +11,11 @@ import { supabase } from '../lib/supabase';
 import {
   authEmailFromPhone,
   generateVendorCode,
+  guessFileContentType,
   isEmail,
   isSyntheticAuthEmail,
   mapAuthError,
+  mapStorageError,
   normalizePhone,
   slugify,
   validateIdDocument,
@@ -118,11 +120,25 @@ async function uploadPrivateFile(
   file: File,
   folder: string
 ): Promise<string> {
-  const ext = file.name.split('.').pop() || 'bin';
-  const path = `${userId}/${folder}/${Date.now()}.${ext}`;
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session?.user?.id) {
+    throw new Error('Session absente : reconnectez-vous avant d’envoyer le document.');
+  }
+  const sessionUserId = sessionData.session.user.id;
+  if (sessionUserId !== userId) {
+    throw new Error('Session incohérente avec le compte en cours de création.');
+  }
+
+  const rawExt = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const ext = rawExt || 'bin';
+  const path = `${sessionUserId}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const contentType = guessFileContentType(file);
+
   const { error } = await supabase.storage.from(bucket).upload(path, file, {
-    upsert: true,
-    contentType: file.type,
+    // Chemin unique : pas besoin d’UPDATE (souvent absent des policies Storage)
+    upsert: false,
+    contentType,
+    cacheControl: '3600',
   });
   if (error) throw error;
   return path;
@@ -470,6 +486,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: `Erreur profil : ${profileError.message}` };
       }
 
+      // Rafraîchir la session pour que le JWT Storage soit bien attaché
+      await supabase.auth.refreshSession().catch(() => undefined);
+
       let idDocumentPath: string;
       try {
         idDocumentPath = await uploadPrivateFile(
@@ -479,12 +498,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           'identity'
         );
       } catch (uploadErr) {
-        console.error(uploadErr);
+        console.error('[registerVendor] upload identity', uploadErr);
         await supabase.auth.signOut();
         return {
           success: false,
-          error:
-            "Impossible d'uploader la pièce d'identité. Vérifiez que le bucket « vendor-documents » existe dans Supabase Storage.",
+          error: mapStorageError(uploadErr),
         };
       }
 
@@ -598,6 +616,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         .eq('id', userId);
 
+      await supabase.auth.refreshSession().catch(() => undefined);
+
       let idDocumentPath: string;
       try {
         idDocumentPath = await uploadPrivateFile(
@@ -606,11 +626,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           data.idDocument!,
           'driver-identity'
         );
-      } catch {
+      } catch (uploadErr) {
+        console.error('[registerDriver] upload identity', uploadErr);
         await supabase.auth.signOut();
         return {
           success: false,
-          error: "Impossible d'uploader la pièce d'identité.",
+          error: mapStorageError(uploadErr),
         };
       }
 
