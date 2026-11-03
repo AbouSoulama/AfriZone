@@ -530,7 +530,7 @@ export default function RegisterVendor() {
                       {watch1('idDocumentType') === 'passport' ? 'passeport' : 'CNI'}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
-                      Photo JPG/PNG/WEBP — CNI ou passeport SN, BF, ML, GN — max 5 Mo
+                      Photo ou PDF — CNI/CNIB ou passeport SN, BF, ML, GN — max 8 Mo
                     </p>
                   </button>
                 ) : (
@@ -589,7 +589,7 @@ export default function RegisterVendor() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                  accept="image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf"
                   className="hidden"
                   onChange={(e) => handleIdFileChange(e.target.files?.[0] || null)}
                 />
@@ -602,8 +602,8 @@ export default function RegisterVendor() {
                   />
                 )}
                 <p className="mt-2 text-xs text-gray-500">
-                  Photo obligatoire de votre CNI ou passeport officiel (Sénégal, Burkina Faso, Mali
-                  ou Guinée). Toute autre image est refusée par le scanner OCR.
+                  Document officiel uniquement : CNI/CNIB ou passeport (Sénégal, Burkina Faso, Mali,
+                  Guinée). Le scanner compare à des modèles réels — type et pays doivent correspondre.
                 </p>
               </div>
 

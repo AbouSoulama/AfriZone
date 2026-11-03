@@ -346,7 +346,7 @@ export default function RegisterDriverPage() {
                   Uploader votre {idDocumentType === 'passport' ? 'passeport' : 'CNI'}
                 </span>
                 <span className="text-xs text-gray-400">
-                  Photo JPG/PNG/WEBP — CNI ou passeport SN, BF, ML, GN — max 5 Mo
+                  Photo ou PDF — CNI/CNIB ou passeport SN, BF, ML, GN — max 8 Mo
                 </span>
               </button>
             ) : (
@@ -392,7 +392,7 @@ export default function RegisterDriverPage() {
             <input
               ref={fileRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+              accept="image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf"
               className="hidden"
               onChange={(e) => handleIdFileChange(e.target.files?.[0] ?? null)}
             />
@@ -405,8 +405,8 @@ export default function RegisterDriverPage() {
               />
             )}
             <p className="mt-2 text-xs text-gray-500">
-              Photo obligatoire de votre CNI ou passeport (Sénégal, Burkina Faso, Mali ou Guinée).
-              Toute autre image est refusée.
+              CNI/CNIB ou passeport officiel (SN, BF, ML, GN). Le type choisi doit correspondre au
+              document scanné.
             </p>
           </div>
 

@@ -43,8 +43,14 @@ export function generateVendorCode(country: string, city: string): string {
   return `${country}-${cityCode}-${seq}`;
 }
 
-const ID_DOC_MAX_BYTES = 5 * 1024 * 1024;
-const ID_DOC_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const ID_DOC_MAX_BYTES = 8 * 1024 * 1024;
+const ID_DOC_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'application/pdf',
+];
 
 /** MIME de secours quand le navigateur n’envoie pas file.type. */
 export function guessFileContentType(file: File): string {
@@ -57,19 +63,18 @@ export function guessFileContentType(file: File): string {
   return 'application/octet-stream';
 }
 
-/** Valide la pièce d'identité (CNI / passeport photo — OCR) */
+/** Valide la pièce d'identité (CNI/CNIB / passeport — OCR profils réels) */
 export function validateIdDocument(file: File | null): string | null {
   if (!file) {
-    return "Veuillez uploader une photo de votre CNI ou passeport (SN, BF, ML ou GN).";
+    return 'Veuillez uploader votre CNI/CNIB ou passeport (SN, BF, ML ou GN).';
   }
-  if (file.size > ID_DOC_MAX_BYTES) return 'Le fichier ne doit pas dépasser 5 Mo.';
-  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-  if (isPdf) {
-    return 'PDF non accepté. Uploadez une photo nette (JPG, PNG ou WEBP) de la pièce.';
-  }
+  if (file.size > ID_DOC_MAX_BYTES) return 'Le fichier ne doit pas dépasser 8 Mo.';
   const typeOk =
-    ID_DOC_TYPES.includes(file.type) || /\.(jpe?g|png|webp)$/i.test(file.name);
-  if (!typeOk) return 'Format accepté : JPG, PNG ou WEBP (photo de CNI / passeport).';
+    ID_DOC_TYPES.includes(file.type) ||
+    /\.(jpe?g|png|webp|pdf)$/i.test(file.name);
+  if (!typeOk) {
+    return 'Format accepté : JPG, PNG, WEBP ou PDF scanné (CNI/CNIB ou passeport).';
+  }
   return null;
 }
 
