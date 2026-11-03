@@ -312,7 +312,7 @@ export default function RegisterDriverPage() {
                   onChange={() => setIdDocumentType('cni')}
                   className="accent-[#FF6B00]"
                 />
-                <span className="text-sm font-bold">CNI</span>
+                <span className="text-sm font-bold">CNI / CNIB</span>
               </label>
               <label
                 className={`flex items-center gap-2 p-3 border-2 rounded-xl cursor-pointer ${
@@ -345,7 +345,9 @@ export default function RegisterDriverPage() {
                 <span className="font-semibold">
                   Uploader votre {idDocumentType === 'passport' ? 'passeport' : 'CNI'}
                 </span>
-                <span className="text-xs text-gray-400">JPG, PNG, WEBP ou PDF — max 5 Mo</span>
+                <span className="text-xs text-gray-400">
+                  Photo JPG/PNG/WEBP — CNI ou passeport SN, BF, ML, GN — max 5 Mo
+                </span>
               </button>
             ) : (
               <div
@@ -390,7 +392,7 @@ export default function RegisterDriverPage() {
             <input
               ref={fileRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf"
+              accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
               className="hidden"
               onChange={(e) => handleIdFileChange(e.target.files?.[0] ?? null)}
             />
@@ -403,7 +405,8 @@ export default function RegisterDriverPage() {
               />
             )}
             <p className="mt-2 text-xs text-gray-500">
-              Uniquement CNI ou passeport. Le scanner vérifie la qualité avant envoi.
+              Photo obligatoire de votre CNI ou passeport (Sénégal, Burkina Faso, Mali ou Guinée).
+              Toute autre image est refusée.
             </p>
           </div>
 

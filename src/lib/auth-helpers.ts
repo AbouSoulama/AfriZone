@@ -44,9 +44,9 @@ export function generateVendorCode(country: string, city: string): string {
 }
 
 const ID_DOC_MAX_BYTES = 5 * 1024 * 1024;
-const ID_DOC_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+const ID_DOC_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
-/** MIME de secours quand le navigateur n’envoie pas file.type (souvent PDF mobile). */
+/** MIME de secours quand le navigateur n’envoie pas file.type. */
 export function guessFileContentType(file: File): string {
   if (file.type && file.type !== 'application/octet-stream') return file.type;
   const ext = (file.name.split('.').pop() || '').toLowerCase();
@@ -57,14 +57,19 @@ export function guessFileContentType(file: File): string {
   return 'application/octet-stream';
 }
 
-/** Valide la pièce d'identité (CNI / passeport) */
+/** Valide la pièce d'identité (CNI / passeport photo — OCR) */
 export function validateIdDocument(file: File | null): string | null {
-  if (!file) return "Veuillez uploader votre pièce d'identité (CNI ou passeport).";
+  if (!file) {
+    return "Veuillez uploader une photo de votre CNI ou passeport (SN, BF, ML ou GN).";
+  }
   if (file.size > ID_DOC_MAX_BYTES) return 'Le fichier ne doit pas dépasser 5 Mo.';
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  if (isPdf) {
+    return 'PDF non accepté. Uploadez une photo nette (JPG, PNG ou WEBP) de la pièce.';
+  }
   const typeOk =
-    ID_DOC_TYPES.includes(file.type) ||
-    /\.(jpe?g|png|webp|pdf)$/i.test(file.name);
-  if (!typeOk) return 'Format accepté : JPG, PNG, WEBP ou PDF.';
+    ID_DOC_TYPES.includes(file.type) || /\.(jpe?g|png|webp)$/i.test(file.name);
+  if (!typeOk) return 'Format accepté : JPG, PNG ou WEBP (photo de CNI / passeport).';
   return null;
 }
 
@@ -91,7 +96,7 @@ export function mapStorageError(error: unknown): string {
     return 'Accès Storage refusé (RLS). Vérifiez les policies du bucket « vendor-documents » ou exécutez la migration 032.';
   }
   if (lower.includes('mime') || lower.includes('content type') || lower.includes('invalid')) {
-    return 'Format de fichier refusé par Storage. Utilisez JPG, PNG, WEBP ou PDF.';
+    return 'Format de fichier refusé par Storage. Utilisez JPG, PNG ou WEBP.';
   }
   if (lower.includes('payload') || lower.includes('too large') || lower.includes('maximum')) {
     return 'Fichier trop volumineux pour Storage (max 5 Mo côté AfriZone).';

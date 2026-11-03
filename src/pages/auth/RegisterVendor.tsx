@@ -485,8 +485,8 @@ export default function RegisterVendor() {
                       className="accent-[#FF6B00]"
                     />
                     <div>
-                      <p className="font-bold text-sm">CNI</p>
-                      <p className="text-xs text-gray-500">Carte Nationale</p>
+                      <p className="font-bold text-sm">CNI / CNIB</p>
+                      <p className="text-xs text-gray-500">Carte nationale d’identité</p>
                     </div>
                   </label>
                   <label
@@ -529,7 +529,9 @@ export default function RegisterVendor() {
                       Cliquez pour uploader votre{' '}
                       {watch1('idDocumentType') === 'passport' ? 'passeport' : 'CNI'}
                     </p>
-                    <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP ou PDF — max 5 Mo</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Photo JPG/PNG/WEBP — CNI ou passeport SN, BF, ML, GN — max 5 Mo
+                    </p>
                   </button>
                 ) : (
                   <div
@@ -587,7 +589,7 @@ export default function RegisterVendor() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf"
+                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
                   className="hidden"
                   onChange={(e) => handleIdFileChange(e.target.files?.[0] || null)}
                 />
@@ -600,8 +602,8 @@ export default function RegisterVendor() {
                   />
                 )}
                 <p className="mt-2 text-xs text-gray-500">
-                  Uniquement CNI ou passeport. Le scanner vérifie la qualité et la concordance du
-                  type avant envoi ; un administrateur confirme ensuite.
+                  Photo obligatoire de votre CNI ou passeport officiel (Sénégal, Burkina Faso, Mali
+                  ou Guinée). Toute autre image est refusée par le scanner OCR.
                 </p>
               </div>
 

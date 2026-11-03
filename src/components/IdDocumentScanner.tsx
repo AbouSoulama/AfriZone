@@ -7,6 +7,13 @@ import {
   type IdScanStepId,
 } from '../lib/id-document-scan';
 
+const COUNTRY_LABEL: Record<string, string> = {
+  SN: 'Sénégal',
+  BF: 'Burkina Faso',
+  ML: 'Mali',
+  GN: 'Guinée',
+};
+
 interface IdDocumentScannerProps {
   file: File | null;
   expectedKind: IdDocKind;
@@ -15,8 +22,7 @@ interface IdDocumentScannerProps {
 }
 
 /**
- * Scanner visuel CNI / Passeport — animation + contrôles qualité côté client.
- * La validation finale reste administrative.
+ * Scanner CNI / Passeport — OCR + pays AfriZone (SN, BF, ML, GN).
  */
 export function IdDocumentScanner({
   file,
@@ -53,16 +59,23 @@ export function IdDocumentScanner({
       const stepDelay = (ms: number) =>
         new Promise<void>((r) => setTimeout(r, ms));
 
+      // OCR lancé tout de suite (peut prendre plusieurs secondes)
+      const analysisPromise = analyzeIdDocument(file!, expectedKind);
+
       for (const step of ID_SCAN_STEPS) {
         if (cancelled || runId.current !== id) return;
         if (step.id === 'done') continue;
         setActiveStep(step.id);
-        await stepDelay(step.id === 'authenticity' ? 1100 : 700);
+        const wait =
+          step.id === 'ocr' ? 1600 : step.id === 'authenticity' || step.id === 'country' ? 900 : 550;
+        await stepDelay(wait);
         if (cancelled || runId.current !== id) return;
         setCompleted((prev) => new Set(prev).add(step.id));
       }
 
-      const analysis = await analyzeIdDocument(file!, expectedKind);
+      // Attendre la fin réelle de l’analyse si l’OCR est encore en cours
+      setActiveStep('ocr');
+      const analysis = await analysisPromise;
       if (cancelled || runId.current !== id) return;
 
       setActiveStep('done');
@@ -92,12 +105,18 @@ export function IdDocumentScanner({
             )}
             <span
               className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-                result?.ok ? 'bg-emerald-400' : scanning ? 'bg-orange-400' : result ? 'bg-red-400' : 'bg-slate-500'
+                result?.ok
+                  ? 'bg-emerald-400'
+                  : scanning
+                    ? 'bg-orange-400'
+                    : result
+                      ? 'bg-red-400'
+                      : 'bg-slate-500'
               }`}
             />
           </span>
           <p className="text-xs font-semibold uppercase tracking-wider text-orange-200">
-            Scanner d’authenticité · CNI / Passeport
+            Scanner OCR · CNI / Passeport · SN·BF·ML·GN
           </p>
         </div>
         <p className="text-[10px] text-slate-400">
@@ -115,14 +134,12 @@ export function IdDocumentScanner({
             />
           ) : (
             <div className="flex h-[200px] flex-col items-center justify-center gap-2 px-4 text-center">
-              <svg className="h-10 w-10 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-              </svg>
-              <p className="text-xs text-slate-400">Scan PDF en cours…</p>
+              <p className="text-xs text-slate-400">
+                Photo JPG/PNG/WEBP requise pour la vérification OCR
+              </p>
             </div>
           )}
 
-          {/* Cadre + faisceau */}
           <div className="pointer-events-none absolute inset-3 rounded-lg border border-orange-400/40 shadow-[inset_0_0_40px_rgba(249,115,22,0.15)]">
             <span className="absolute left-0 top-0 h-4 w-4 border-l-2 border-t-2 border-orange-400" />
             <span className="absolute right-0 top-0 h-4 w-4 border-r-2 border-t-2 border-orange-400" />
@@ -137,12 +154,14 @@ export function IdDocumentScanner({
           {result && !scanning && (
             <div
               className={`absolute inset-x-0 bottom-0 px-3 py-2 text-center text-xs font-semibold ${
-                result.ok
-                  ? 'bg-emerald-500/90 text-white'
-                  : 'bg-red-500/90 text-white'
+                result.ok ? 'bg-emerald-500/90 text-white' : 'bg-red-500/90 text-white'
               }`}
             >
-              {result.ok ? 'Document accepté pour dépôt' : 'Document refusé — recommencez'}
+              {result.ok
+                ? `Validé · ${result.detectedCountry ? COUNTRY_LABEL[result.detectedCountry] : 'pays OK'} · ${
+                    result.detectedKind === 'passport' ? 'Passeport' : 'CNI'
+                  }`
+                : 'Document refusé — pièce d’identité invalide'}
             </div>
           )}
         </div>
@@ -183,18 +202,21 @@ export function IdDocumentScanner({
             >
               {result.ok ? (
                 <p>
-                  Contrôles passés
+                  CNI/Passeport reconnu
+                  {result.detectedCountry
+                    ? ` · ${COUNTRY_LABEL[result.detectedCountry]}`
+                    : ''}
                   {result.confidence
                     ? ` · confiance ${(result.confidence * 100).toFixed(0)} %`
                     : ''}
-                  . Un administrateur confirmera l’identité.
+                  . Contrôle admin ensuite.
                 </p>
               ) : (
                 <p>{result.error}</p>
               )}
-              {result.details.length > 0 && result.ok && (
-                <ul className="mt-1.5 space-y-0.5 text-[10px] text-emerald-200/70">
-                  {result.details.slice(0, 4).map((d) => (
+              {result.details.length > 0 && (
+                <ul className="mt-1.5 space-y-0.5 text-[10px] opacity-70">
+                  {result.details.slice(0, 5).map((d) => (
                     <li key={d}>• {d}</li>
                   ))}
                 </ul>
