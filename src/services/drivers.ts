@@ -42,7 +42,7 @@ export interface DriverRegisterInput {
   country: 'SN' | 'BF' | 'ML' | 'GN';
   zones: string[];
   licenseNumber?: string;
-  idDocumentType: 'cni' | 'passport' | 'permis';
+  idDocumentType: 'cni' | 'passport';
   idDocumentPath: string;
 }
 

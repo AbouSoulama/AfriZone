@@ -97,7 +97,7 @@ export interface DriverRegisterData {
   zones: string[];
   licenseNumber?: string;
   idDocument: File | null;
-  idDocumentType: 'cni' | 'passport' | 'permis';
+  idDocumentType: 'cni' | 'passport';
   acceptTerms: boolean;
 }
 

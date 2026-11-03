@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bike, CheckCircle, Upload } from 'lucide-react';
+import { Bike, CheckCircle, Upload, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCountry } from '../../context/CountryContext';
+import { IdDocumentScanner } from '../../components/IdDocumentScanner';
+import { validateIdDocument } from '../../lib/auth-helpers';
+import type { IdScanResult } from '../../lib/id-document-scan';
 import { CITIES_BY_COUNTRY, capitalForCountry } from '../../types/catalog';
 import { VEHICLE_LABELS, type VehicleType } from '../../services/drivers';
 
@@ -21,8 +24,11 @@ export default function RegisterDriverPage() {
   const [vehiclePlate, setVehiclePlate] = useState('');
   const [zones, setZones] = useState<string[]>(() => [capitalForCountry(country)]);
   const [licenseNumber, setLicenseNumber] = useState('');
-  const [idDocumentType, setIdDocumentType] = useState<'cni' | 'passport' | 'permis'>('cni');
+  const [idDocumentType, setIdDocumentType] = useState<'cni' | 'passport'>('cni');
   const [idDocument, setIdDocument] = useState<File | null>(null);
+  const [idDocPreview, setIdDocPreview] = useState<string | null>(null);
+  const [idScanOk, setIdScanOk] = useState(false);
+  const [idScanPending, setIdScanPending] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -34,9 +40,62 @@ export default function RegisterDriverPage() {
     setZones([capital]);
   }, [country]);
 
+  // Re-lance le scan si l’utilisateur change CNI ↔ Passeport avec un fichier déjà choisi
+  useEffect(() => {
+    if (!idDocument) return;
+    setIdScanOk(false);
+    setIdScanPending(true);
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rescan on type only
+  }, [idDocumentType]);
+
   const toggleZone = (z: string) => {
     setZones((prev) => (prev.includes(z) ? prev.filter((x) => x !== z) : [...prev, z]));
   };
+
+  const handleIdFileChange = (file: File | null) => {
+    if (idDocPreview) URL.revokeObjectURL(idDocPreview);
+
+    if (!file) {
+      setIdDocument(null);
+      setIdDocPreview(null);
+      setIdScanOk(false);
+      setIdScanPending(false);
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+
+    const validationError = validateIdDocument(file);
+    if (validationError) {
+      setError(validationError);
+      setIdDocument(null);
+      setIdDocPreview(null);
+      setIdScanOk(false);
+      setIdScanPending(false);
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+
+    setError(null);
+    setIdScanOk(false);
+    setIdScanPending(true);
+    setIdDocument(file);
+    if (file.type.startsWith('image/')) {
+      setIdDocPreview(URL.createObjectURL(file));
+    } else {
+      setIdDocPreview(null);
+    }
+  };
+
+  const handleIdScanComplete = useCallback((result: IdScanResult) => {
+    setIdScanPending(false);
+    setIdScanOk(result.ok);
+    if (!result.ok) {
+      setError(result.error || 'Le document n’a pas passé le scanner d’authenticité.');
+    } else {
+      setError(null);
+    }
+  }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +103,22 @@ export default function RegisterDriverPage() {
     setError(null);
     if (zones.length === 0) {
       setError('Sélectionnez au moins une zone desservie');
+      setLoading(false);
+      return;
+    }
+    const docError = validateIdDocument(idDocument);
+    if (docError) {
+      setError(docError);
+      setLoading(false);
+      return;
+    }
+    if (idScanPending) {
+      setError('Patientez : le scanner d’authenticité analyse encore votre pièce.');
+      setLoading(false);
+      return;
+    }
+    if (!idScanOk) {
+      setError('La pièce doit être une CNI ou un passeport accepté par le scanner.');
       setLoading(false);
       return;
     }
@@ -98,68 +173,100 @@ export default function RegisterDriverPage() {
         </div>
         <p className="text-xs mb-4 -mt-2">
           <Link to="/auth/register" className="text-[#FF6B00] font-semibold hover:underline">
-            ← Changer de type de compte
+            Compte client
           </Link>
+          {' · '}
+          Inscription livreur · {countryName}
         </p>
         <form onSubmit={onSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold mb-1">Nom complet *</label>
+            <input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl"
+            />
+          </div>
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-bold mb-1">Nom complet *</label>
-              <input required value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl" />
+              <label className="block text-sm font-bold mb-1">Téléphone *</label>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl"
+              />
             </div>
             <div>
-              <label className="block text-sm font-bold mb-1">Téléphone *</label>
-              <input required value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl" />
+              <label className="block text-sm font-bold mb-1">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl"
+              />
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-bold mb-1">Email (optionnel)</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl" />
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-bold mb-1">Mot de passe *</label>
-              <input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl"
+              />
             </div>
             <div>
-              <label className="block text-sm font-bold mb-1">Confirmer *</label>
-              <input type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl" />
+              <label className="block text-sm font-bold mb-1">Confirmation *</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl"
+              />
             </div>
           </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-bold mb-1">Pays *</label>
-              <input
-                type="text"
-                readOnly
-                value={countryName}
-                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-700"
-              />
-              <p className="text-[11px] text-gray-500 mt-1">
-                Pays choisi à l’entrée du site.
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-bold mb-1">Ville *</label>
-              <select value={city} onChange={(e) => setCity(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white">
-                {cities.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="block text-sm font-bold mb-1">Ville *</label>
+            <select
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white"
+            >
+              {cities.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-bold mb-1">Véhicule *</label>
-              <select value={vehicleType} onChange={(e) => setVehicleType(e.target.value as VehicleType)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white">
-                {(Object.keys(VEHICLE_LABELS) as VehicleType[]).map((v) => (
-                  <option key={v} value={v}>{VEHICLE_LABELS[v]}</option>
+              <select
+                value={vehicleType}
+                onChange={(e) => setVehicleType(e.target.value as VehicleType)}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white"
+              >
+                {(Object.keys(VEHICLE_LABELS) as VehicleType[]).map((k) => (
+                  <option key={k} value={k}>
+                    {VEHICLE_LABELS[k]}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
               <label className="block text-sm font-bold mb-1">Immatriculation</label>
-              <input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl" />
+              <input
+                value={vehiclePlate}
+                onChange={(e) => setVehiclePlate(e.target.value)}
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl"
+              />
             </div>
           </div>
           <div>
@@ -171,7 +278,9 @@ export default function RegisterDriverPage() {
                   type="button"
                   onClick={() => toggleZone(z)}
                   className={`px-3 py-1.5 rounded-full text-xs font-bold border-2 ${
-                    zones.includes(z) ? 'border-[#FF6B00] bg-orange-50 text-[#FF6B00]' : 'border-gray-200'
+                    zones.includes(z)
+                      ? 'border-[#FF6B00] bg-orange-50 text-[#FF6B00]'
+                      : 'border-gray-200'
                   }`}
                 >
                   {z}
@@ -181,35 +290,153 @@ export default function RegisterDriverPage() {
           </div>
           <div>
             <label className="block text-sm font-bold mb-1">N° permis (optionnel)</label>
-            <input value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl" />
+            <input
+              value={licenseNumber}
+              onChange={(e) => setLicenseNumber(e.target.value)}
+              className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl"
+            />
           </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-bold mb-1">Type de pièce *</label>
-              <select value={idDocumentType} onChange={(e) => setIdDocumentType(e.target.value as 'cni' | 'passport' | 'permis')} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl bg-white">
-                <option value="cni">CNI</option>
-                <option value="passport">Passeport</option>
-                <option value="permis">Permis</option>
-              </select>
+
+          <div>
+            <label className="block text-sm font-bold mb-2">Type de pièce d&apos;identité *</label>
+            <div className="grid grid-cols-2 gap-3">
+              <label
+                className={`flex items-center gap-2 p-3 border-2 rounded-xl cursor-pointer ${
+                  idDocumentType === 'cni' ? 'border-[#FF6B00] bg-orange-50' : 'border-gray-200'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="idType"
+                  checked={idDocumentType === 'cni'}
+                  onChange={() => setIdDocumentType('cni')}
+                  className="accent-[#FF6B00]"
+                />
+                <span className="text-sm font-bold">CNI</span>
+              </label>
+              <label
+                className={`flex items-center gap-2 p-3 border-2 rounded-xl cursor-pointer ${
+                  idDocumentType === 'passport'
+                    ? 'border-[#FF6B00] bg-orange-50'
+                    : 'border-gray-200'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="idType"
+                  checked={idDocumentType === 'passport'}
+                  onChange={() => setIdDocumentType('passport')}
+                  className="accent-[#FF6B00]"
+                />
+                <span className="text-sm font-bold">Passeport</span>
+              </label>
             </div>
-            <div>
-              <label className="block text-sm font-bold mb-1">Document *</label>
-              <button type="button" onClick={() => fileRef.current?.click()} className="w-full px-3 py-2.5 border-2 border-dashed border-gray-300 rounded-xl text-sm flex items-center justify-center gap-2">
-                <Upload size={16} /> {idDocument ? idDocument.name : 'Choisir un fichier'}
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold mb-2">Photo / scan CNI ou passeport *</label>
+            {!idDocument ? (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="w-full px-3 py-6 border-2 border-dashed border-gray-300 rounded-xl text-sm flex flex-col items-center justify-center gap-2 hover:border-[#FF6B00]"
+              >
+                <Upload size={24} className="text-[#FF6B00]" />
+                <span className="font-semibold">
+                  Uploader votre {idDocumentType === 'passport' ? 'passeport' : 'CNI'}
+                </span>
+                <span className="text-xs text-gray-400">JPG, PNG, WEBP ou PDF — max 5 Mo</span>
               </button>
-              <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => setIdDocument(e.target.files?.[0] ?? null)} />
-            </div>
+            ) : (
+              <div
+                className={`border-2 rounded-xl p-3 ${
+                  idScanOk
+                    ? 'border-green-200 bg-green-50'
+                    : idScanPending
+                      ? 'border-orange-200 bg-orange-50/50'
+                      : 'border-red-200 bg-red-50/40'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold truncate">{idDocument.name}</p>
+                    <p className="text-xs text-gray-600">
+                      {idDocumentType === 'passport' ? 'Passeport' : 'CNI'}
+                      {idScanPending
+                        ? ' · scan en cours…'
+                        : idScanOk
+                          ? ' · authentifié'
+                          : ' · refusé'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleIdFileChange(null)}
+                    className="p-1 text-gray-500 hover:text-red-600"
+                    aria-label="Retirer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="mt-2 text-xs font-semibold text-[#FF6B00] hover:underline"
+                >
+                  Remplacer
+                </button>
+              </div>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf"
+              className="hidden"
+              onChange={(e) => handleIdFileChange(e.target.files?.[0] ?? null)}
+            />
+            {idDocument && (
+              <IdDocumentScanner
+                file={idDocument}
+                expectedKind={idDocumentType}
+                previewUrl={idDocPreview}
+                onComplete={handleIdScanComplete}
+              />
+            )}
+            <p className="mt-2 text-xs text-gray-500">
+              Uniquement CNI ou passeport. Le scanner vérifie la qualité avant envoi.
+            </p>
           </div>
+
           <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} className="mt-1 accent-[#FF6B00]" />
+            <input
+              type="checkbox"
+              checked={acceptTerms}
+              onChange={(e) => setAcceptTerms(e.target.checked)}
+              className="mt-1 accent-[#FF6B00]"
+            />
             J&apos;accepte les conditions livreur AfriZone
           </label>
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{error}</div>}
-          <button type="submit" disabled={loading} className="w-full py-3 bg-[#FF6B00] text-white rounded-xl font-bold disabled:opacity-50">
-            {loading ? 'Envoi...' : 'Envoyer ma candidature'}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">
+              {error}
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={loading || idScanPending || (!!idDocument && !idScanOk)}
+            className="w-full py-3 bg-[#FF6B00] text-white rounded-xl font-bold disabled:opacity-50"
+          >
+            {loading
+              ? 'Envoi...'
+              : idScanPending
+                ? 'Scan en cours…'
+                : 'Envoyer ma candidature'}
           </button>
           <p className="text-center text-sm text-gray-500">
-            Déjà inscrit ? <Link to="/auth/login" className="text-[#FF6B00] font-semibold">Connexion</Link>
+            Déjà inscrit ?{' '}
+            <Link to="/auth/login" className="text-[#FF6B00] font-semibold">
+              Connexion
+            </Link>
           </p>
         </form>
       </div>

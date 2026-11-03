@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -23,7 +23,9 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useCountry } from '../../context/CountryContext';
 import BrandLogo from '../../components/BrandLogo';
+import { IdDocumentScanner } from '../../components/IdDocumentScanner';
 import { validateIdDocument } from '../../lib/auth-helpers';
+import type { IdScanResult } from '../../lib/id-document-scan';
 import {
   CITIES_BY_COUNTRY,
   capitalForCountry,
@@ -96,6 +98,8 @@ export default function RegisterVendor() {
   const [vendorCode, setVendorCode] = useState<string | null>(null);
   const [idDocFile, setIdDocFile] = useState<File | null>(null);
   const [idDocPreview, setIdDocPreview] = useState<string | null>(null);
+  const [idScanOk, setIdScanOk] = useState(false);
+  const [idScanPending, setIdScanPending] = useState(false);
   const [shopLogoFile, setShopLogoFile] = useState<File | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -142,6 +146,8 @@ export default function RegisterVendor() {
     if (!file) {
       setIdDocFile(null);
       setIdDocPreview(null);
+      setIdScanOk(false);
+      setIdScanPending(false);
       return;
     }
 
@@ -150,11 +156,15 @@ export default function RegisterVendor() {
       setError(validationError);
       setIdDocFile(null);
       setIdDocPreview(null);
+      setIdScanOk(false);
+      setIdScanPending(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
     setError(null);
+    setIdScanOk(false);
+    setIdScanPending(true);
     setIdDocFile(file);
     if (file.type.startsWith('image/')) {
       setIdDocPreview(URL.createObjectURL(file));
@@ -163,10 +173,42 @@ export default function RegisterVendor() {
     }
   };
 
+  const handleIdScanComplete = useCallback((result: IdScanResult) => {
+    setIdScanPending(false);
+    setIdScanOk(result.ok);
+    if (!result.ok) {
+      setError(result.error || 'Le document n’a pas passé le scanner d’authenticité.');
+    } else {
+      setError(null);
+    }
+  }, []);
+
+  const selectedIdType = watch1('idDocumentType');
+
+  // Re-lance le scan si l’utilisateur change CNI ↔ Passeport avec un fichier déjà choisi
+  useEffect(() => {
+    if (!idDocFile) return;
+    setIdScanOk(false);
+    setIdScanPending(true);
+    setError(null);
+    // idDocFile volontairement omis : l’upload est géré dans handleIdFileChange
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rescan on type only
+  }, [selectedIdType]);
+
   const handleStep1Submit = (data: Step1FormData) => {
     const docError = validateIdDocument(idDocFile);
     if (docError) {
       setError(docError);
+      return;
+    }
+    if (idScanPending) {
+      setError('Patientez : le scanner d’authenticité analyse encore votre pièce.');
+      return;
+    }
+    if (!idScanOk) {
+      setError(
+        'La pièce doit être une CNI ou un passeport valide, accepté par le scanner. Remplacez le fichier.'
+      );
       return;
     }
     setStep1Data(data);
@@ -179,6 +221,14 @@ export default function RegisterVendor() {
     const docError = validateIdDocument(idDocFile);
     if (docError) {
       setError(docError);
+      return;
+    }
+    if (idScanPending) {
+      setError('Patientez : le scanner d’authenticité analyse encore votre pièce.');
+      return;
+    }
+    if (!idScanOk) {
+      setError('Uploadez une CNI ou un passeport accepté par le scanner avant de continuer.');
       return;
     }
     setError('Veuillez corriger les champs indiqués en rouge avant de continuer.');
@@ -194,6 +244,11 @@ export default function RegisterVendor() {
     const docError = validateIdDocument(idDocFile);
     if (docError || !idDocFile) {
       setError(docError || "Pièce d'identité manquante.");
+      setStep(1);
+      return;
+    }
+    if (!idScanOk) {
+      setError('La pièce d’identité n’a pas été validée par le scanner.');
       setStep(1);
       return;
     }
@@ -477,17 +532,37 @@ export default function RegisterVendor() {
                     <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP ou PDF — max 5 Mo</p>
                   </button>
                 ) : (
-                  <div className="border-2 border-green-200 bg-green-50 rounded-xl p-4">
+                  <div
+                    className={`border-2 rounded-xl p-4 ${
+                      idScanOk
+                        ? 'border-green-200 bg-green-50'
+                        : idScanPending
+                          ? 'border-orange-200 bg-orange-50/50'
+                          : 'border-red-200 bg-red-50/40'
+                    }`}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <CheckCircle size={20} className="text-green-600 shrink-0" />
+                        <CheckCircle
+                          size={20}
+                          className={`shrink-0 ${idScanOk ? 'text-green-600' : 'text-gray-400'}`}
+                        />
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-green-800 truncate">
+                          <p
+                            className={`text-sm font-semibold truncate ${
+                              idScanOk ? 'text-green-800' : 'text-gray-800'
+                            }`}
+                          >
                             {idDocFile.name}
                           </p>
-                          <p className="text-xs text-green-700">
+                          <p className="text-xs text-gray-600">
                             {(idDocFile.size / 1024).toFixed(0)} Ko ·{' '}
                             {watch1('idDocumentType') === 'passport' ? 'Passeport' : 'CNI'}
+                            {idScanPending
+                              ? ' · scan en cours…'
+                              : idScanOk
+                                ? ' · authentifié'
+                                : ' · refusé'}
                           </p>
                         </div>
                       </div>
@@ -500,13 +575,6 @@ export default function RegisterVendor() {
                         <X size={18} />
                       </button>
                     </div>
-                    {idDocPreview && (
-                      <img
-                        src={idDocPreview}
-                        alt="Aperçu pièce d'identité"
-                        className="mt-3 max-h-40 rounded-lg mx-auto object-contain"
-                      />
-                    )}
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
@@ -523,6 +591,18 @@ export default function RegisterVendor() {
                   className="hidden"
                   onChange={(e) => handleIdFileChange(e.target.files?.[0] || null)}
                 />
+                {idDocFile && (
+                  <IdDocumentScanner
+                    file={idDocFile}
+                    expectedKind={watch1('idDocumentType')}
+                    previewUrl={idDocPreview}
+                    onComplete={handleIdScanComplete}
+                  />
+                )}
+                <p className="mt-2 text-xs text-gray-500">
+                  Uniquement CNI ou passeport. Le scanner vérifie la qualité et la concordance du
+                  type avant envoi ; un administrateur confirme ensuite.
+                </p>
               </div>
 
               <label className="flex items-start gap-2 cursor-pointer">
@@ -555,9 +635,16 @@ export default function RegisterVendor() {
 
               <button
                 type="submit"
-                className="w-full py-3.5 bg-[#FF6B00] hover:bg-[#E05E00] text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg"
+                disabled={idScanPending || (!!idDocFile && !idScanOk)}
+                className="w-full py-3.5 bg-[#FF6B00] hover:bg-[#E05E00] text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Continuer vers la boutique <ArrowRight size={18} />
+                {idScanPending ? (
+                  'Scan d’authenticité en cours…'
+                ) : (
+                  <>
+                    Continuer vers la boutique <ArrowRight size={18} />
+                  </>
+                )}
               </button>
             </form>
           )}
