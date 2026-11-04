@@ -3,11 +3,11 @@ import path from 'path';
 import fs from 'fs';
 
 const files = [
-  'src/lib/id-doc-references/cnib-bf-recto-exemple-1.jpg',
-  'src/lib/id-doc-references/cnib-bf-recto-verso-exemple-2.jpg',
-  'src/lib/id-doc-references/passport-pages/page-01.jpg',
-  'src/lib/id-doc-references/passport-pages/page-03.jpg',
-  'src/lib/id-doc-references/passport-pages/page-04.jpg',
+  'docs/id-doc-references/cnib-bf-recto-exemple-1.jpg',
+  'docs/id-doc-references/cnib-bf-recto-verso-exemple-2.jpg',
+  'docs/id-doc-references/passport-pages/page-01.jpg',
+  'docs/id-doc-references/passport-pages/page-03.jpg',
+  'docs/id-doc-references/passport-pages/page-04.jpg',
 ];
 
 const worker = await createWorker('fra+eng');

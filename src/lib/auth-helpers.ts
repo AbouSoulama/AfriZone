@@ -63,11 +63,12 @@ export function guessFileContentType(file: File): string {
   return 'application/octet-stream';
 }
 
-/** Valide la pièce d'identité (CNI/CNIB / passeport — OCR profils réels) */
+/** Valide format/taille côté client (MIME + extension). L’OCR décide ensuite authenticité. */
 export function validateIdDocument(file: File | null): string | null {
   if (!file) {
     return 'Veuillez uploader votre CNI/CNIB ou passeport (SN, BF, ML ou GN).';
   }
+  if (file.size <= 0) return 'Fichier vide. Choisissez une photo de votre pièce d’identité.';
   if (file.size > ID_DOC_MAX_BYTES) return 'Le fichier ne doit pas dépasser 8 Mo.';
   const typeOk =
     ID_DOC_TYPES.includes(file.type) ||

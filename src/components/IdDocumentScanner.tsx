@@ -23,6 +23,7 @@ interface IdDocumentScannerProps {
 
 /**
  * Scanner CNI / Passeport — OCR + pays AfriZone (SN, BF, ML, GN).
+ * Verdicts : valid | invalid | uncertain.
  */
 export function IdDocumentScanner({
   file,
@@ -59,7 +60,6 @@ export function IdDocumentScanner({
       const stepDelay = (ms: number) =>
         new Promise<void>((r) => setTimeout(r, ms));
 
-      // OCR lancé tout de suite (peut prendre plusieurs secondes)
       const analysisPromise = analyzeIdDocument(file!, expectedKind);
 
       for (const step of ID_SCAN_STEPS) {
@@ -73,7 +73,6 @@ export function IdDocumentScanner({
         setCompleted((prev) => new Set(prev).add(step.id));
       }
 
-      // Attendre la fin réelle de l’analyse si l’OCR est encore en cours
       setActiveStep('ocr');
       const analysis = await analysisPromise;
       if (cancelled || runId.current !== id) return;
@@ -95,6 +94,41 @@ export function IdDocumentScanner({
 
   const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp)$/i.test(file.name);
 
+  const bannerClass =
+    result?.verdict === 'valid'
+      ? 'bg-emerald-500/90 text-white'
+      : result?.verdict === 'uncertain'
+        ? 'bg-amber-500/90 text-white'
+        : 'bg-red-500/90 text-white';
+
+  const bannerText = !result
+    ? ''
+    : result.verdict === 'valid'
+      ? `Validé · ${result.detectedCountry ? COUNTRY_LABEL[result.detectedCountry] : 'pays OK'} · ${
+          result.detectedKind === 'passport' ? 'Passeport' : 'CNI'
+        }`
+      : result.verdict === 'uncertain'
+        ? 'Vérification complémentaire requise'
+        : 'Document refusé — pièce d’identité invalide';
+
+  const resultBoxClass =
+    result?.verdict === 'valid'
+      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100'
+      : result?.verdict === 'uncertain'
+        ? 'border-amber-500/40 bg-amber-500/10 text-amber-50'
+        : 'border-red-500/40 bg-red-500/10 text-red-100';
+
+  const statusDot =
+    result?.verdict === 'valid'
+      ? 'bg-emerald-400'
+      : scanning
+        ? 'bg-orange-400'
+        : result?.verdict === 'uncertain'
+          ? 'bg-amber-400'
+          : result
+            ? 'bg-red-400'
+            : 'bg-slate-500';
+
   return (
     <div className="id-scanner mt-4 overflow-hidden rounded-2xl border border-orange-200/80 bg-gradient-to-b from-slate-950 to-slate-900 text-white shadow-lg shadow-orange-500/10">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
@@ -103,17 +137,7 @@ export function IdDocumentScanner({
             {scanning && (
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             )}
-            <span
-              className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-                result?.ok
-                  ? 'bg-emerald-400'
-                  : scanning
-                    ? 'bg-orange-400'
-                    : result
-                      ? 'bg-red-400'
-                      : 'bg-slate-500'
-              }`}
-            />
+            <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${statusDot}`} />
           </span>
           <p className="text-xs font-semibold uppercase tracking-wider text-orange-200">
             Scanner OCR · CNI / Passeport · SN·BF·ML·GN
@@ -152,16 +176,8 @@ export function IdDocumentScanner({
             </div>
           )}
           {result && !scanning && (
-            <div
-              className={`absolute inset-x-0 bottom-0 px-3 py-2 text-center text-xs font-semibold ${
-                result.ok ? 'bg-emerald-500/90 text-white' : 'bg-red-500/90 text-white'
-              }`}
-            >
-              {result.ok
-                ? `Validé · ${result.detectedCountry ? COUNTRY_LABEL[result.detectedCountry] : 'pays OK'} · ${
-                    result.detectedKind === 'passport' ? 'Passeport' : 'CNI'
-                  }`
-                : 'Document refusé — pièce d’identité invalide'}
+            <div className={`absolute inset-x-0 bottom-0 px-3 py-2 text-center text-xs font-semibold ${bannerClass}`}>
+              {bannerText}
             </div>
           )}
         </div>
@@ -193,27 +209,17 @@ export function IdDocumentScanner({
           </ul>
 
           {result && (
-            <div
-              className={`rounded-xl border px-3 py-2 text-xs leading-relaxed ${
-                result.ok
-                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100'
-                  : 'border-red-500/40 bg-red-500/10 text-red-100'
-              }`}
-            >
-              {result.ok ? (
-                <p>
-                  CNI/Passeport reconnu
-                  {result.detectedCountry
-                    ? ` · ${COUNTRY_LABEL[result.detectedCountry]}`
-                    : ''}
-                  {result.confidence
-                    ? ` · confiance ${(result.confidence * 100).toFixed(0)} %`
-                    : ''}
-                  . Contrôle admin ensuite.
-                </p>
-              ) : (
-                <p>{result.error}</p>
-              )}
+            <div className={`rounded-xl border px-3 py-2 text-xs leading-relaxed ${resultBoxClass}`}>
+              <p>
+                {result.message ||
+                  result.error ||
+                  (result.verdict === 'valid'
+                    ? successFallback(result)
+                    : 'Document non validé.')}
+                {result.verdict === 'valid' && result.confidence
+                  ? ` Confiance ${(result.confidence * 100).toFixed(0)} %.`
+                  : ''}
+              </p>
               {result.details.length > 0 && (
                 <ul className="mt-1.5 space-y-0.5 text-[10px] opacity-70">
                   {result.details.slice(0, 5).map((d) => (
@@ -227,4 +233,11 @@ export function IdDocumentScanner({
       </div>
     </div>
   );
+}
+
+function successFallback(result: IdScanResult): string {
+  const country = result.detectedCountry ? COUNTRY_LABEL[result.detectedCountry] : '';
+  return result.detectedKind === 'passport'
+    ? `Passeport détecté avec succès${country ? ` (${country})` : ''}.`
+    : `Carte nationale d'identité détectée avec succès${country ? ` (${country})` : ''}.`;
 }

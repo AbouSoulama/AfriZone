@@ -89,9 +89,10 @@ export default function RegisterDriverPage() {
 
   const handleIdScanComplete = useCallback((result: IdScanResult) => {
     setIdScanPending(false);
+    // valid et uncertain permettent de continuer (revue admin si uncertain)
     setIdScanOk(result.ok);
     if (!result.ok) {
-      setError(result.error || 'Le document n’a pas passé le scanner d’authenticité.');
+      setError(result.error || result.message || 'Le document n’a pas passé le scanner d’authenticité.');
     } else {
       setError(null);
     }
@@ -367,7 +368,7 @@ export default function RegisterDriverPage() {
                       {idScanPending
                         ? ' · scan en cours…'
                         : idScanOk
-                          ? ' · authentifié'
+                          ? ' · accepté (contrôle admin ensuite)'
                           : ' · refusé'}
                     </p>
                   </div>
