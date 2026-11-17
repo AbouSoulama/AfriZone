@@ -5,6 +5,7 @@ import type {
   ProductApprovalStatus,
   ProductReception,
 } from '../types/catalog';
+import { parseAttributes } from '../lib/catalog-config';
 
 export type ProductRow = Record<string, unknown>;
 
@@ -44,6 +45,7 @@ export function mapProductRow(row: ProductRow): CatalogProduct {
     description: str(row.description),
     category: row.category as string,
     subcategory: str(row.subcategory),
+    attributes: parseAttributes(row.attributes),
     price: Number(row.price),
     oldPrice: num(row.old_price),
     currency: (row.currency as string) || 'FCFA',

@@ -2,15 +2,21 @@ import { createWorker, type Worker } from 'tesseract.js';
 import {
   bestProfilesFor,
   normalizeIdOcr,
-  scoreProfile,
   scoreSignals,
-  ALL_ID_PROFILES,
-  GENERIC_ID_SIGNALS,
-  hasStrongTypeSignal,
+  CNI_FIELD_SIGNALS,
+  PASSPORT_FIELD_SIGNALS,
+  HEADER_CARTE_IDENTITE,
+  OTHER_DOCUMENT_PATTERNS,
   type IdCountryCode,
   type IdDocKind,
-  type IdDocProfile,
 } from './id-doc-profiles';
+import {
+  extractCniDates,
+  isAuthorizedMrzCountry,
+  isExpired,
+  parseMrz,
+  type MrzParseResult,
+} from './id-mrz';
 
 export type { IdCountryCode, IdDocKind };
 
@@ -60,6 +66,16 @@ const COUNTRY_LABEL: Record<IdCountryCode, string> = {
   ML: 'Mali',
   GN: 'Guinée',
 };
+
+const MRZ_TO_COUNTRY: Record<string, IdCountryCode> = {
+  BFA: 'BF',
+  SEN: 'SN',
+  MLI: 'ML',
+  GIN: 'GN',
+};
+
+const UNREADABLE_MESSAGE =
+  'Nous n’avons pas pu lire correctement votre document. Reprenez la photo en plein jour, à plat, sans reflet, avec la pièce entière dans le cadre.';
 
 let workerPromise: Promise<Worker> | null = null;
 
@@ -128,6 +144,46 @@ export async function detectRealFileKind(
     return 'pdf';
   }
   return 'unknown';
+}
+
+/**
+ * Réduit une photo de téléphone (souvent 4000×3000, 4-10 Mo) avant analyse et upload :
+ * côté long ≤ 2000 px, JPEG. L'orientation EXIF est appliquée par le navigateur.
+ * Les PDF et les petites images sont renvoyés tels quels.
+ */
+export async function prepareIdDocumentImage(file: File): Promise<File> {
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  if (isPdf) return file;
+
+  try {
+    const img = await loadImageFromFile(file);
+    const longest = Math.max(img.width, img.height);
+    const MAX_SIDE = 2000;
+    if (longest <= MAX_SIDE && file.size <= 1.5 * 1024 * 1024 && file.type === 'image/jpeg') {
+      return file;
+    }
+    const scale = Math.min(1, MAX_SIDE / longest);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.9)
+    );
+    if (!blob || blob.size === 0) return file;
+    // Si la recompression n'apporte rien, on garde l'original
+    if (blob.size >= file.size && longest <= MAX_SIDE) return file;
+
+    const base = file.name.replace(/\.[^.]+$/, '') || 'document';
+    return new File([blob], `${base}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
+  } catch {
+    return file;
+  }
 }
 
 /** Rasterise les 1ères pages d’un PDF scanné (passeport multi-pages). */
@@ -231,8 +287,8 @@ function analyzeCanvasPixels(canvas: HTMLCanvasElement): PixelStats {
 
 /** Prétraitement : redimensionnement + étirement de contraste léger. */
 function imageToAnalysisCanvas(img: HTMLImageElement): HTMLCanvasElement {
-  const maxSide = 1400;
-  const minSide = 900;
+  const maxSide = 1800;
+  const minSide = 1000;
   const longest = Math.max(img.width, img.height);
   let scale = Math.min(1, maxSide / longest);
   if (longest < minSide) {
@@ -274,17 +330,83 @@ function imageToAnalysisCanvas(img: HTMLImageElement): HTMLCanvasElement {
   return canvas;
 }
 
-async function runOcrOnCanvas(canvas: HTMLCanvasElement): Promise<{ text: string; confidence: number }> {
-  const worker = await getOcrWorker();
-  const { data } = await worker.recognize(canvas);
-  return {
-    text: normalizeIdOcr(data.text || ''),
-    confidence: data.confidence ?? 0,
-  };
+/** Rotation du canvas (90 / 180 / 270°) pour les photos prises « de travers ». */
+function rotateCanvas(src: HTMLCanvasElement, degrees: 90 | 180 | 270): HTMLCanvasElement {
+  const swap = degrees !== 180;
+  const out = document.createElement('canvas');
+  out.width = swap ? src.height : src.width;
+  out.height = swap ? src.width : src.height;
+  const ctx = out.getContext('2d');
+  if (!ctx) return src;
+  ctx.translate(out.width / 2, out.height / 2);
+  ctx.rotate((degrees * Math.PI) / 180);
+  ctx.drawImage(src, -src.width / 2, -src.height / 2);
+  return out;
 }
 
-function oppositeKind(kind: IdDocKind): IdDocKind {
-  return kind === 'cni' ? 'passport' : 'cni';
+/**
+ * Niveaux de gris + seuillage d'Otsu : aide l'OCR quand la photo a des reflets
+ * ou un fond coloré (cartes plastifiées).
+ */
+function binarizeCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
+  const out = document.createElement('canvas');
+  out.width = src.width;
+  out.height = src.height;
+  const ctx = out.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return src;
+  ctx.drawImage(src, 0, 0);
+  const img = ctx.getImageData(0, 0, out.width, out.height);
+  const d = img.data;
+
+  const hist = new Array<number>(256).fill(0);
+  for (let i = 0; i < d.length; i += 4) {
+    const g = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+    hist[g] += 1;
+  }
+  const total = d.length / 4;
+  let sumAll = 0;
+  for (let t = 0; t < 256; t++) sumAll += t * hist[t];
+  let sumB = 0;
+  let wB = 0;
+  let best = 0;
+  let threshold = 128;
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t];
+    if (wB === 0) continue;
+    const wF = total - wB;
+    if (wF === 0) break;
+    sumB += t * hist[t];
+    const mB = sumB / wB;
+    const mF = (sumAll - sumB) / wF;
+    const between = wB * wF * (mB - mF) * (mB - mF);
+    if (between > best) {
+      best = between;
+      threshold = t;
+    }
+  }
+  // Seuil légèrement relevé : le texte imprimé reste net, le fond clair disparaît
+  const cut = Math.min(235, threshold + 12);
+  for (let i = 0; i < d.length; i += 4) {
+    const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    const v = g > cut ? 255 : 0;
+    d[i] = v;
+    d[i + 1] = v;
+    d[i + 2] = v;
+  }
+  ctx.putImageData(img, 0, 0);
+  return out;
+}
+
+async function runOcrOnCanvas(
+  canvas: HTMLCanvasElement
+): Promise<{ text: string; confidence: number }> {
+  const worker = await getOcrWorker();
+  const { data } = await worker.recognize(canvas);
+  // Texte BRUT : les retours à la ligne sont nécessaires à la lecture de la MRZ.
+  return {
+    text: data.text || '',
+    confidence: data.confidence ?? 0,
+  };
 }
 
 function successMessage(kind: IdDocKind, country: IdCountryCode | null): string {
@@ -309,10 +431,348 @@ function failResult(
 }
 
 export interface OcrDecisionInput {
+  /** Texte OCR brut (avec retours à la ligne) ou déjà normalisé. */
   ocrText: string;
   ocrConfidence: number;
   expected: IdDocKind;
   details?: string[];
+  /** Date de référence (tests). Par défaut : maintenant. */
+  now?: Date;
+}
+
+/* ───────────────────────────  Pays / étranger  ─────────────────────────── */
+
+/**
+ * Pays reconnu par son NOM sur le document (les codes à 3 lettres ne sont pris
+ * en compte que dans la MRZ, où ils sont fiables, pas dans du texte OCR bruité).
+ */
+const COUNTRY_TEXT: Array<{ code: IdCountryCode; pattern: RegExp }> = [
+  { code: 'BF', pattern: /burkina|burkinab|\bcnib\b/i },
+  { code: 'SN', pattern: /\bsenegal|senegalais/i },
+  { code: 'ML', pattern: /\bmali\b|\bmalien/i },
+  { code: 'GN', pattern: /\bguinee\b|\bguinea\b|guineen/i },
+];
+
+const FOREIGN_TEXT =
+  /\b(france|francaise|belgique|cote\s+d'?ivoire|ivoirienne|niger|togo|benin|cameroun|maroc|algerie|tunisie|gabon|congo|rwanda|kenya|nigeria|ghana|usa|united\s+states|canada|portugal|espagne|allemagne|mauritanie|gambie|liberia|sierra\s+leone)\b/i;
+
+function detectCountry(text: string, mrz: MrzParseResult): IdCountryCode | null {
+  const fromMrz =
+    mrz.line1?.country ?? mrz.line2?.nationality ?? mrz.idCardCountry ?? null;
+  if (fromMrz && MRZ_TO_COUNTRY[fromMrz]) return MRZ_TO_COUNTRY[fromMrz];
+  for (const c of COUNTRY_TEXT) {
+    if (c.pattern.test(text)) return c.code;
+  }
+  return null;
+}
+
+function mrzCountries(mrz: MrzParseResult): string[] {
+  const list: string[] = [];
+  if (mrz.line1?.country) list.push(mrz.line1.country);
+  if (mrz.line2?.nationality) list.push(mrz.line2.nationality);
+  if (mrz.idCardCountry) list.push(mrz.idCardCountry);
+  return list;
+}
+
+function formatDate(d: Date): string {
+  return d.toLocaleDateString('fr-FR', { timeZone: 'UTC' });
+}
+
+const FOREIGN_MESSAGE =
+  'Ce document ne provient pas d’un pays autorisé (Sénégal, Burkina Faso, Mali, Guinée).';
+
+const OTHER_DOC_EXEMPT_FIELDS = 6;
+
+/* ─────────────────────────────  Décision CNI  ───────────────────────────── */
+
+interface DecisionContext {
+  raw: string;
+  text: string;
+  mrz: MrzParseResult;
+  country: IdCountryCode | null;
+  ocrConfidence: number;
+  details: string[];
+  now: Date;
+}
+
+function evaluateCni(ctx: DecisionContext): IdScanResult {
+  const { text, mrz, country, details, now, ocrConfidence } = ctx;
+
+  const header = HEADER_CARTE_IDENTITE.test(text) || /\bcnib\b/i.test(text);
+  const mrzCard = !!mrz.idCardCountry;
+  /** Verso de la carte : MRZ authentifiée par ses chiffres de contrôle OACI. */
+  const mrzCardChecks = mrz.idCard?.checksPassed ?? 0;
+  const mrzCardAuthentic = mrzCardChecks >= 2;
+  const strong = header || mrzCard;
+
+  const fields = scoreSignals(text, CNI_FIELD_SIGNALS);
+  const fieldIds = fields.matched.filter((id) => id !== 'cedea');
+  const fieldCount = fieldIds.length;
+  const hasSerial = /\bB\d{7,10}\b/.test(text);
+  const hasLongId = /\b\d{15,19}\b/.test(text);
+  const cardStructure = hasSerial && hasLongId;
+
+  const ranking = bestProfilesFor(text, 'cni');
+  const best = ranking.find((r) => r.profile.country === country) ?? ranking[0];
+  const profileScore = best?.score ?? 0;
+  const minScore = best?.profile.minScore ?? 40;
+
+  details.push(
+    `CNI : en-tête ${header ? 'oui' : 'non'}, MRZ ${mrzCard ? `oui (${mrzCardChecks}/3)` : 'non'}, champs ${fieldCount}, n°+série ${cardStructure ? 'oui' : 'non'}, score ${profileScore}/${minScore}`
+  );
+
+  // Un passeport présenté comme CNI
+  const passportEvidence =
+    !!mrz.line1 || (mrz.line2?.checksPassed ?? 0) >= 2 || /\bpasse?port\b/i.test(text);
+  if (passportEvidence && !strong) {
+    return failResult({
+      detectedKind: 'passport',
+      detectedCountry: country,
+      confidence: 0.8,
+      error: 'Le document détecté ne correspond pas au type sélectionné (c’est un passeport).',
+      details,
+    });
+  }
+
+  // Autre pièce qui ressemble à une CNI (permis, attestation, carte d'électeur…)
+  const other = OTHER_DOCUMENT_PATTERNS.find((p) => p.pattern.test(text));
+  const exempt = mrzCardAuthentic || (cardStructure && fieldCount >= OTHER_DOC_EXEMPT_FIELDS);
+  if (other && !exempt) {
+    return failResult({
+      confidence: 0.15,
+      error: `Ce document semble être ${other.label}, pas une carte nationale d’identité. Présentez le recto de votre CNI/CNIB.`,
+      details: [...details, `Document détecté : ${other.id}`],
+    });
+  }
+
+  if (!country) {
+    return failResult({
+      confidence: 0.2,
+      error: `${FOREIGN_MESSAGE} Aucun de ces pays n’a été reconnu sur le document.`,
+      details,
+    });
+  }
+
+  // Carte expirée : date de la MRZ (fiable si son chiffre de contrôle est bon)…
+  if (mrz.idCard?.expiry && mrz.idCard.expiryReliable && isExpired(mrz.idCard.expiry, now)) {
+    return failResult({
+      detectedKind: 'cni',
+      detectedCountry: country,
+      confidence: 0.6,
+      error: `Cette carte est expirée (le ${formatDate(mrz.idCard.expiry)}). Une pièce en cours de validité est exigée.`,
+      details,
+    });
+  }
+  // …ou dates imprimées au recto (lues et cohérentes entre elles uniquement)
+  const dates = extractCniDates(text);
+  if (dates.coherent && dates.expiry && isExpired(dates.expiry, now)) {
+    return failResult({
+      detectedKind: 'cni',
+      detectedCountry: country,
+      confidence: 0.6,
+      error: `Cette carte est expirée (le ${formatDate(dates.expiry)}). Une pièce en cours de validité est exigée.`,
+      details,
+    });
+  }
+  if (dates.coherent) details.push('Dates de la carte : cohérentes');
+
+  const confidence = Math.min(
+    0.97,
+    0.4 + profileScore / 180 + ocrConfidence / 500 + (dates.coherent ? 0.05 : 0)
+  );
+
+  // CNIB burkinabè : le recto porte un n° à ~17 chiffres + une série « B… » ; sans ces deux
+  // éléments (ou des dates cohérentes), on ne valide pas automatiquement (revue admin).
+  const bfStructureOk = country !== 'BF' || cardStructure || mrzCard || (fieldCount >= 5 && dates.coherent);
+
+  // VALIDE (verso) : MRZ de la carte authentifiée par ses chiffres de contrôle OACI
+  if (mrzCardAuthentic && country) {
+    details.push(`Validé · verso · MRZ authentifiée (${mrzCardChecks}/3 chiffres de contrôle OACI)`);
+    return {
+      ok: true,
+      verdict: 'valid',
+      detectedKind: 'cni',
+      detectedCountry: country,
+      confidence: Math.min(0.98, confidence + 0.1),
+      message: successMessage('cni', country),
+      details,
+    };
+  }
+
+  // VALIDE (recto) : en-tête de carte d'identité + pays autorisé + au moins 3 champs de la carte
+  if (strong && fieldCount >= 3 && profileScore >= minScore && bfStructureOk) {
+    details.push(`Validé · ${best?.profile.label ?? 'CNI'} · ${fieldIds.slice(0, 8).join(', ')}`);
+    return {
+      ok: true,
+      verdict: 'valid',
+      detectedKind: 'cni',
+      detectedCountry: country,
+      confidence,
+      message: successMessage('cni', country),
+      details,
+    };
+  }
+
+  // INCERTAIN (revue admin) : indices sérieux mais lecture incomplète
+  if ((strong && fieldCount >= 2) || (!strong && fieldCount >= 5 && cardStructure)) {
+    details.push(`Incertain · champs ${fieldCount}, score ${profileScore}/${minScore}`);
+    return {
+      ok: true,
+      verdict: 'uncertain',
+      detectedKind: 'cni',
+      detectedCountry: country,
+      confidence: Math.min(0.55, confidence),
+      message:
+        'Lecture incomplète de votre carte. Vous pouvez continuer (un administrateur vérifiera la pièce) ou reprendre une photo plus nette.',
+      details,
+    };
+  }
+
+  return failResult({
+    detectedKind: strong ? 'cni' : null,
+    detectedCountry: country,
+    confidence: Math.min(0.45, profileScore / 100),
+    error: strong
+      ? 'Carte reconnue mais illisible : cadrez le recto entier (photo, nom, prénoms, dates) en pleine lumière.'
+      : 'Ce document ne semble pas être une carte nationale d’identité (SN, BF, ML, GN). Cadrez le recto de la carte, texte lisible.',
+    details,
+  });
+}
+
+/* ────────────────────────────  Décision passeport  ──────────────────────── */
+
+function evaluatePassport(ctx: DecisionContext): IdScanResult {
+  const { text, mrz, country, details, now, ocrConfidence } = ctx;
+
+  const hasWord = /\bpasse?port\b/i.test(text);
+  const line1 = mrz.line1;
+  const line2 = mrz.line2;
+  const mrzFound = !!line1 || !!line2;
+  const mrzChecks = line2?.checksPassed ?? 0;
+
+  const fields = scoreSignals(text, PASSPORT_FIELD_SIGNALS);
+  const fieldCount = fields.matched.length;
+
+  const ranking = bestProfilesFor(text, 'passport');
+  const best = ranking.find((r) => r.profile.country === country) ?? ranking[0];
+  const profileScore = best?.score ?? 0;
+  const minScore = best?.profile.minScore ?? 40;
+
+  details.push(
+    `Passeport : mot ${hasWord ? 'oui' : 'non'}, MRZ ${line1 ? 'L1' : '—'}/${line2 ? 'L2' : '—'}, contrôles ${mrzChecks}/3, champs ${fieldCount}, score ${profileScore}/${minScore}`
+  );
+
+  const cniHeader =
+    HEADER_CARTE_IDENTITE.test(text) || /\bcnib\b/i.test(text) || (!!mrz.idCard && !line1);
+  if (cniHeader && !mrzFound && !hasWord) {
+    return failResult({
+      detectedKind: 'cni',
+      detectedCountry: country,
+      confidence: 0.8,
+      error: 'Le document détecté ne correspond pas au type sélectionné (c’est une carte d’identité).',
+      details,
+    });
+  }
+
+  if (mrz.isVisa && mrzChecks < 2) {
+    return failResult({
+      confidence: 0.2,
+      error: 'Cette page est un visa, pas la page d’identité du passeport (photo + 2 lignes en bas).',
+      details,
+    });
+  }
+
+  // Pays de la MRZ : au moins un code lu doit être autorisé
+  const codes = mrzCountries(mrz);
+  if (codes.length > 0 && !codes.some((c) => isAuthorizedMrzCountry(c))) {
+    return failResult({
+      confidence: 0.25,
+      error: FOREIGN_MESSAGE,
+      details: [...details, `Code pays MRZ : ${codes.join('/')}`],
+    });
+  }
+  if (codes.length === 0 && FOREIGN_TEXT.test(text) && !COUNTRY_TEXT.some((c) => c.pattern.test(text))) {
+    return failResult({ confidence: 0.25, error: FOREIGN_MESSAGE, details });
+  }
+
+  // Autre pièce (attestation, formulaire…) : refusée, sauf MRZ authentifiée par ses chiffres
+  const other = OTHER_DOCUMENT_PATTERNS.find((p) => p.pattern.test(text));
+  if (other && mrzChecks < 2) {
+    return failResult({
+      confidence: 0.15,
+      error: `Ce document semble être ${other.label}, pas un passeport. Présentez la page d’identité (photo + 2 lignes en bas).`,
+      details: [...details, `Document détecté : ${other.id}`],
+    });
+  }
+
+  // Passeport expiré : seulement si la date est fiable (chiffre de contrôle correct)
+  if (line2?.expiry && line2.expiryReliable && isExpired(line2.expiry, now)) {
+    return failResult({
+      detectedKind: 'passport',
+      detectedCountry: country,
+      confidence: 0.6,
+      error: `Ce passeport est expiré (le ${formatDate(line2.expiry)}). Un passeport en cours de validité est exigé.`,
+      details,
+    });
+  }
+
+  const authorized = country !== null;
+  const mrzAuthorized =
+    (!!line1 && isAuthorizedMrzCountry(line1.country)) ||
+    (!!line2 && isAuthorizedMrzCountry(line2.nationality));
+
+  const confidence = Math.min(
+    0.98,
+    0.4 + profileScore / 180 + ocrConfidence / 500 + (mrzChecks >= 3 ? 0.12 : mrzChecks === 2 ? 0.06 : 0)
+  );
+
+  const valid =
+    authorized &&
+    ((mrzChecks >= 2 && mrzAuthorized) ||
+      (!!line1 && mrzAuthorized && profileScore >= minScore) ||
+      (hasWord && fieldCount >= 4 && profileScore >= minScore));
+
+  if (valid) {
+    details.push(
+      mrzChecks >= 2
+        ? `Validé · MRZ authentifiée (${mrzChecks}/3 chiffres de contrôle OACI)`
+        : `Validé · ${best?.profile.label ?? 'Passeport'}`
+    );
+    return {
+      ok: true,
+      verdict: 'valid',
+      detectedKind: 'passport',
+      detectedCountry: country,
+      confidence,
+      message: successMessage('passport', country),
+      details,
+    };
+  }
+
+  if (authorized && (mrzFound || hasWord) && (profileScore >= (best?.profile.softScore ?? 24) || fieldCount >= 3)) {
+    details.push(`Incertain · score ${profileScore}/${minScore}`);
+    return {
+      ok: true,
+      verdict: 'uncertain',
+      detectedKind: 'passport',
+      detectedCountry: country,
+      confidence: Math.min(0.55, confidence),
+      message:
+        'Lecture incomplète de votre passeport. Vous pouvez continuer (un administrateur vérifiera la pièce) ou reprendre une photo plus nette (page d’identité + 2 lignes en bas).',
+      details,
+    };
+  }
+
+  return failResult({
+    detectedKind: mrzFound || hasWord ? 'passport' : null,
+    detectedCountry: country,
+    confidence: Math.min(0.4, profileScore / 100),
+    error:
+      mrzFound || hasWord
+        ? 'Passeport reconnu mais illisible : cadrez la page d’identité entière (photo + les 2 lignes MRZ en bas).'
+        : 'Ce document ne semble pas être un passeport (SN, BF, ML, GN). Cadrez la page d’identité : photo + 2 lignes en bas.',
+    details,
+  });
 }
 
 /**
@@ -321,213 +781,62 @@ export interface OcrDecisionInput {
  */
 export function decideIdDocumentFromOcr(input: OcrDecisionInput): IdScanResult {
   const details = [...(input.details ?? [])];
-  const text = normalizeIdOcr(input.ocrText);
-  const expected = input.expected;
-  const ocrConf = input.ocrConfidence;
+  const raw = input.ocrText || '';
+  const text = normalizeIdOcr(raw);
+  const now = input.now ?? new Date();
 
   if (text.length < 12) {
     return failResult({
       confidence: 0.12,
-      error:
-        'Nous n’avons pas pu lire correctement votre document. Veuillez prendre une nouvelle photo dans un endroit bien éclairé.',
+      error: UNREADABLE_MESSAGE,
       details: [...details, `OCR trop court (${text.length} car.)`],
     });
   }
 
-  const expectedRanking = bestProfilesFor(text, expected);
-  const oppositeRanking = bestProfilesFor(text, oppositeKind(expected));
-  const bestExpected = expectedRanking[0];
-  const bestOpposite = oppositeRanking[0];
-  const generic = scoreSignals(text, GENERIC_ID_SIGNALS);
+  const mrz = parseMrz(raw, now);
+  const ctx: DecisionContext = {
+    raw,
+    text,
+    mrz,
+    country: detectCountry(text, mrz),
+    ocrConfidence: input.ocrConfidence,
+    details,
+    now,
+  };
 
-  details.push(
-    `Meilleur profil ${expected}: ${bestExpected?.profile.label ?? '—'} (${bestExpected?.score ?? 0})`
-  );
-  if (bestOpposite && bestOpposite.score > 0) {
-    details.push(`Profil opposé: ${bestOpposite.profile.label} (${bestOpposite.score})`);
+  return input.expected === 'cni' ? evaluateCni(ctx) : evaluatePassport(ctx);
+}
+
+/* ───────────────────────  Analyse d'un fichier (navigateur)  ─────────────── */
+
+const VERDICT_RANK: Record<IdScanVerdict, number> = { valid: 3, uncertain: 2, invalid: 1 };
+
+function rankResult(r: IdScanResult): number {
+  return VERDICT_RANK[r.verdict] * 1000 + r.confidence * 100;
+}
+
+/** Texte « lisible » (mots d'au moins 4 lettres) : sert à décider s'il faut tenter des rotations. */
+function readableWordCount(text: string): number {
+  return (normalizeIdOcr(text).match(/[a-z]{4,}/gi) || []).length;
+}
+
+async function ocrCanvases(canvases: HTMLCanvasElement[]): Promise<{ text: string; conf: number }> {
+  let text = '';
+  let conf = 0;
+  for (const canvas of canvases) {
+    const ocr = await runOcrOnCanvas(canvas);
+    if (ocr.text.trim().length > 0) text += (text ? '\n' : '') + ocr.text;
+    conf = Math.max(conf, ocr.confidence);
   }
-  if (generic.score > 0) {
-    details.push(`Signaux génériques: ${generic.matched.join(', ')} (${generic.score})`);
-  }
-
-  const oppositeStrong =
-    bestOpposite &&
-    hasStrongTypeSignal(oppositeKind(expected), bestOpposite.matched) &&
-    bestOpposite.score >= bestOpposite.profile.softScore;
-
-  // Type croisé clair → invalid (pas uncertain)
-  if (
-    oppositeStrong &&
-    bestOpposite.score >= (bestOpposite.profile.minScore - 8) &&
-    bestOpposite.score > (bestExpected?.score ?? 0) + 12
-  ) {
-    return failResult({
-      detectedKind: oppositeKind(expected),
-      detectedCountry: bestOpposite.profile.country,
-      confidence: Math.min(0.9, bestOpposite.score / 100),
-      error: 'Le document détecté ne correspond pas au type sélectionné.',
-      details: [
-        ...details,
-        `Signaux: ${bestOpposite.matched.slice(0, 8).join(', ')}`,
-      ],
-    });
-  }
-
-  // Autre profil AfriZone du mauvais type qui passe minScore
-  const anyBest = ALL_ID_PROFILES.map((p) => ({
-    profile: p,
-    ...scoreProfile(text, p),
-  })).sort((a, b) => b.score - a.score)[0] as
-    | { profile: IdDocProfile; score: number; matched: string[] }
-    | undefined;
-
-  if (
-    anyBest &&
-    anyBest.score >= anyBest.profile.minScore &&
-    anyBest.profile.kind !== expected &&
-    hasStrongTypeSignal(anyBest.profile.kind, anyBest.matched) &&
-    anyBest.score > (bestExpected?.score ?? 0) + 8
-  ) {
-    return failResult({
-      detectedKind: anyBest.profile.kind,
-      detectedCountry: anyBest.profile.country,
-      confidence: Math.min(0.9, anyBest.score / 100),
-      error: 'Le document détecté ne correspond pas au type sélectionné.',
-      details: [...details, `Profil: ${anyBest.profile.label} (${anyBest.score})`],
-    });
-  }
-
-  if (!bestExpected) {
-    return failResult({
-      confidence: 0.1,
-      error: 'Ce document ne semble pas être une pièce d’identité officielle. Veuillez réessayer.',
-      details,
-    });
-  }
-
-  const { profile, score, matched } = bestExpected;
-  const strongType = hasStrongTypeSignal(expected, matched);
-  const confidence = Math.min(0.97, 0.4 + score / 180 + ocrConf / 500);
-
-  const authorizedCountry =
-    matched.some((id) =>
-      /burkina|senegal|mali|guinee|bfa|sen|mli|gin|cnib|republique-(senegal|mali|guinee)/i.test(
-        id
-      )
-    ) ||
-    /(?:burkina\s*faso|\bsenegal\b|\bmali\b|\bguinee\b|\bguinea\b|\bbfa\b|\bsen\b|\bmli\b|\bgin\b)/i.test(
-      text
-    );
-
-  const foreign =
-    /\b(france|francaise|belgique|cote\s+d'?ivoire|ivoire|niger|togo|benin|cameroun|maroc|algerie|tunisie|gabon|congo|rwanda|kenya|nigeria|ghana|usa|united\s+states|canada|portugal|espagne|allemagne)\b/i.test(
-      text
-    ) ||
-    /i\s*<\s*(fra|civ|ner|tgo|ben|cmr|mar|dza|tun|gab|cog|rwa|ken|nga|gha|usa|can|prt|esp|deu)/i.test(
-      text
-    ) ||
-    /p\s*<\s*(fra|civ|ner|tgo|ben|cmr|mar|dza|tun|gab|cog|rwa|ken|nga|gha|usa|can|prt|esp|deu)/i.test(
-      text
-    );
-
-  // Refus pays non autorisé avant toute acceptation soft/uncertain
-  if (foreign && !authorizedCountry) {
-    return failResult({
-      confidence: 0.25,
-      error:
-        'Ce document ne semble pas provenir d’un pays autorisé (Sénégal, Burkina Faso, Mali, Guinée).',
-      details: [...details, `Score ${score}/${profile.minScore}`],
-    });
-  }
-
-  // Valid : score suffisant + signal de type (ou score très élevé)
-  if (score >= profile.minScore && (strongType || score >= profile.minScore + 18)) {
-    details.push(`Validé · ${profile.label} · signaux: ${matched.slice(0, 10).join(', ')}`);
-    return {
-      ok: true,
-      verdict: 'valid',
-      detectedKind: expected,
-      detectedCountry: profile.country,
-      confidence,
-      message: successMessage(expected, profile.country),
-      details,
-    };
-  }
-
-  // Uncertain : indices d’une vraie pièce mais OCR incomplet
-  const softHit = score >= profile.softScore;
-  const genericHit = generic.score >= 18;
-  const countryHint = matched.some((id) =>
-    /burkina|senegal|mali|guinee|bfa|sen|mli|gin|cnib|republique/i.test(id)
-  );
-
-  if (
-    (softHit && (strongType || countryHint || genericHit)) ||
-    (genericHit && countryHint && score >= Math.max(12, profile.softScore - 8)) ||
-    (strongType && countryHint && score >= profile.softScore - 4)
-  ) {
-    details.push(
-      `Incertain · score ${score}/${profile.minScore} (seuil soft ${profile.softScore})`
-    );
-    return {
-      ok: true,
-      verdict: 'uncertain',
-      detectedKind: expected,
-      detectedCountry: profile.country,
-      confidence: Math.min(0.55, confidence),
-      message:
-        'Ce document nécessite une vérification complémentaire. Vous pouvez continuer ; un administrateur vérifiera votre pièce.',
-      details,
-    };
-  }
-
-  if (generic.score < 10 && score < profile.softScore) {
-    return failResult({
-      detectedKind: null,
-      detectedCountry: null,
-      confidence: Math.min(0.4, score / 100),
-      error: 'Ce document ne semble pas être une pièce d’identité officielle. Veuillez réessayer.',
-      details: [
-        ...details,
-        `Score ${score}/${profile.minScore}`,
-        `Signaux: ${matched.join(', ') || 'aucun'}`,
-      ],
-    });
-  }
-
-  // Indices faibles → uncertain plutôt que rejet sec
-  if (generic.score >= 10 || score >= 14) {
-    details.push(`Incertain (signaux faibles) · score ${score}`);
-    return {
-      ok: true,
-      verdict: 'uncertain',
-      detectedKind: expected,
-      detectedCountry: score >= profile.softScore ? profile.country : null,
-      confidence: 0.35,
-      message:
-        'Nous n’avons pas pu lire correctement votre document. Vous pouvez reprendre une photo plus nette, ou continuer pour une vérification manuelle.',
-      details,
-    };
-  }
-
-  return failResult({
-    detectedKind: bestExpected.profile.kind,
-    detectedCountry: bestExpected.profile.country,
-    confidence: Math.min(0.45, score / 100),
-    error:
-      expected === 'cni'
-        ? 'CNI/CNIB non reconnue (SN, BF, ML, GN). Cadrez le recto entier, texte lisible.'
-        : 'Passeport non reconnu (SN, BF, ML, GN). Cadrez la page d’identité (photo + MRZ).',
-    details: [
-      ...details,
-      `Score ${score}/${profile.minScore}`,
-      `Signaux: ${matched.join(', ') || 'aucun'}`,
-    ],
-  });
+  return { text, conf };
 }
 
 /**
  * Analyse CNI / passeport (profils SN·BF·ML·GN) avec verdict valid|invalid|uncertain.
+ *
+ * Passes OCR successives (on s'arrête dès qu'un verdict « valid » est obtenu) :
+ *   1. image d'origine ; 2. image binarisée (reflets) ; 3. rotations 90/270/180°
+ *   (uniquement si le texte est illisible, c'est-à-dire photo probablement de travers).
  */
 export async function analyzeIdDocument(
   file: File,
@@ -608,13 +917,12 @@ export async function analyzeIdDocument(
   if (stats.brightness < 18 || stats.brightness > 248) {
     return failResult({
       confidence: 0.2,
-      error:
-        'Nous n’avons pas pu lire correctement votre document. Veuillez prendre une nouvelle photo dans un endroit bien éclairé.',
+      error: UNREADABLE_MESSAGE,
       details,
     });
   }
 
-  // Selfie / portrait sans texte — seuil plus tolérant (CNI ont une photo)
+  // Selfie / portrait sans texte — seuil plus tolérant (les CNI ont une photo)
   if (stats.skinRatio > 0.55 && stats.textLikeRatio < 0.015) {
     return failResult({
       confidence: 0.1,
@@ -634,30 +942,47 @@ export async function analyzeIdDocument(
 
   details.push('Structure image : OK — lecture OCR…');
 
-  let ocrText = '';
-  let bestConf = 0;
+  const results: IdScanResult[] = [];
+
+  const consider = (text: string, conf: number, label: string): IdScanResult => {
+    const res = decideIdDocumentFromOcr({
+      ocrText: text,
+      ocrConfidence: conf,
+      expected,
+      details: [...details, `Passe OCR : ${label} (${conf.toFixed(0)} %, ${text.length} car.)`],
+    });
+    results.push(res);
+    return res;
+  };
+
+  const bestResult = (): IdScanResult =>
+    results.reduce((a, b) => (rankResult(b) > rankResult(a) ? b : a));
+
   try {
-    for (let i = 0; i < canvases.length; i++) {
-      const ocr = await runOcrOnCanvas(canvases[i]);
-      if (ocr.text.length > 0) {
-        ocrText += (ocrText ? '\n' : '') + ocr.text;
+    // Passe 1 : image d'origine
+    const pass1 = await ocrCanvases(canvases);
+    const first = consider(pass1.text, pass1.conf, 'originale');
+    if (first.verdict === 'valid') return first;
+
+    // Passe 2 : image binarisée
+    const pass2 = await ocrCanvases(canvases.map(binarizeCanvas));
+    const second = consider(pass2.text, pass2.conf, 'contrastée');
+    if (second.verdict === 'valid') return second;
+
+    // Passe 3 : rotations, seulement si le texte est illisible (images uniquement)
+    const garbled = readableWordCount(pass1.text) < 12 && readableWordCount(pass2.text) < 12;
+    if (!isPdf && garbled) {
+      for (const deg of [90, 270, 180] as const) {
+        const ocr = await runOcrOnCanvas(rotateCanvas(primary, deg));
+        const res = consider(ocr.text, ocr.confidence, `rotation ${deg}°`);
+        if (res.verdict === 'valid') return res;
       }
-      bestConf = Math.max(bestConf, ocr.confidence);
     }
   } catch {
-    return failResult({
-      error:
-        'Nous n’avons pas pu lire correctement votre document. Veuillez prendre une nouvelle photo dans un endroit bien éclairé.',
-      details,
-    });
+    return failResult({ error: UNREADABLE_MESSAGE, details });
   }
 
-  details.push(`OCR ${(bestConf || 0).toFixed(0)} % · ${ocrText.length} caractères`);
-
-  return decideIdDocumentFromOcr({
-    ocrText,
-    ocrConfidence: bestConf,
-    expected,
-    details,
-  });
+  return results.length > 0
+    ? bestResult()
+    : failResult({ error: UNREADABLE_MESSAGE, details });
 }

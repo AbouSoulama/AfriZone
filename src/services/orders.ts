@@ -1,5 +1,10 @@
 import { supabase } from '../lib/supabase';
 import {
+  parseSelectedOptions,
+  variantGroups,
+  type SelectedOptions,
+} from '../lib/catalog-config';
+import {
   clearCart,
   estimateItemShipping,
   fetchCartSummary,
@@ -57,6 +62,8 @@ export interface OrderItemView {
   productName?: string;
   productImage?: string | null;
   productSlug?: string | null;
+  /** Taille / couleur / pointure choisies par le client. */
+  selectedOptions: SelectedOptions;
 }
 
 export interface OrderView {
@@ -130,12 +137,31 @@ export async function placeOrders(
   const cart = await fetchCartSummary(userId);
   if (!cart.items.length) throw new Error('Votre panier est vide.');
 
+  // Le stock est global par produit : on additionne toutes les lignes (tailles / couleurs) du même produit
+  const quantityByProduct = new Map<string, number>();
+  for (const item of cart.items) {
+    quantityByProduct.set(
+      item.productId,
+      (quantityByProduct.get(item.productId) ?? 0) + item.quantity
+    );
+  }
+
   for (const item of cart.items) {
     if (!item.product.isActive) {
       throw new Error(`Le produit « ${item.product.name} » n'est plus disponible.`);
     }
-    if (item.quantity > item.product.stock) {
+    if ((quantityByProduct.get(item.productId) ?? 0) > item.product.stock) {
       throw new Error(`Stock insuffisant pour « ${item.product.name} ».`);
+    }
+
+    // Taille / couleur / pointure obligatoires quand le vendeur en propose
+    const missing = variantGroups(item.product.category, item.product.attributes).filter(
+      (g) => g.values.length > 1 && !item.selectedOptions[g.label]
+    );
+    if (missing.length > 0) {
+      throw new Error(
+        `Choisissez ${missing.map((g) => g.label.toLowerCase()).join(', ')} pour « ${item.product.name} » (retirez-le du panier puis rajoutez-le depuis sa fiche).`
+      );
     }
   }
 
@@ -229,6 +255,7 @@ export async function placeOrders(
         total: lineTotal,
         platform_fee: platformFee,
         vendor_net: lineTotal - platformFee,
+        selected_options: i.selectedOptions,
       };
     });
 
@@ -250,7 +277,7 @@ export async function fetchMyOrders(userId: string): Promise<OrderView[]> {
       *,
       vendors ( shop_name ),
       order_items (
-        id, product_id, quantity, price, total,
+        id, product_id, quantity, price, total, selected_options,
         products ( name, main_image, images, slug )
       )
     `
@@ -273,7 +300,7 @@ export async function fetchOrderById(
       *,
       vendors ( shop_name ),
       order_items (
-        id, product_id, quantity, price, total,
+        id, product_id, quantity, price, total, selected_options,
         products ( name, main_image, images, slug )
       )
     `
@@ -345,6 +372,7 @@ function mapOrder(row: Record<string, unknown>): OrderView {
         productName: (p?.name as string) || 'Produit',
         productImage: (p?.main_image as string) || images[0] || null,
         productSlug: (p?.slug as string) || null,
+        selectedOptions: parseSelectedOptions(item.selected_options),
       };
     }),
   };

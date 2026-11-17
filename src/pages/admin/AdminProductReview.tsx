@@ -3,6 +3,7 @@ import { Camera, Check, Package, Warehouse, X } from 'lucide-react';
 import AdminModal from '../../components/admin/AdminModal';
 import { useAdminCountry } from '../../context/AdminCountryContext';
 import { formatPrice } from '../../services/catalog';
+import { specRows } from '../../lib/catalog-config';
 import {
   fetchProductsToReview,
   reviewProductAdmin,
@@ -341,6 +342,20 @@ export default function AdminProductReviewPage() {
                 <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
                   {detail.description}
                 </p>
+              </div>
+            )}
+
+            {specRows(detail.category, detail.attributes ?? {}).length > 0 && (
+              <div>
+                <p className="text-sm font-extrabold mb-2">Caractéristiques</p>
+                <div className="rounded-xl border border-gray-100 divide-y divide-gray-100 text-sm">
+                  {specRows(detail.category, detail.attributes ?? {}).map((r) => (
+                    <div key={r.key} className="grid grid-cols-3 gap-3 px-3 py-2">
+                      <span className="text-gray-500">{r.label}</span>
+                      <span className="col-span-2 font-semibold break-words">{r.value}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

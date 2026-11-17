@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { formatPrice } from '../services/catalog';
 import { estimateItemShipping } from '../services/cart';
+import SelectedOptionsChips from '../components/products/SelectedOptionsChips';
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -77,6 +78,7 @@ export default function CartPage() {
                     >
                       {item.product.name}
                     </Link>
+                    <SelectedOptionsChips options={item.selectedOptions} className="mt-1.5" />
                     <p className="text-xs text-gray-500 mt-1">
                       {item.product.vendor?.shopName} ·{' '}
                       {item.product.deliveryMode === 'afrizone'

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Truck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import SelectedOptionsChips from '../../components/products/SelectedOptionsChips';
 import { formatPrice } from '../../services/catalog';
 import { getVendorIdForUser } from '../../services/vendor';
 import {
@@ -273,6 +274,7 @@ export default function VendorOrderDetailPage() {
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate">{item.productName}</p>
+                    <SelectedOptionsChips options={item.selectedOptions} className="my-1" />
                     <p className="text-xs text-gray-500">
                       {item.quantity} × {formatPrice(item.price)}
                     </p>

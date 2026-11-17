@@ -1,12 +1,19 @@
 import { supabase } from '../lib/supabase';
 import type { CatalogProduct } from '../types/catalog';
 import { mapProductRow } from './product-mapper';
+import {
+  parseSelectedOptions,
+  selectedOptionsKey,
+  type SelectedOptions,
+} from '../lib/catalog-config';
 
 export interface CartItemRow {
   id: string;
   cartId: string;
   productId: string;
   quantity: number;
+  /** Choix du client : taille, couleur, pointure… */
+  selectedOptions: SelectedOptions;
   product: CatalogProduct;
 }
 
@@ -83,7 +90,7 @@ export async function fetchCartSummary(userId: string): Promise<CartSummary> {
     .from('cart_items')
     .select(
       `
-      id, cart_id, product_id, quantity,
+      id, cart_id, product_id, quantity, selected_options,
       products (
         *,
         vendors (
@@ -105,6 +112,7 @@ export async function fetchCartSummary(userId: string): Promise<CartSummary> {
         cartId: row.cart_id as string,
         productId: row.product_id as string,
         quantity: Number(row.quantity),
+        selectedOptions: parseSelectedOptions(row.selected_options),
         product: mapProduct(productRaw as Record<string, unknown>),
       };
     })
@@ -130,26 +138,43 @@ export async function fetchCartSummary(userId: string): Promise<CartSummary> {
   };
 }
 
+/** Message clair si la migration 034 (colonne `selected_options`) n'est pas appliquée. */
+function cartWriteError(message: string): Error {
+  if (/selected_options/i.test(message) || /cart_items_cart_id_product_id_key/i.test(message)) {
+    return new Error(
+      'La base de données doit être mise à jour : exécutez la migration 034_product_attributes.sql dans Supabase.'
+    );
+  }
+  return new Error(message);
+}
+
 export async function addToCart(
   userId: string,
   productId: string,
-  quantity = 1
+  quantity = 1,
+  selectedOptions: SelectedOptions = {}
 ): Promise<void> {
   const cartId = await getOrCreateCartId(userId);
+  const wantedKey = selectedOptionsKey(selectedOptions);
 
-  const { data: existing } = await supabase
+  // Même produit ET mêmes options (taille, couleur…) → on additionne les quantités
+  const { data: rows, error: selectError } = await supabase
     .from('cart_items')
-    .select('id, quantity')
+    .select('id, quantity, selected_options')
     .eq('cart_id', cartId)
-    .eq('product_id', productId)
-    .maybeSingle();
+    .eq('product_id', productId);
+  if (selectError) throw cartWriteError(selectError.message);
+
+  const existing = (rows ?? []).find(
+    (r) => selectedOptionsKey(parseSelectedOptions(r.selected_options)) === wantedKey
+  );
 
   if (existing) {
     const { error } = await supabase
       .from('cart_items')
       .update({ quantity: Number(existing.quantity) + quantity })
       .eq('id', existing.id);
-    if (error) throw new Error(error.message);
+    if (error) throw cartWriteError(error.message);
     return;
   }
 
@@ -157,8 +182,9 @@ export async function addToCart(
     cart_id: cartId,
     product_id: productId,
     quantity,
+    selected_options: selectedOptions,
   });
-  if (error) throw new Error(error.message);
+  if (error) throw cartWriteError(error.message);
 }
 
 export async function updateCartItemQuantity(

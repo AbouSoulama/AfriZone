@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { slugify } from '../lib/auth-helpers';
 import type { CatalogProduct, DeliveryMode, ProductCondition } from '../types/catalog';
+import { cleanAttributes, type ProductAttributes } from '../lib/catalog-config';
 import {
   mapProductRow,
   receptionPayload,
@@ -21,6 +22,8 @@ export interface ProductInput {
   description: string;
   category: string;
   subcategory?: string;
+  /** Champs propres à la catégorie (taille, couleur, pointure, marque, modèle, type…). */
+  attributes?: ProductAttributes;
   price: number;
   oldPrice?: number | null;
   stock: number;
@@ -70,6 +73,16 @@ function assertProductInput(input: ProductInput): void {
   ) {
     throw new Error('Étape 2 : choisissez le hub AfriZone de réception.');
   }
+}
+
+/** Message clair si la migration 034 (colonne `attributes`) n'est pas encore appliquée. */
+function productWriteError(message: string): Error {
+  if (/attributes/i.test(message) && /(column|schema cache)/i.test(message)) {
+    return new Error(
+      'La base de données doit être mise à jour : exécutez la migration 034_product_attributes.sql dans Supabase.'
+    );
+  }
+  return new Error(message);
 }
 
 export async function getVendorIdForUser(userId: string): Promise<string | null> {
@@ -136,6 +149,7 @@ function productPayload(input: ProductInput): Record<string, unknown> {
     description: input.description,
     category: input.category,
     subcategory: input.subcategory || null,
+    attributes: cleanAttributes(input.category, input.attributes),
     price: input.price,
     old_price: input.oldPrice ?? null,
     stock: input.stock,
@@ -173,7 +187,7 @@ export async function createProduct(
     .select('*')
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throw productWriteError(error.message);
   return mapProduct(data);
 }
 
@@ -192,7 +206,7 @@ export async function updateProduct(
     .select('*')
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throw productWriteError(error.message);
   return mapProduct(data);
 }
 

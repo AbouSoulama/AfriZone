@@ -1,3 +1,5 @@
+import { CATEGORY_NAMES, type ProductAttributes } from '../lib/catalog-config';
+
 export type DeliveryMode = 'vendor' | 'afrizone';
 export type ProductCondition = 'neuf' | 'occasion';
 
@@ -51,6 +53,8 @@ export interface CatalogProduct {
   description: string | null;
   category: string;
   subcategory: string | null;
+  /** Champs spécifiques à la catégorie : taille, couleur, pointure, marque, modèle, type… */
+  attributes: ProductAttributes;
   price: number;
   oldPrice: number | null;
   currency: string;
@@ -110,16 +114,8 @@ export interface CatalogResult {
   pageSize: number;
 }
 
-export const CATALOG_CATEGORIES = [
-  'Électronique',
-  'Mode',
-  'Maison',
-  'Beauté',
-  'Alimentation',
-  'Sport',
-  'Livres',
-  'Auto',
-] as const;
+/** Catégories de produits (détail des sous-catégories et champs : `lib/catalog-config`). */
+export const CATALOG_CATEGORIES = CATEGORY_NAMES;
 
 /** Pays couverts par AfriZone (sélecteur principal du site) */
 export const CATALOG_COUNTRIES = [

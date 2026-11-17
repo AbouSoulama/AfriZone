@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bike, CheckCircle, Upload, X } from 'lucide-react';
+import { Bike, CheckCircle, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCountry } from '../../context/CountryContext';
 import { IdDocumentScanner } from '../../components/IdDocumentScanner';
+import { IdDocumentCapture } from '../../components/IdDocumentCapture';
 import { validateIdDocument } from '../../lib/auth-helpers';
-import type { IdScanResult } from '../../lib/id-document-scan';
+import { prepareIdDocumentImage, type IdScanResult } from '../../lib/id-document-scan';
 import { CITIES_BY_COUNTRY, capitalForCountry } from '../../types/catalog';
 import { VEHICLE_LABELS, type VehicleType } from '../../services/drivers';
 
@@ -13,7 +14,6 @@ export default function RegisterDriverPage() {
   const { registerDriver } = useAuth();
   const { country, countryName } = useCountry();
   const cities = CITIES_BY_COUNTRY[country];
-  const fileRef = useRef<HTMLInputElement>(null);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -53,18 +53,23 @@ export default function RegisterDriverPage() {
     setZones((prev) => (prev.includes(z) ? prev.filter((x) => x !== z) : [...prev, z]));
   };
 
-  const handleIdFileChange = (file: File | null) => {
+  const handleIdFileChange = async (rawFile: File | null) => {
     if (idDocPreview) URL.revokeObjectURL(idDocPreview);
 
-    if (!file) {
+    if (!rawFile) {
       setIdDocument(null);
       setIdDocPreview(null);
       setIdScanOk(false);
       setIdScanPending(false);
-      if (fileRef.current) fileRef.current.value = '';
       return;
     }
 
+    // Bloque l'envoi pendant la préparation (une photo de téléphone fait plusieurs Mo)
+    setError(null);
+    setIdScanOk(false);
+    setIdScanPending(true);
+
+    const file = await prepareIdDocumentImage(rawFile);
     const validationError = validateIdDocument(file);
     if (validationError) {
       setError(validationError);
@@ -72,13 +77,9 @@ export default function RegisterDriverPage() {
       setIdDocPreview(null);
       setIdScanOk(false);
       setIdScanPending(false);
-      if (fileRef.current) fileRef.current.value = '';
       return;
     }
 
-    setError(null);
-    setIdScanOk(false);
-    setIdScanPending(true);
     setIdDocument(file);
     if (file.type.startsWith('image/')) {
       setIdDocPreview(URL.createObjectURL(file));
@@ -337,19 +338,17 @@ export default function RegisterDriverPage() {
           <div>
             <label className="block text-sm font-bold mb-2">Photo / scan CNI ou passeport *</label>
             {!idDocument ? (
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="w-full px-3 py-6 border-2 border-dashed border-gray-300 rounded-xl text-sm flex flex-col items-center justify-center gap-2 hover:border-[#FF6B00]"
-              >
-                <Upload size={24} className="text-[#FF6B00]" />
-                <span className="font-semibold">
-                  Uploader votre {idDocumentType === 'passport' ? 'passeport' : 'CNI'}
-                </span>
-                <span className="text-xs text-gray-400">
-                  Photo ou PDF — CNI/CNIB ou passeport SN, BF, ML, GN — max 8 Mo
-                </span>
-              </button>
+              idScanPending ? (
+                <p className="rounded-xl border-2 border-orange-200 bg-orange-50/50 p-4 text-center text-sm font-semibold text-gray-700">
+                  Préparation de la photo…
+                </p>
+              ) : (
+                <IdDocumentCapture
+                  kind={idDocumentType}
+                  hasFile={false}
+                  onSelect={handleIdFileChange}
+                />
+              )
             ) : (
               <div
                 className={`border-2 rounded-xl p-3 ${
@@ -381,22 +380,14 @@ export default function RegisterDriverPage() {
                     <X size={18} />
                   </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className="mt-2 text-xs font-semibold text-[#FF6B00] hover:underline"
-                >
-                  Remplacer
-                </button>
+                <IdDocumentCapture
+                  kind={idDocumentType}
+                  hasFile
+                  disabled={idScanPending}
+                  onSelect={handleIdFileChange}
+                />
               </div>
             )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf"
-              className="hidden"
-              onChange={(e) => handleIdFileChange(e.target.files?.[0] ?? null)}
-            />
             {idDocument && (
               <IdDocumentScanner
                 file={idDocument}
@@ -406,8 +397,8 @@ export default function RegisterDriverPage() {
               />
             )}
             <p className="mt-2 text-xs text-gray-500">
-              CNI/CNIB ou passeport officiel (SN, BF, ML, GN). Le type choisi doit correspondre au
-              document scanné.
+              CNI/CNIB ou passeport officiel en cours de validité (SN, BF, ML, GN). Le type choisi
+              doit correspondre au document scanné ; tout autre document est refusé.
             </p>
           </div>
 

@@ -3,6 +3,7 @@ import { Package, Pencil, Store, Trash2 } from 'lucide-react';
 import AdminModal from '../../components/admin/AdminModal';
 import { useAdminCountry } from '../../context/AdminCountryContext';
 import { formatPrice } from '../../services/catalog';
+import { CATEGORY_NAMES } from '../../lib/catalog-config';
 import {
   deleteProductAdmin,
   deleteShopAdmin,
@@ -387,7 +388,13 @@ export default function AdminCatalogPage() {
               onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
               className="w-full border-2 rounded-xl px-3 py-2"
               placeholder="Catégorie"
+              list="admin-category-suggestions"
             />
+            <datalist id="admin-category-suggestions">
+              {CATEGORY_NAMES.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="number"

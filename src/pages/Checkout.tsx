@@ -6,6 +6,7 @@ import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { formatPrice } from '../services/catalog';
+import { selectedOptionsText } from '../lib/catalog-config';
 import { placeOrders, type PaymentMethod } from '../services/orders';
 import { fetchDefaultAddress, fetchMyAddresses, type AddressView } from '../services/account';
 import PaymentMethodPicker from '../components/PaymentMethodPicker';
@@ -497,6 +498,11 @@ export default function CheckoutPage() {
                 <li key={i.id} className="flex justify-between gap-2">
                   <span className="text-gray-600 truncate">
                     {i.quantity}× {i.product.name}
+                    {selectedOptionsText(i.selectedOptions) && (
+                      <span className="block text-[11px] text-gray-400">
+                        {selectedOptionsText(i.selectedOptions)}
+                      </span>
+                    )}
                   </span>
                   <span className="font-semibold shrink-0">
                     {formatPrice(i.product.price * i.quantity)}

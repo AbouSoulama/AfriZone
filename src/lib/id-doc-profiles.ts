@@ -37,8 +37,33 @@ export function normalizeIdOcr(raw: string): string {
     .trim();
 }
 
+/**
+ * En-tête d'une carte d'identité : « Carte nationale d'identité » ou
+ * « Carte d'identité » (formats CEDEAO biométriques). Texte OCR normalisé.
+ */
+export const HEADER_CARTE_IDENTITE = /carte\s+(?:nationale\s+)?d'?\s?identit/i;
+
+/**
+ * Documents qui ressemblent à une pièce d'identité (mêmes champs « Nom / Prénoms /
+ * Né(e) le … », même pays) mais qui n'en sont pas. Ils doivent être refusés.
+ */
+export const OTHER_DOCUMENT_PATTERNS: Array<{ id: string; label: string; pattern: RegExp }> = [
+  { id: 'permis', label: 'un permis de conduire', pattern: /permis\s+de\s+conduire|driving\s+licen[cs]e/i },
+  { id: 'electeur', label: 'une carte d’électeur', pattern: /carte\s+d'?\s?electeur|carte\s+electorale/i },
+  { id: 'consulaire', label: 'une carte consulaire', pattern: /carte\s+consulaire/i },
+  { id: 'scolaire', label: 'une carte scolaire ou étudiante', pattern: /carte\s+(?:scolaire|d'?\s?etudiant|etudiante|universitaire)|student\s+card/i },
+  { id: 'professionnelle', label: 'une carte professionnelle', pattern: /carte\s+(?:professionnelle|de\s+service|de\s+membre)/i },
+  { id: 'grise', label: 'une carte grise', pattern: /carte\s+grise|certificat\s+d'?\s?immatriculation/i },
+  { id: 'sejour', label: 'un titre de séjour', pattern: /titre\s+de\s+sejour|carte\s+de\s+sejour|residence\s+permit/i },
+  { id: 'acte', label: 'un acte d’état civil', pattern: /acte\s+de\s+naissance|extrait\s+d'?\s?acte|extrait\s+de\s+naissance|acte\s+de\s+mariage/i },
+  { id: 'attestation', label: 'une attestation ou un certificat', pattern: /\battestation\b|\bcertificat\b|\bcertifie\b|\bjugement\b/i },
+  { id: 'facture', label: 'une facture ou un reçu', pattern: /\bfacture\b|\brecu\b|\bquittance\b|\breleve\b|\bbulletin\b|\bcontrat\b|\bdiplome\b/i },
+  { id: 'formulaire', label: 'un formulaire', pattern: /\bformulaire\b|\bdemande\s+de\b|\bdeclaration\b/i },
+  { id: 'visa', label: 'un visa', pattern: /\bvisa\b/i },
+];
+
 /** Champs génériques CNI — deux-points optionnels (OCR téléphone souvent sans « : ») */
-const CNI_FIELD_SIGNALS: IdDocSignal[] = [
+export const CNI_FIELD_SIGNALS: IdDocSignal[] = [
   { id: 'field-nom', weight: 4, pattern: /\bnom\s*:?/i },
   { id: 'field-prenoms', weight: 5, pattern: /\bprenoms?\s*:?/i },
   { id: 'field-nee-le', weight: 10, pattern: /\bne\(?e\)?\s*le\s*:?/i },
@@ -55,7 +80,7 @@ const CNI_FIELD_SIGNALS: IdDocSignal[] = [
   { id: 'cedea', weight: 6, pattern: /\bcedea[ou]?\b|\becowas\b/i },
 ];
 
-const PASSPORT_FIELD_SIGNALS: IdDocSignal[] = [
+export const PASSPORT_FIELD_SIGNALS: IdDocSignal[] = [
   { id: 'surname', weight: 6, pattern: /\bsurname\b|\bnom\b/i },
   { id: 'given-names', weight: 6, pattern: /given\s+names?|\bprenoms?\b/i },
   { id: 'nationalite', weight: 8, pattern: /nationalit/i },
@@ -106,7 +131,7 @@ export const PROFILE_CNIB_BF: IdDocProfile = {
     {
       id: 'header-carte-nationale',
       weight: 22,
-      pattern: /carte\s+nationale\s+d'?identite/i,
+      pattern: HEADER_CARTE_IDENTITE,
     },
     { id: 'cnib-token', weight: 18, pattern: /\bcnib\b/i },
     { id: 'burkina-faso', weight: 18, pattern: /burkina\s*faso/i },
@@ -195,7 +220,7 @@ export const PROFILE_CNI_SN: IdDocProfile = {
     {
       id: 'header-carte-nationale',
       weight: 22,
-      pattern: /carte\s+nationale\s+d'?identite/i,
+      pattern: HEADER_CARTE_IDENTITE,
     },
     { id: 'cni', weight: 10, pattern: /\bcni\b/i },
     { id: 'mrz-i-sen', weight: 36, pattern: /i\s*<\s*sen/i },
@@ -252,7 +277,7 @@ export const PROFILE_CNI_ML: IdDocProfile = {
     {
       id: 'header-carte-nationale',
       weight: 22,
-      pattern: /carte\s+nationale\s+d'?identite/i,
+      pattern: HEADER_CARTE_IDENTITE,
     },
     { id: 'cni', weight: 10, pattern: /\bcni\b/i },
     { id: 'nni', weight: 12, pattern: /\bnni\b/i },
@@ -310,7 +335,7 @@ export const PROFILE_CNI_GN: IdDocProfile = {
     {
       id: 'header-carte-nationale',
       weight: 22,
-      pattern: /carte\s+nationale\s+d'?identite/i,
+      pattern: HEADER_CARTE_IDENTITE,
     },
     { id: 'cni', weight: 10, pattern: /\bcni\b/i },
     { id: 'mrz-i-gin', weight: 36, pattern: /i\s*<\s*gin/i },

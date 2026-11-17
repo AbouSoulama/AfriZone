@@ -6,6 +6,7 @@ import {
   type DeliveryJobStatus,
 } from './drivers';
 import type { VendorStatus } from '../types/auth';
+import { parseSelectedOptions, type SelectedOptions } from '../lib/catalog-config';
 
 export interface AdminDriverRow extends DriverProfile {
   ownerName?: string | null;
@@ -221,6 +222,8 @@ export interface AssignableOrderItem {
   weightKg: number | null;
   deliveryMode: string | null;
   mainImage: string | null;
+  /** Taille / couleur / pointure choisies par le client. */
+  selectedOptions: SelectedOptions;
 }
 
 export interface AssignableOrderDetail {
@@ -264,7 +267,7 @@ export async function fetchAssignableOrderDetail(
       ${ASSIGNABLE_ORDER_SELECT},
       user_id,
       order_items (
-        quantity, price, total,
+        quantity, price, total, selected_options,
         products ( name, weight_kg, delivery_mode, main_image )
       )
     `
@@ -301,6 +304,7 @@ export async function fetchAssignableOrderDetail(
         weightKg: product?.weight_kg != null ? Number(product.weight_kg) : null,
         deliveryMode: (product?.delivery_mode as string) ?? null,
         mainImage: (product?.main_image as string) ?? null,
+        selectedOptions: parseSelectedOptions(it.selected_options),
       };
     }
   );

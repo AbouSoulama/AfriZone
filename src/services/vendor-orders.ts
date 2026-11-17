@@ -25,7 +25,7 @@ const ORDER_SELECT = `
   vendors ( shop_name ),
   profiles ( full_name, phone ),
   order_items (
-    id, product_id, quantity, price, total,
+    id, product_id, quantity, price, total, selected_options,
     products ( name, main_image, images )
   )
 `;

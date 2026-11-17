@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useAuth } from './AuthContext';
+import type { SelectedOptions } from '../lib/catalog-config';
 import {
   addToCart,
   fetchCartSummary,
@@ -20,7 +21,11 @@ interface CartContextType {
   itemCount: number;
   isLoading: boolean;
   refreshCart: () => Promise<void>;
-  addItem: (productId: string, quantity?: number) => Promise<void>;
+  addItem: (
+    productId: string,
+    quantity?: number,
+    selectedOptions?: SelectedOptions
+  ) => Promise<void>;
   setQuantity: (itemId: string, quantity: number) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
 }
@@ -60,9 +65,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     refreshCart();
   }, [refreshCart]);
 
-  const addItem = async (productId: string, quantity = 1) => {
+  const addItem = async (
+    productId: string,
+    quantity = 1,
+    selectedOptions: SelectedOptions = {}
+  ) => {
     if (!user) throw new Error('Connectez-vous pour ajouter au panier.');
-    await addToCart(user.id, productId, quantity);
+    await addToCart(user.id, productId, quantity, selectedOptions);
     await refreshCart();
   };
 

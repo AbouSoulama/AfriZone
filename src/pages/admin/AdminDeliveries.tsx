@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Clock, Eye, MapPin, Navigation, Package, Truck, User } from 'lucide-react';
 import AdminModal from '../../components/admin/AdminModal';
+import SelectedOptionsChips from '../../components/products/SelectedOptionsChips';
 import { useAuth } from '../../context/AuthContext';
 import { useAdminCountry } from '../../context/AdminCountryContext';
 import { formatPrice } from '../../services/catalog';
@@ -758,6 +759,7 @@ export default function AdminDeliveriesPage() {
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate">{it.productName}</p>
+                      <SelectedOptionsChips options={it.selectedOptions} className="my-0.5" />
                       <p className="text-xs text-gray-500">
                         ×{it.quantity} · {formatPrice(it.price)}
                         {it.weightKg != null ? ` · ${it.weightKg} kg/u` : ''}

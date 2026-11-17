@@ -24,8 +24,10 @@ import { useAuth } from '../../context/AuthContext';
 import { useCountry } from '../../context/CountryContext';
 import BrandLogo from '../../components/BrandLogo';
 import { IdDocumentScanner } from '../../components/IdDocumentScanner';
+import { IdDocumentCapture } from '../../components/IdDocumentCapture';
 import { validateIdDocument } from '../../lib/auth-helpers';
-import type { IdScanResult } from '../../lib/id-document-scan';
+import { CATEGORY_NAMES } from '../../lib/catalog-config';
+import { prepareIdDocumentImage, type IdScanResult } from '../../lib/id-document-scan';
 import {
   CITIES_BY_COUNTRY,
   capitalForCountry,
@@ -71,17 +73,8 @@ type Step2FormData = z.infer<typeof step2Schema>;
 type Step = 1 | 2 | 3;
 
 const shopCategories = [
-  'Électronique',
-  'Mode & Vêtements',
-  'Maison & Décoration',
-  'Beauté & Cosmétiques',
-  'Alimentation',
-  'Sport & Loisirs',
-  'Livres & Papeterie',
-  'Auto & Moto',
-  'Téléphonie',
-  'Informatique',
-  'Artisanat',
+  'Multi-catégories',
+  ...CATEGORY_NAMES,
   'Autre',
 ];
 
@@ -102,7 +95,6 @@ export default function RegisterVendor() {
   const [idScanPending, setIdScanPending] = useState(false);
   const [shopLogoFile, setShopLogoFile] = useState<File | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -140,10 +132,10 @@ export default function RegisterVendor() {
     setValue2('city', capitalForCountry(siteCountry), { shouldValidate: true });
   }, [siteCountry, setValue2]);
 
-  const handleIdFileChange = (file: File | null) => {
+  const handleIdFileChange = async (rawFile: File | null) => {
     if (idDocPreview) URL.revokeObjectURL(idDocPreview);
 
-    if (!file) {
+    if (!rawFile) {
       setIdDocFile(null);
       setIdDocPreview(null);
       setIdScanOk(false);
@@ -151,6 +143,12 @@ export default function RegisterVendor() {
       return;
     }
 
+    // Bloque la soumission pendant la préparation (une photo de téléphone fait plusieurs Mo)
+    setError(null);
+    setIdScanOk(false);
+    setIdScanPending(true);
+
+    const file = await prepareIdDocumentImage(rawFile);
     const validationError = validateIdDocument(file);
     if (validationError) {
       setError(validationError);
@@ -158,13 +156,9 @@ export default function RegisterVendor() {
       setIdDocPreview(null);
       setIdScanOk(false);
       setIdScanPending(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
-    setError(null);
-    setIdScanOk(false);
-    setIdScanPending(true);
     setIdDocFile(file);
     if (file.type.startsWith('image/')) {
       setIdDocPreview(URL.createObjectURL(file));
@@ -520,20 +514,17 @@ export default function RegisterVendor() {
                   Photo / scan de la pièce * (obligatoire)
                 </label>
                 {!idDocFile ? (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full border-2 border-dashed border-red-200 bg-red-50/40 rounded-xl p-6 text-center hover:border-[#FF6B00] transition-colors"
-                  >
-                    <Upload size={32} className="mx-auto text-[#FF6B00] mb-2" />
-                    <p className="text-sm font-semibold text-gray-700">
-                      Cliquez pour uploader votre{' '}
-                      {watch1('idDocumentType') === 'passport' ? 'passeport' : 'CNI'}
+                  idScanPending ? (
+                    <p className="rounded-xl border-2 border-orange-200 bg-orange-50/50 p-4 text-center text-sm font-semibold text-gray-700">
+                      Préparation de la photo…
                     </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Photo ou PDF — CNI/CNIB ou passeport SN, BF, ML, GN — max 8 Mo
-                    </p>
-                  </button>
+                  ) : (
+                    <IdDocumentCapture
+                      kind={watch1('idDocumentType')}
+                      hasFile={false}
+                      onSelect={handleIdFileChange}
+                    />
+                  )
                 ) : (
                   <div
                     className={`border-2 rounded-xl p-4 ${
@@ -578,22 +569,14 @@ export default function RegisterVendor() {
                         <X size={18} />
                       </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="mt-3 text-xs font-semibold text-[#FF6B00] hover:underline"
-                    >
-                      Remplacer le fichier
-                    </button>
+                    <IdDocumentCapture
+                      kind={watch1('idDocumentType')}
+                      hasFile
+                      disabled={idScanPending}
+                      onSelect={handleIdFileChange}
+                    />
                   </div>
                 )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf"
-                  className="hidden"
-                  onChange={(e) => handleIdFileChange(e.target.files?.[0] || null)}
-                />
                 {idDocFile && (
                   <IdDocumentScanner
                     file={idDocFile}
@@ -604,7 +587,8 @@ export default function RegisterVendor() {
                 )}
                 <p className="mt-2 text-xs text-gray-500">
                   Document officiel uniquement : CNI/CNIB ou passeport (Sénégal, Burkina Faso, Mali,
-                  Guinée). Le scanner compare à des modèles réels — type et pays doivent correspondre.
+                  Guinée). Le scanner vérifie le type, le pays, les champs et la validité de la pièce :
+                  tout autre document (permis, attestation, carte d’électeur…) est refusé.
                 </p>
               </div>
 

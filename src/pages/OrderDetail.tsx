@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Navigation, Star } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import SelectedOptionsChips from '../components/products/SelectedOptionsChips';
 import ReviewForm from '../components/reviews/ReviewForm';
 import { StarRating } from '../components/reviews/StarRating';
 import { useAuth } from '../context/AuthContext';
@@ -185,6 +186,7 @@ export default function OrderDetailPage() {
                           ) : (
                             <p className="font-semibold text-sm truncate">{item.productName}</p>
                           )}
+                          <SelectedOptionsChips options={item.selectedOptions} className="my-1" />
                           <p className="text-xs text-gray-500">
                             {item.quantity} × {formatPrice(item.price)}
                           </p>

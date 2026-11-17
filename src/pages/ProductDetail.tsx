@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -18,6 +18,8 @@ import { useCart } from '../context/CartContext';
 import { fetchProductBySlug, formatPrice } from '../services/catalog';
 import { getAfrizoneShippingFee } from '../services/cart';
 import type { CatalogProduct } from '../types/catalog';
+import { specRows, variantGroups, type SelectedOptions } from '../lib/catalog-config';
+import ProductOptionPicker from '../components/products/ProductOptionPicker';
 
 export default function ProductDetailPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -30,6 +32,38 @@ export default function ProductDetailPage() {
   const [activeImage, setActiveImage] = useState(0);
   const [cartMsg, setCartMsg] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [selected, setSelected] = useState<SelectedOptions>({});
+  const [missing, setMissing] = useState<string[]>([]);
+
+  const groups = useMemo(
+    () => (product ? variantGroups(product.category, product.attributes ?? {}) : []),
+    [product]
+  );
+  const specs = useMemo(
+    () => (product ? specRows(product.category, product.attributes ?? {}) : []),
+    [product]
+  );
+
+  // Un seul choix possible (ex. une seule couleur) : on le sélectionne d'office
+  useEffect(() => {
+    const initial: SelectedOptions = {};
+    for (const g of groups) {
+      if (g.values.length === 1) initial[g.label] = g.values[0];
+    }
+    setSelected(initial);
+    setMissing([]);
+  }, [groups]);
+
+  /** Vérifie que le client a choisi taille / couleur / pointure… avant de commander. */
+  const checkOptions = (): boolean => {
+    const notChosen = groups.filter((g) => !selected[g.label]).map((g) => g.label);
+    setMissing(notChosen);
+    if (notChosen.length > 0) {
+      setCartMsg(`Veuillez choisir : ${notChosen.join(', ')}.`);
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => {
     if (!slug) return;
@@ -208,6 +242,17 @@ export default function ProductDetailPage() {
                 </Link>
               )}
 
+              <ProductOptionPicker
+                groups={groups}
+                selected={selected}
+                missing={missing}
+                onChange={(next) => {
+                  setSelected(next);
+                  setMissing([]);
+                  setCartMsg(null);
+                }}
+              />
+
               <div className="flex flex-wrap gap-3 mb-6">
                 <button
                   disabled={adding || product.stock <= 0}
@@ -216,10 +261,11 @@ export default function ProductDetailPage() {
                       navigate('/auth/login', { state: { from: `/produit/${slug}` } });
                       return;
                     }
+                    if (!checkOptions()) return;
                     setAdding(true);
                     setCartMsg(null);
                     try {
-                      await addItem(product.id, 1);
+                      await addItem(product.id, 1, selected);
                       setCartMsg('Ajouté au panier.');
                       setTimeout(() => setCartMsg(null), 3000);
                     } catch (e) {
@@ -239,10 +285,11 @@ export default function ProductDetailPage() {
                       navigate('/auth/login', { state: { from: `/produit/${slug}` } });
                       return;
                     }
+                    if (!checkOptions()) return;
                     setAdding(true);
                     setCartMsg(null);
                     try {
-                      await addItem(product.id, 1);
+                      await addItem(product.id, 1, selected);
                       navigate('/checkout');
                     } catch (e) {
                       setCartMsg(e instanceof Error ? e.message : 'Erreur panier');
@@ -270,6 +317,22 @@ export default function ProductDetailPage() {
                   {product.description || 'Aucune description fournie.'}
                 </p>
               </div>
+
+              {specs.length > 0 && (
+                <div className="bg-white border border-gray-100 rounded-2xl p-5 mt-4">
+                  <h2 className="font-extrabold text-[#1F2937] mb-3">Caractéristiques</h2>
+                  <dl className="divide-y divide-gray-100 text-sm">
+                    {specs.map((row) => (
+                      <div key={row.key} className="grid grid-cols-3 gap-3 py-2">
+                        <dt className="text-gray-500">{row.label}</dt>
+                        <dd className="col-span-2 font-semibold text-[#1F2937] break-words">
+                          {row.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              )}
             </div>
           </div>
         )}

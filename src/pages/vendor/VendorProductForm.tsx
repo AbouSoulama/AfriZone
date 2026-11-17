@@ -32,6 +32,8 @@ import {
 } from '../../services/vendor';
 import { fetchActiveSubscription } from '../../services/subscriptions';
 import { PLATFORM_COMMISSION_RATE } from '../../lib/commission';
+import { subcategoriesFor, type ProductAttributes } from '../../lib/catalog-config';
+import ProductAttributesFields from '../../components/products/ProductAttributesFields';
 
 const STEPS = [
   { id: 1, label: 'Le produit', hint: 'Fiche catalogue + photo générique' },
@@ -59,6 +61,7 @@ export default function VendorProductFormPage() {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<string>(CATALOG_CATEGORIES[0]);
   const [subcategory, setSubcategory] = useState('');
+  const [attributes, setAttributes] = useState<ProductAttributes>({});
   const [price, setPrice] = useState('');
   const [oldPrice, setOldPrice] = useState('');
   const [stock, setStock] = useState('1');
@@ -129,6 +132,7 @@ export default function VendorProductFormPage() {
           setDescription(product.description || '');
           setCategory(product.category);
           setSubcategory(product.subcategory || '');
+          setAttributes(product.attributes || {});
           setPrice(String(product.price));
           setOldPrice(product.oldPrice != null ? String(product.oldPrice) : '');
           setStock(String(product.stock));
@@ -260,6 +264,7 @@ export default function VendorProductFormPage() {
         description: description.trim(),
         category,
         subcategory: subcategory.trim() || undefined,
+        attributes,
         price: Number(price),
         oldPrice: oldPrice ? Number(oldPrice) : null,
         stock: Number(stock),
@@ -268,10 +273,16 @@ export default function VendorProductFormPage() {
         deliveryMode,
         deliveryZones,
         vendorDeliveryFee: vendorDeliveryFee ? Number(vendorDeliveryFee) : null,
-        tags: tags
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean),
+        // La marque et le modèle sont ajoutés aux mots-clés : la recherche les retrouve
+        tags: [
+          ...new Set(
+            [
+              ...tags.split(',').map((t) => t.trim()),
+              typeof attributes.brand === 'string' ? attributes.brand.trim() : '',
+              typeof attributes.model === 'string' ? attributes.model.trim() : '',
+            ].filter(Boolean)
+          ),
+        ],
         isActive,
         images,
         mainImage: images[0],
@@ -422,10 +433,23 @@ export default function VendorProductFormPage() {
                 <input
                   value={subcategory}
                   onChange={(e) => setSubcategory(e.target.value)}
+                  list="subcategory-suggestions"
+                  placeholder="Choisir ou saisir"
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#FF6B00] focus:outline-none"
                 />
+                <datalist id="subcategory-suggestions">
+                  {subcategoriesFor(category).map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
               </div>
             </div>
+
+            <ProductAttributesFields
+              category={category}
+              values={attributes}
+              onChange={setAttributes}
+            />
 
             <div className="grid sm:grid-cols-3 gap-4">
               <div>
