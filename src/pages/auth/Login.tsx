@@ -42,7 +42,7 @@ export default function Login() {
       const redirect = params.get('redirect') || fromState;
       if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
         navigate(redirect);
-      } else if (result.role === 'admin') navigate('/admin/vendeurs');
+      } else if (result.role === 'admin') navigate('/admin');
       else if (result.role === 'vendeur') navigate('/vendeur');
       else if (result.role === 'livreur') navigate('/livreur');
       else navigate('/');
