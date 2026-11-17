@@ -5,7 +5,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useCountry } from '../../context/CountryContext';
 import { IdDocumentScanner } from '../../components/IdDocumentScanner';
 import { IdDocumentCapture } from '../../components/IdDocumentCapture';
+import ServiceCountryGuard from '../../components/ServiceCountryGuard';
 import { validateIdDocument } from '../../lib/auth-helpers';
+import { assertCanRegisterOrPay } from '../../lib/geo-country';
 import { prepareIdDocumentImage, type IdScanResult } from '../../lib/id-document-scan';
 import { CITIES_BY_COUNTRY, capitalForCountry } from '../../types/catalog';
 import { VEHICLE_LABELS, type VehicleType } from '../../services/drivers';
@@ -124,28 +126,34 @@ export default function RegisterDriverPage() {
       setLoading(false);
       return;
     }
-    const result = await registerDriver({
-      fullName,
-      phone,
-      email: email || undefined,
-      password,
-      confirmPassword,
-      city,
-      country,
-      vehicleType,
-      vehiclePlate,
-      zones,
-      licenseNumber,
-      idDocument,
-      idDocumentType,
-      acceptTerms,
-    });
-    setLoading(false);
-    if (!result.success) {
-      setError(result.error || 'Erreur');
-      return;
+    try {
+      await assertCanRegisterOrPay();
+      const result = await registerDriver({
+        fullName,
+        phone,
+        email: email || undefined,
+        password,
+        confirmPassword,
+        city,
+        country,
+        vehicleType,
+        vehiclePlate,
+        zones,
+        licenseNumber,
+        idDocument,
+        idDocumentType,
+        acceptTerms,
+      });
+      if (!result.success) {
+        setError(result.error || 'Erreur');
+        return;
+      }
+      setDoneCode(result.vendorCode || null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Inscription impossible depuis votre pays.');
+    } finally {
+      setLoading(false);
     }
-    setDoneCode(result.vendorCode || null);
   };
 
   if (doneCode) {
@@ -167,6 +175,7 @@ export default function RegisterDriverPage() {
   }
 
   return (
+    <ServiceCountryGuard action="inscription">
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 py-10 px-4">
       <div className="max-w-xl mx-auto bg-white border border-gray-100 rounded-2xl p-6 md:p-8">
         <div className="flex items-center gap-2 mb-6">
@@ -436,5 +445,6 @@ export default function RegisterDriverPage() {
         </form>
       </div>
     </div>
+    </ServiceCountryGuard>
   );
 }

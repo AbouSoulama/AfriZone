@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, Bike, ShoppingBag, Store } from 'lucide-react';
 import BrandLogo from '../../components/BrandLogo';
+import ServiceCountryGuard from '../../components/ServiceCountryGuard';
 
 const roles = [
   {
@@ -37,6 +38,7 @@ const roles = [
 
 export default function RegisterChoicePage() {
   return (
+    <ServiceCountryGuard action="inscription">
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 flex items-center justify-center p-4">
       <div className="w-full max-w-3xl">
         <div className="text-center mb-8">
@@ -98,5 +100,6 @@ export default function RegisterChoicePage() {
         </p>
       </div>
     </div>
+    </ServiceCountryGuard>
   );
 }

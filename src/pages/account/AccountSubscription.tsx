@@ -3,6 +3,7 @@ import { Check, Crown, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCountry } from '../../context/CountryContext';
 import PaymentMethodPicker from '../../components/PaymentMethodPicker';
+import ServiceCountryGuard from '../../components/ServiceCountryGuard';
 import SubscriptionTermPicker from '../../components/SubscriptionTermPicker';
 import { paymentMethodLabel, paymentMethodsForCountry } from '../../data/country-payments';
 import {
@@ -127,6 +128,7 @@ export default function AccountSubscriptionPage() {
       : 0;
 
   return (
+    <ServiceCountryGuard action="paiement">
     <div className="space-y-6">
       <div className="bg-white border border-gray-100 rounded-2xl p-6">
         <div className="flex items-center gap-2 mb-2">
@@ -265,5 +267,6 @@ export default function AccountSubscriptionPage() {
         })}
       </div>
     </div>
+    </ServiceCountryGuard>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Check, Loader2, Megaphone, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCountry } from '../../context/CountryContext';
+import ServiceCountryGuard from '../../components/ServiceCountryGuard';
 import PaymentMethodPicker from '../../components/PaymentMethodPicker';
 import SubscriptionTermPicker from '../../components/SubscriptionTermPicker';
 import { paymentMethodLabel, paymentMethodsForCountry } from '../../data/country-payments';
@@ -177,6 +178,7 @@ export default function VendorSubscriptionPage() {
   }
 
   return (
+    <ServiceCountryGuard action="paiement">
     <div className="space-y-6">
       <div className="bg-white border border-gray-100 rounded-2xl p-6">
         <div className="flex items-center gap-2 mb-2">
@@ -410,5 +412,6 @@ export default function VendorSubscriptionPage() {
         </div>
       )}
     </div>
+    </ServiceCountryGuard>
   );
 }

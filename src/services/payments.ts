@@ -7,7 +7,11 @@
  *   (après branchement des APIs opérateurs).
  */
 import { paymentMethodLabel } from '../data/country-payments';
-
+import {
+  assertCanRegisterOrPay,
+  isServiceCountry,
+  serviceUnavailableMessage,
+} from '../lib/geo-country';
 import { supabase } from '../lib/supabase';
 
 export type PaymentChannel = 'mobile_money' | 'wave';
@@ -136,6 +140,12 @@ export async function startCheckout(input: StartCheckoutInput): Promise<StartChe
   }
   if (!input.provider) {
     throw new Error('Choisissez un moyen de paiement.');
+  }
+
+  // Restriction pays : GPS / IP doivent confirmer SN, BF, ML ou GN.
+  await assertCanRegisterOrPay();
+  if (input.country && !isServiceCountry(input.country)) {
+    throw new Error(serviceUnavailableMessage(input.country));
   }
 
   if (paymentMode() !== 'live') {

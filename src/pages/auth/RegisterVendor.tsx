@@ -25,8 +25,10 @@ import { useCountry } from '../../context/CountryContext';
 import BrandLogo from '../../components/BrandLogo';
 import { IdDocumentScanner } from '../../components/IdDocumentScanner';
 import { IdDocumentCapture } from '../../components/IdDocumentCapture';
+import ServiceCountryGuard from '../../components/ServiceCountryGuard';
 import { validateIdDocument } from '../../lib/auth-helpers';
 import { CATEGORY_NAMES } from '../../lib/catalog-config';
+import { assertCanRegisterOrPay } from '../../lib/geo-country';
 import { prepareIdDocumentImage, type IdScanResult } from '../../lib/id-document-scan';
 import {
   CITIES_BY_COUNTRY,
@@ -251,32 +253,38 @@ export default function RegisterVendor() {
     setIsLoading(true);
     setError(null);
 
-    const result = await registerVendor({
-      fullName: step1Data.fullName,
-      phone: step1Data.phone,
-      email: step1Data.email,
-      password: step1Data.password,
-      confirmPassword: step1Data.confirmPassword,
-      idDocument: idDocFile,
-      idDocumentType: step1Data.idDocumentType,
-      shopName: data.shopName,
-      country: siteCountry,
-      city: data.city,
-      address: data.address,
-      shopCategory: data.shopCategory,
-      shopDescription: data.shopDescription,
-      shopLogo: shopLogoFile,
-      commerceRegister: data.commerceRegister,
-      acceptTerms: step1Data.acceptTerms,
-    });
+    try {
+      await assertCanRegisterOrPay();
+      const result = await registerVendor({
+        fullName: step1Data.fullName,
+        phone: step1Data.phone,
+        email: step1Data.email,
+        password: step1Data.password,
+        confirmPassword: step1Data.confirmPassword,
+        idDocument: idDocFile,
+        idDocumentType: step1Data.idDocumentType,
+        shopName: data.shopName,
+        country: siteCountry,
+        city: data.city,
+        address: data.address,
+        shopCategory: data.shopCategory,
+        shopDescription: data.shopDescription,
+        shopLogo: shopLogoFile,
+        commerceRegister: data.commerceRegister,
+        acceptTerms: step1Data.acceptTerms,
+      });
 
-    if (result.success) {
-      setVendorCode(result.vendorCode || null);
-      setStep(3);
-    } else {
-      setError(result.error || 'Une erreur est survenue');
+      if (result.success) {
+        setVendorCode(result.vendorCode || null);
+        setStep(3);
+      } else {
+        setError(result.error || 'Une erreur est survenue');
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Inscription impossible depuis votre pays.');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   if (step === 3) {
@@ -318,6 +326,7 @@ export default function RegisterVendor() {
   }
 
   return (
+    <ServiceCountryGuard action="inscription">
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-6">
@@ -869,5 +878,6 @@ export default function RegisterVendor() {
         </div>
       </div>
     </div>
+    </ServiceCountryGuard>
   );
 }

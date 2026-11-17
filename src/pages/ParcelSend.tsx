@@ -17,8 +17,10 @@ import {
   type ParcelType,
 } from '../services/parcels';
 import PaymentMethodPicker from '../components/PaymentMethodPicker';
+import ServiceCountryGuard from '../components/ServiceCountryGuard';
 import { paymentMethodById, paymentMethodLabel, paymentMethodsForCountry } from '../data/country-payments';
 import { isPaymentTestMode, startCheckout, TEST_PAYMENT_HINT } from '../services/payments';
+import { isServiceCountry } from '../lib/geo-country';
 import { countryCodeFromLabelOrCity, countryLabel } from '../types/catalog';
 
 type GpsTarget = 'pickup' | 'delivery';
@@ -265,6 +267,11 @@ export default function ParcelSendPage() {
     setError(null);
     try {
       if (!paymentMethod) throw new Error('Choisissez un moyen de paiement.');
+      if (!isServiceCountry(siteCountry)) {
+        throw new Error(
+          'Paiement réservé au Sénégal, Burkina Faso, Mali et Guinée.'
+        );
+      }
       const paidWith = payPhone.trim() || senderPhone.trim();
       if (paidWith.replace(/\D/g, '').length < 8) {
         throw new Error('Indiquez le numéro Mobile Money utilisé pour payer.');
@@ -390,6 +397,7 @@ export default function ParcelSendPage() {
   );
 
   return (
+    <ServiceCountryGuard action="paiement">
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-7xl mx-auto px-4 py-8">
@@ -687,5 +695,6 @@ export default function ParcelSendPage() {
       </main>
       <Footer />
     </div>
+    </ServiceCountryGuard>
   );
 }

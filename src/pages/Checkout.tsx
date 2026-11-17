@@ -10,6 +10,7 @@ import { selectedOptionsText } from '../lib/catalog-config';
 import { placeOrders, type PaymentMethod } from '../services/orders';
 import { fetchDefaultAddress, fetchMyAddresses, type AddressView } from '../services/account';
 import PaymentMethodPicker from '../components/PaymentMethodPicker';
+import ServiceCountryGuard from '../components/ServiceCountryGuard';
 import { paymentMethodById, paymentMethodLabel, paymentMethodsForCountry } from '../data/country-payments';
 import { isPaymentTestMode, startCheckout, TEST_PAYMENT_HINT } from '../services/payments';
 import { previewClubShippingDiscount } from '../services/subscriptions';
@@ -21,6 +22,7 @@ import {
   type CatalogCountryCode,
 } from '../types/catalog';
 import { useCountry } from '../context/CountryContext';
+import { isServiceCountry } from '../lib/geo-country';
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -242,6 +244,11 @@ export default function CheckoutPage() {
     setError(null);
     try {
       if (!paymentMethod) throw new Error('Choisissez un moyen de paiement.');
+      if (!isServiceCountry(shipCountry) || !isServiceCountry(siteCountry)) {
+        throw new Error(
+          'Paiement réservé au Sénégal, Burkina Faso, Mali et Guinée.'
+        );
+      }
       const paidWith = payPhone.trim() || phone.trim();
       if (paidWith.replace(/\D/g, '').length < 8) {
         throw new Error('Indiquez le numéro Mobile Money utilisé pour payer.');
@@ -282,6 +289,7 @@ export default function CheckoutPage() {
   };
 
   return (
+    <ServiceCountryGuard action="paiement">
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-7xl mx-auto px-4 py-8">
@@ -572,5 +580,6 @@ export default function CheckoutPage() {
       </main>
       <Footer />
     </div>
+    </ServiceCountryGuard>
   );
 }

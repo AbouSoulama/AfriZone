@@ -19,6 +19,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useCountry } from '../../context/CountryContext';
 import BrandLogo from '../../components/BrandLogo';
+import ServiceCountryGuard from '../../components/ServiceCountryGuard';
+import { assertCanRegisterOrPay } from '../../lib/geo-country';
 import {
   CITIES_BY_COUNTRY,
   capitalForCountry,
@@ -98,29 +100,34 @@ export default function RegisterClient() {
     setIsLoading(true);
     setError(null);
 
-    const result = await registerUser({
-      fullName: data.fullName,
-      phone: data.phone,
-      email: data.email || undefined,
-      password: data.password,
-      confirmPassword: data.confirmPassword,
-      city: data.city,
-      acceptTerms: data.acceptTerms,
-    });
+    try {
+      await assertCanRegisterOrPay();
+      const result = await registerUser({
+        fullName: data.fullName,
+        phone: data.phone,
+        email: data.email || undefined,
+        password: data.password,
+        confirmPassword: data.confirmPassword,
+        city: data.city,
+        acceptTerms: data.acceptTerms,
+      });
 
-    if (result.success) {
-      if (result.needsEmailConfirmation) {
-        setSuccessMessage(
-          'Compte créé. Vérifiez votre email pour confirmer votre inscription, puis connectez-vous.'
-        );
+      if (result.success) {
+        if (result.needsEmailConfirmation) {
+          setSuccessMessage(
+            'Compte créé. Vérifiez votre email pour confirmer votre inscription, puis connectez-vous.'
+          );
+        } else {
+          navigate('/');
+        }
       } else {
-        navigate('/');
+        setError(result.error || 'Une erreur est survenue');
       }
-    } else {
-      setError(result.error || 'Une erreur est survenue');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Inscription impossible depuis votre pays.');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   if (successMessage) {
@@ -146,6 +153,7 @@ export default function RegisterClient() {
   }
 
   return (
+    <ServiceCountryGuard action="inscription">
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
@@ -375,5 +383,6 @@ export default function RegisterClient() {
         </div>
       </div>
     </div>
+    </ServiceCountryGuard>
   );
 }

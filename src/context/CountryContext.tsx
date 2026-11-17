@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -13,6 +14,12 @@ import {
   countryLabel,
   type CatalogCountryCode,
 } from '../types/catalog';
+import {
+  clearGeoCountryCache,
+  detectUserCountry,
+  isServiceCountry,
+  type GeoCountryResult,
+} from '../lib/geo-country';
 
 const STORAGE_KEY = 'afrizone_selected_country';
 const CHOSEN_KEY = 'afrizone_country_chosen';
@@ -25,6 +32,13 @@ interface CountryContextType {
   hasChosenCountry: boolean;
   setCountry: (code: CatalogCountryCode) => void;
   countries: typeof CATALOG_COUNTRIES;
+  /** Résultat de la détection GPS / IP. */
+  geo: GeoCountryResult | null;
+  isDetectingGeo: boolean;
+  /** true si la position confirme un des 4 pays (inscription + paiement OK). */
+  canRegisterOrPay: boolean;
+  /** Relance la détection (GPS prioritaire). */
+  refreshGeo: (force?: boolean) => Promise<GeoCountryResult>;
 }
 
 const CountryContext = createContext<CountryContextType | undefined>(undefined);
@@ -36,7 +50,6 @@ function isCountryCode(value: string): value is CatalogCountryCode {
 function readChosenFlag(): boolean {
   try {
     if (localStorage.getItem(CHOSEN_KEY) === '1') return true;
-    // Ancienne session avec pays déjà stocké = choix déjà fait
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored && isCountryCode(stored)) return true;
     if (localStorage.getItem(LEGACY_CITY_KEY)) return true;
@@ -85,6 +98,9 @@ export function CountryProvider({ children }: { children: ReactNode }) {
     () => readStoredCountry() || 'SN'
   );
   const [hasChosenCountry, setHasChosenCountry] = useState(() => readChosenFlag());
+  const [geo, setGeo] = useState<GeoCountryResult | null>(null);
+  const [isDetectingGeo, setIsDetectingGeo] = useState(true);
+  const detectingRef = useRef(false);
 
   const setCountry = useCallback((next: CatalogCountryCode) => {
     if (!isCountryCode(next)) return;
@@ -94,6 +110,56 @@ export function CountryProvider({ children }: { children: ReactNode }) {
     setHasChosenCountry(true);
   }, []);
 
+  const applyGeoResult = useCallback(
+    (result: GeoCountryResult, opts?: { autoSelect?: boolean }) => {
+      setGeo(result);
+      // Si on est dans un pays AfriZone : sélection automatique (emplacement détecté).
+      if (opts?.autoSelect !== false && result.availability === 'allowed' && result.country) {
+        setCountry(result.country);
+      }
+    },
+    [setCountry]
+  );
+
+  const refreshGeo = useCallback(
+    async (force = false) => {
+      if (detectingRef.current && !force) {
+        return detectUserCountry({ force: false });
+      }
+      detectingRef.current = true;
+      setIsDetectingGeo(true);
+      try {
+        if (force) clearGeoCountryCache();
+        const result = await detectUserCountry({ force, preferGps: true });
+        applyGeoResult(result, { autoSelect: true });
+        return result;
+      } finally {
+        detectingRef.current = false;
+        setIsDetectingGeo(false);
+      }
+    },
+    [applyGeoResult]
+  );
+
+  // Détection automatique au démarrage
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setIsDetectingGeo(true);
+      try {
+        const result = await detectUserCountry({ preferGps: true });
+        if (cancelled) return;
+        applyGeoResult(result, { autoSelect: true });
+      } finally {
+        if (!cancelled) setIsDetectingGeo(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [applyGeoResult]);
+
+  // Profil utilisateur / stockage local (si pas encore de pays choisi et geo inconnue)
   useEffect(() => {
     if (isLoading) return;
 
@@ -107,6 +173,11 @@ export function CountryProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (geo?.availability === 'allowed' && geo.country) {
+      setCountry(geo.country);
+      return;
+    }
+
     if (isAuthenticated && user && !hasChosenCountry) {
       const fromProfile =
         countryCodeFromLabelOrCity(user.vendor?.country) ||
@@ -114,11 +185,13 @@ export function CountryProvider({ children }: { children: ReactNode }) {
         countryCodeFromLabelOrCity(user.city) ||
         countryCodeFromLabelOrCity(user.vendor?.city) ||
         countryCodeFromLabelOrCity(user.driver?.city);
-      if (fromProfile) {
+      if (fromProfile && isServiceCountry(fromProfile)) {
         setCountry(fromProfile);
       }
     }
-  }, [isLoading, isAuthenticated, user, hasChosenCountry, setCountry]);
+  }, [isLoading, isAuthenticated, user, hasChosenCountry, setCountry, geo]);
+
+  const canRegisterOrPay = geo?.availability === 'allowed' && !!geo.country;
 
   return (
     <CountryContext.Provider
@@ -128,6 +201,10 @@ export function CountryProvider({ children }: { children: ReactNode }) {
         hasChosenCountry,
         setCountry,
         countries: CATALOG_COUNTRIES,
+        geo,
+        isDetectingGeo,
+        canRegisterOrPay,
+        refreshGeo,
       }}
     >
       {children}

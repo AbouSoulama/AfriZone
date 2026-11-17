@@ -4,13 +4,13 @@ import {
   variantGroups,
   type SelectedOptions,
 } from '../lib/catalog-config';
+import { isServiceCountry, serviceUnavailableMessage } from '../lib/geo-country';
 import {
   clearCart,
   estimateItemShipping,
   fetchCartSummary,
   type CartItemRow,
 } from './cart';
-
 export type PaymentMethod =
   | 'mobile_money'
   | 'orange_money'
@@ -132,6 +132,9 @@ export async function placeOrders(
   }
   if (!input.paymentPhone.trim()) {
     throw new Error('Indiquez le numéro Mobile Money pour payer.');
+  }
+  if (!isServiceCountry(input.shippingCountry)) {
+    throw new Error(serviceUnavailableMessage(input.shippingCountry));
   }
 
   const cart = await fetchCartSummary(userId);
