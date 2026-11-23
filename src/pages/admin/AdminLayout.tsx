@@ -14,6 +14,7 @@ import {
   UserSquare2,
   Wallet,
   Crown,
+  Mail,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import BrandLogo from '../../components/BrandLogo';
@@ -34,6 +35,7 @@ const NAV = [
   { to: '/admin/livraisons', label: 'Courses', icon: Truck },
   { to: '/admin/retraits', label: 'Retraits', icon: Wallet },
   { to: '/admin/abonnements', label: 'Abonnements', icon: Crown },
+  { to: '/admin/newsletter', label: 'Newsletter', icon: Mail },
   { to: '/admin/colis', label: 'Colis', icon: Package },
 ];
 

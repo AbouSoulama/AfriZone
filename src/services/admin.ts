@@ -163,12 +163,6 @@ export async function deleteVendorAdmin(vendorId: string): Promise<void> {
 export async function getVendorDocumentUrl(path: string): Promise<string | null> {
   if (!path) return null;
   if (path.startsWith('http')) return path;
-  const { data, error } = await supabase.storage
-    .from('vendor-documents')
-    .createSignedUrl(path, 60 * 30);
-  if (error) {
-    console.error(error);
-    return null;
-  }
-  return data.signedUrl;
+  const { getPrivateMediaUrl } = await import('./media');
+  return getPrivateMediaUrl('vendor-documents', path, 60 * 30);
 }

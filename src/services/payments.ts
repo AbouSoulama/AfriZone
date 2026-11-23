@@ -173,20 +173,16 @@ export async function checkCheckout(transactionId: string): Promise<{
     return { status: 'paid', providerStatus: 'approved' };
   }
 
-  const base = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  if (!base) throw new Error('Configuration Supabase manquante.');
-
+  const { apiBase } = await import('../lib/api-base');
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-  if (!token || !anon) throw new Error('Connectez-vous pour payer.');
+  if (!token) throw new Error('Connectez-vous pour payer.');
 
-  const res = await fetch(`${base}/functions/v1/mobile-money`, {
+  const res = await fetch(`${apiBase()}/payments/mobile-money`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
-      apikey: anon,
     },
     body: JSON.stringify({ action: 'check', transactionId }),
   });

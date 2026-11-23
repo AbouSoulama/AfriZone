@@ -129,19 +129,15 @@ async function uploadPrivateFile(
     throw new Error('Session incohérente avec le compte en cours de création.');
   }
 
-  const rawExt = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const ext = rawExt || 'bin';
-  const path = `${sessionUserId}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const contentType = guessFileContentType(file);
-
-  const { error } = await supabase.storage.from(bucket).upload(path, file, {
-    // Chemin unique : pas besoin d’UPDATE (souvent absent des policies Storage)
-    upsert: false,
-    contentType,
-    cacheControl: '3600',
+  void guessFileContentType(file);
+  const { uploadMediaFile } = await import('../services/media');
+  const uploaded = await uploadMediaFile({
+    bucket: bucket as 'vendor-documents' | 'avatars' | 'product-images' | 'delivery-proofs',
+    file,
+    folder,
+    userId: sessionUserId,
   });
-  if (error) throw error;
-  return path;
+  return uploaded.path;
 }
 
 async function uploadPublicFile(
@@ -150,9 +146,15 @@ async function uploadPublicFile(
   file: File,
   folder: string
 ): Promise<string> {
-  const path = await uploadPrivateFile(bucket, userId, file, folder);
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-  return data.publicUrl;
+  const { uploadMediaFile } = await import('../services/media');
+  const uploaded = await uploadMediaFile({
+    bucket: bucket as 'avatars' | 'product-images',
+    file,
+    folder,
+    userId,
+  });
+  if (!uploaded.url) throw new Error('URL publique manquante après upload.');
+  return uploaded.url;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

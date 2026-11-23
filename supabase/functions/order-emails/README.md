@@ -1,20 +1,25 @@
 # Edge Function `order-emails`
 
-Emails transactionnels AfriZone via Resend :
+Emails transactionnels AfriZone avec **templates brandés** (logo) et envoi via :
 
-- **Commandes** : client + vendeur + admin (achat payé, changements de statut)
-- **Plateforme** : colis, validation boutique/livreur/produit, courses, retraits, abonnements
+1. **SMTP Hostinger** (`contact@afrizones.com`) à travers le relais VPS `MAIL_RELAY_URL`
+2. **Resend** en secours si le relais échoue et qu’une clé est définie
 
 ## Déploiement
 
 ```bash
 supabase functions deploy order-emails --no-verify-jwt
-supabase secrets set RESEND_API_KEY=re_xxx EMAIL_HOOK_SECRET=un-secret-long APP_URL=https://votre-domaine
-# recommandé en prod (domaine vérifié chez Resend) :
-# supabase secrets set EMAIL_FROM="AfriZone <noreply@votredomaine.com>"
+
+supabase secrets set ^
+  EMAIL_HOOK_SECRET=un-secret-long ^
+  APP_URL=https://afrizones.com ^
+  EMAIL_FROM="AfriZone <contact@afrizones.com>" ^
+  MAIL_RELAY_URL=https://afrizones.com/api/email/send
 ```
 
-## Config SQL (après migrations `014` + `030`)
+Le même `EMAIL_HOOK_SECRET` doit être dans `/var/www/afrizone-api/.env` sur le VPS.
+
+## Config SQL
 
 ```sql
 insert into public.app_settings (key, value) values
@@ -24,28 +29,19 @@ on conflict (key) do update
   set value = excluded.value, updated_at = now();
 ```
 
-`email_hook_secret` doit être **identique** au secret Edge Function.
-
-## Mode simulate
-
-Sans `RESEND_API_KEY`, les emails sont journalisés (`email_logs`, mode `simulate`) sans envoi réel.
+Sans ces `app_settings`, les triggers SQL n’appellent pas la fonction.
 
 ## Flux
 
+DB trigger → `dispatch_*` → Edge `order-emails` → VPS `/api/email/send` → SMTP Hostinger
+
 | Événement | Destinataires |
 |---|---|
-| Commande payée | Client, vendeur, admin |
-| Statut commande | Client, vendeur, admin |
-| Colis créé / statut | Client (+ admin à la création) |
+| Commande payée / statut | Client, vendeur, admin |
+| Colis créé / statut | Client (+ admin) |
 | Boutique / livreur en attente | Admin |
 | Boutique / livreur validé / refusé | Vendeur / livreur |
 | Produit à valider / revue | Admin / vendeur |
 | Course / lot assigné | Livreur |
 | Retrait demandé / traité | Admin / livreur |
 | Abonnement activé | Client ou vendeur |
-
-Appels SQL : `dispatch_order_email` (commandes) ou `dispatch_platform_email` (générique) → `pg_net` → cette fonction → Resend.
-
-## Auth
-
-Seuls `x-email-hook-secret` (= `EMAIL_HOOK_SECRET`) ou la service role key sont acceptés.

@@ -460,12 +460,6 @@ export async function fetchAllDeliveriesAdmin(): Promise<AdminDeliveryView[]> {
 export async function getDriverDocumentUrl(path: string): Promise<string | null> {
   if (!path) return null;
   if (path.startsWith('http')) return path;
-  const { data, error } = await supabase.storage
-    .from('vendor-documents')
-    .createSignedUrl(path, 60 * 10);
-  if (error) {
-    console.error(error);
-    return null;
-  }
-  return data.signedUrl;
+  const { getPrivateMediaUrl } = await import('./media');
+  return getPrivateMediaUrl('vendor-documents', path, 60 * 10);
 }

@@ -250,14 +250,14 @@ export async function uploadProductImage(
   file: File,
   kind: 'generic' | 'real' = 'generic'
 ): Promise<string> {
-  const ext = file.name.split('.').pop() || 'jpg';
   const folder = kind === 'real' ? 'products/reelles' : 'products';
-  const path = `${userId}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const { error } = await supabase.storage.from('product-images').upload(path, file, {
-    upsert: false,
-    contentType: file.type,
+  const { uploadMediaFile } = await import('./media');
+  const uploaded = await uploadMediaFile({
+    bucket: 'product-images',
+    file,
+    folder,
+    userId,
   });
-  if (error) throw new Error(error.message);
-  const { data } = supabase.storage.from('product-images').getPublicUrl(path);
-  return data.publicUrl;
+  if (!uploaded.url) throw new Error('URL image manquante après upload.');
+  return uploaded.url;
 }

@@ -52,6 +52,9 @@ import AdminCatalogPage from './pages/admin/AdminCatalog';
 import AdminProductReviewPage from './pages/admin/AdminProductReview';
 import AdminWithdrawalsPage from './pages/admin/AdminWithdrawals';
 import AdminSubscriptionsPage from './pages/admin/AdminSubscriptions';
+import AdminNewsletterPage from './pages/admin/AdminNewsletter';
+import NewsletterConfirmPage from './pages/NewsletterConfirm';
+import NewsletterUnsubscribePage from './pages/NewsletterUnsubscribe';
 import DeliveryTrackPage from './pages/DeliveryTrack';
 import PaymentReturnPage from './pages/PaymentReturn';
 import SubscriptionsPage from './pages/Subscriptions';
@@ -162,6 +165,8 @@ export default function App() {
               <Route path="/confidentialite" element={<PrivacyPage />} />
               <Route path="/faq" element={<FaqPage />} />
               <Route path="/contact" element={<ContactPage />} />
+              <Route path="/newsletter/confirmer" element={<NewsletterConfirmPage />} />
+              <Route path="/newsletter/desabonnement" element={<NewsletterUnsubscribePage />} />
 
               <Route path="/auth/login" element={<LoginPage />} />
               <Route path="/auth/register" element={<RegisterChoicePage />} />
@@ -222,6 +227,7 @@ export default function App() {
                 <Route path="livraisons" element={<AdminDeliveriesPage />} />
                 <Route path="retraits" element={<AdminWithdrawalsPage />} />
                 <Route path="abonnements" element={<AdminSubscriptionsPage />} />
+                <Route path="newsletter" element={<AdminNewsletterPage />} />
                 <Route path="colis" element={<AdminParcelsPage />} />
               </Route>
             </Routes>

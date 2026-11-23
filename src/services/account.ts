@@ -89,16 +89,15 @@ export async function uploadAvatar(userId: string, file: File): Promise<string> 
     throw new Error('Avatar trop volumineux (max 2 Mo).');
   }
 
-  const ext = file.name.split('.').pop() || 'jpg';
-  const path = `${userId}/avatar/${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from('avatars').upload(path, file, {
-    upsert: true,
-    contentType: file.type,
+  const { uploadMediaFile } = await import('./media');
+  const uploaded = await uploadMediaFile({
+    bucket: 'avatars',
+    file,
+    folder: 'avatar',
+    userId,
   });
-  if (error) throw new Error(error.message);
-
-  const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-  const avatarUrl = data.publicUrl;
+  if (!uploaded.url) throw new Error('URL avatar manquante après upload.');
+  const avatarUrl = uploaded.url;
 
   const { error: updateError } = await supabase
     .from('profiles')

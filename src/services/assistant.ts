@@ -45,20 +45,15 @@ async function askRemote(
   history: AssistantMessage[],
   ctx: AssistantContext
 ): Promise<string> {
-  const base = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-  if (!base || !anon) throw new Error('Configuration Supabase manquante.');
-
+  const { apiBase } = await import('../lib/api-base');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
 
   try {
-    const res = await fetch(`${base}/functions/v1/ai-assistant`, {
+    const res = await fetch(`${apiBase()}/assistant`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${anon}`,
-        apikey: anon,
       },
       signal: controller.signal,
       body: JSON.stringify({

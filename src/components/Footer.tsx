@@ -70,8 +70,12 @@ export default function Footer() {
     setMsg(null);
     setErr(null);
     try {
-      await subscribeNewsletter(email, country);
-      setMsg('Merci ! Vous êtes inscrit(e) à la newsletter AfriZone.');
+      const res = await subscribeNewsletter(email, country);
+      setMsg(
+        res.status === 'already_confirmed'
+          ? 'Cette adresse est déjà inscrite à la newsletter.'
+          : 'Presque terminé ! Vérifiez votre boîte mail et confirmez votre inscription.'
+      );
       setEmail('');
     } catch (ex) {
       setErr(ex instanceof Error ? ex.message : 'Inscription impossible.');
